@@ -1,0 +1,32 @@
+// ========== Imports: ==========
+import { Role } from '../../common/enums/role.enum';
+import { UserDocument } from '../schemas/user.schema';
+
+/**
+ * Public-facing User shape.
+ * NEVER includes passwordHash, failedLoginAttempts, or lockedUntil.
+ */
+
+export class UserResponseDto {
+    id!: string;
+    name!: string;
+    surname!: string;
+    email!: string;
+    role!: Role;
+    studyCenter!: string;
+    isActive!: boolean;
+    createdAt!: Date;
+
+    static fromDocument(user: UserDocument): UserResponseDto {
+        return {
+            id: user._id.toString(),
+            name: user.name,
+            surname: user.surname,
+            email: user.email,
+            role: user.role,
+            studyCenter: user.studyCenter,
+            isActive: user.isActive,
+            createdAt: user.createdAt!,
+        };
+    }
+}
