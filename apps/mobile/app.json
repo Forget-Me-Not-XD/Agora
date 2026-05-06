@@ -1,0 +1,27 @@
+{
+    "expo": {
+      "name": "Akademia-Funksiebestuur",
+      "slug": "akademia-mobile",
+      "version": "0.1.0",
+      "orientation": "portrait",
+      "userInterfaceStyle": "light",
+      "splash": {
+        "resizeMode": "contain",
+        "backgroundColor": "#1E3A5F"
+      },
+      "assetBundlePatterns": ["**/*"],
+      "ios": {
+        "supportsTablet": true,
+        "bundleIdentifier": "ac.akademia.app"
+      },
+      "android": {
+        "package": "ac.akademia.app",
+        "adaptiveIcon": {
+          "backgroundColor": "#1E3A5F"
+        }
+      },
+      "extra": {
+        "apiUrl": "http://10.0.2.2:3000/api/v1"
+      }
+    }
+  }
