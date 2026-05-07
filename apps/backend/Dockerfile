@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install build deps
 COPY package*.json ./
-RUN npm ci
+RUN if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
 
 # Build application
 COPY tsconfig.json nest-cli.json ./
@@ -17,7 +17,7 @@ WORKDIR /app
 
 # Install runtime deps only
 COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev --no-audit --no-fund; fi && npm cache clean --force
 
 # Copy built app from builder
 COPY --from=builder /app/dist ./dist
@@ -30,4 +30,4 @@ USER nestjs
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/config/main.js"]

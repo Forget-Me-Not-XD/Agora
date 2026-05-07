@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import { UserResponseDto } from './dto/user-response.dto';
-import { Role } from '../common/enums/role.enum';
+import { Role } from '../common/enums/role.enums';
 
 @Controller('users')
 export class UsersController {

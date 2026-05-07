@@ -16,7 +16,7 @@ export const EXCHANGES = {
     AUDIT: 'audit.events',
 } as const;
 
-export const ROUTING_KEYES = {
+export const ROUTING_KEYS = {
     // Auth Domain:
     USER_REGISTERED: 'auth.user.registered',
     USER_LOGIN: 'auth.user.login',
@@ -33,7 +33,7 @@ export const ROUTING_KEYES = {
     AUDIT_LOG_CREATE: 'audit.log.create',
 } as const;
 
-export QUEUES = {
+export const QUEUES = {
     NOTIFICATION_EMAIL: 'queue.notification.email',
     NOTIFICATION_SMS: 'queue.notification.sms',
     NOTIFICATION_PUSH: 'queue.notification.push',
@@ -54,7 +54,7 @@ export QUEUES = {
     email: string;
     ipAddress: string;
     userAgent: string;
-    timestampL: string;
+    timestamp: string;
  }
 
  export interface UserFailedLoginEvent {
@@ -69,7 +69,7 @@ export QUEUES = {
     action: string;
     resource: string;
     resourceId?: string;
-    apAddress: string;
+    ipAddress: string;
     userAgent: string;
     oldValue?: Record<string, unknown>;
     newValue?: Record<string, unknown>;

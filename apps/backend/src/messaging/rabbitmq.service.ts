@@ -6,13 +6,6 @@ import { ChannelWrapper } from 'amqp-connection-manager';
 import { Channel, ConsumeMessage } from 'amqplib';
 import { EXCHANGES, QUEUES, ROUTING_KEYS } from './events.constants';
 
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as amqp from 'amqp-connection-manager';
-import { ChannelWrapper } from 'amqp-connection-manager';
-import { Channel, ConsumeMessage } from 'amqplib';
-import { EXCHANGES, QUEUES, ROUTING_KEYS } from './events.constants';
-
 /**
  * Centralised RabbitMQ connection + publisher/consumer service.
  *

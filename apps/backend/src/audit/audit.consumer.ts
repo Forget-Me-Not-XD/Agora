@@ -46,7 +46,7 @@ export class AuditConsumer implements OnModuleInit {
         timestamp:  new Date((payload.timestamp as string) ?? Date.now()),
     });
 
-    this.logger.debug(`📝 Audit logged: ${routingKey}`);
+    this.logger.debug(`Audit logged: ${routingKey}`);
 }
 
     private deriveResource(routingKey: string): string {

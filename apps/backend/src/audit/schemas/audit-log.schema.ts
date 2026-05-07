@@ -12,7 +12,7 @@ export type AuditLogDocument = HydratedDocument<AuditLog>;
  */
 @Schema({ timestamps: true, collection: 'audit_logs' })
 export class AuditLog {
-    @Prop({ index: true, default: null })
+    @Prop({ type: String, index: true, default: null })
     userId!: string | null;
 
     @Prop({ required: true, index: true })
@@ -21,7 +21,7 @@ export class AuditLog {
     @Prop({ required: true })
     resource!: string;
 
-    @Prop({ default: null })
+    @Prop({ type: String, default: null })
     resourceId!: string | null;
 
     @Prop({ default: '' })

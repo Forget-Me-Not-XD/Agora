@@ -1,6 +1,6 @@
 // ========== Imports: ==========
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, MaxLength, Matches } from 'class-validator';
-import { Role } from '../../common/enums/role.enum';
+import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, MaxLength, Matches, ValidateIf } from 'class-validator';
+import { Role } from '../../common/enums/role.enums';
 
 export class RegisterDto {
     @IsString()
@@ -35,6 +35,7 @@ export class RegisterDto {
     @IsEnum(Role)
     role!: Role;
 
+    @ValidateIf((dto: RegisterDto) => dto.role !== Role.GAS)
     @IsString()
     @IsNotEmpty()
     @MaxLength(80)
