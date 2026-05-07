@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule, {
-        logger: ['error', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], 
+        logger: ['error', 'warn', 'log'],
     });
 
     const config = app.get(ConfigService);
@@ -25,9 +25,9 @@ async function bootstrap() {
     app.useGlobalPipes(
         new ValidationPipe({
             whitelist: true,
-            forbidNonWhiteListed: true,
+            forbidNonWhitelisted: true,
             transform: true,
-            transformOptions: (enableImplicitConversion: true),
+            transformOptions: { enableImplicitConversion: true },
         }),
     );
 

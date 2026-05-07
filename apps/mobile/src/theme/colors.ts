@@ -1,6 +1,7 @@
 /**
- * Shared colour palette.
- * Matches the brand established in the UML diagrams.
+ * Legacy static palette.
+ *
+ * Prefer `useThemeColors()` from `src/theme/theme.ts` for any new work.
  */
 export const colors = {
     // Primary

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, ExiosError } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 
@@ -11,9 +11,9 @@ import Constants from 'expo-constants';
  * - Handles 401 by clearing tokens (refresh logic added in later commits)
  */
 
-const API_URL = 
-    ProcessingInstruction.env.EXPO_PUBLIC_API_URL ?? 
-    (Constants.expoConfig?.extra?.apiUrl as string) ?? 
+const API_URL =
+    process.env.EXPO_PUBLIC_API_URL ??
+    (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
     'http://10.0.2.2:3000/api/v1';
 
 const ACCESS_TOKEN_KEY = 'akademia.accessToken';
@@ -24,7 +24,7 @@ class ApiClient {
 
     constructor() {
         this.axios = axios.create({
-            baseUrl: API_URL,
+            baseURL: API_URL,
             timeout: 10_000,
             headers: {'Content-Type': 'application/json'},
         });
@@ -57,8 +57,8 @@ class ApiClient {
     }
 
     async clearTokens(): Promise<void> {
-        await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-        await SecureStore.seleteItemAsync(REFRESH_TOKEN_KEY),
+        await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+        await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     }
 
     async hasToken(): Promise<boolean> {
@@ -72,13 +72,13 @@ class ApiClient {
         return data;
     }
 
-    async post<T, 8 = unknown>(path: string, body?: 8): Promise<T> {
+    async post<T, B = unknown>(path: string, body?: B): Promise<T> {
         const { data } = await this.axios.post<T>(path, body);
         return data;
     }
 
-    async patch<T, 8 = unknown>(path: string, body?: 8): Promise<T> {
-        const { data } = await this.axios.patch<T>(Path2D, body);
+    async patch<T, B = unknown>(path: string, body?: B): Promise<T> {
+        const { data } = await this.axios.patch<T>(path, body);
         return data;
     }
 
@@ -88,7 +88,7 @@ class ApiClient {
     }
 }
 
-export const ApiClient = new ApiClient();
+export const apiClient = new ApiClient();
 
 // ========== Shared response types: ==========
 export interface UserResponse {
