@@ -44,8 +44,51 @@ open http://localhost:15672  # user: akademia, pass: see .env
 
 ## Mobile
 
+The mobile app is built with **React Native + Expo 50** and talks to the same NestJS backend. The backend must be running before you launch the app.
+
+### Prerequisites
+
+| Tool | Minimum version | Notes |
+|---|---|---|
+| Node.js | 18+ | |
+| Expo Go app | latest | Install on your phone from the App Store / Play Store |
+| Android Studio | Hedgehog+ | Required only for Android emulator |
+| Xcode | 15+ | Required only for iOS simulator — macOS only |
+
+### Install
+
 ```bash
 cd apps/mobile
 npm install
-npx expo start
 ```
+
+### Configure the API URL
+
+The app reads `EXPO_PUBLIC_API_URL` from the root `.env` to reach the backend. The default value works for an Android emulator. Change it if you're using a different target:
+
+| Target | `EXPO_PUBLIC_API_URL` |
+|---|---|
+| Android emulator | `http://10.0.2.2:3000` ← default |
+| iOS simulator | `http://localhost:3000` |
+| Physical device | `http://<your-machine-LAN-ip>:3000` |
+
+To find your machine's LAN IP on Windows: `ipconfig` → look for IPv4 Address under your active adapter.
+
+### Run
+
+```bash
+# Start the Expo dev server — scan the QR code with Expo Go on your phone
+npm start
+
+# Open directly in a running Android emulator
+npm run android
+
+# Open directly in the iOS simulator (macOS only)
+npm run ios
+
+# Open in browser for a quick web preview
+# First time only: npx expo install react-native-web react-dom @expo/metro-runtime
+npm run web
+```
+
+> **Tip:** press `a` in the Expo terminal to open the Android emulator, `i` for iOS simulator, or `w` for web — no need to restart the server.

@@ -1,10 +1,9 @@
 {
-    "extends": "expo/tsconfig.base",
-    "compilerOptions": {
-      "strict": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "jsx": "react-native"
-    },
-    "include": ["App.tsx", "src/**/*"]
-  }
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext"
+  },
+  "include": ["App.tsx", "src/**/*"]
+}
