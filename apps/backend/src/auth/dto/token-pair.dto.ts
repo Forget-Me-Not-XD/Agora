@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { UserResponseDto } from "src/users/dto/user-response.dto";
+import { UserResponseDto } from "../../users/dto/user-response.dto";
 
 /**
  * Standard authentication response shape.

@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  Modal,
-  Pressable,
+  Modal, Pressable, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -35,9 +34,11 @@ export function RegisterScreen({ navigation }: Props) {
   const { register, isLoading, error, clearError } = useAuthStore();
   const colors = useThemeColors();
   const styles = makeStyles(colors);
+
   const [uiRole, setUiRole] = useState<UiRole>('STUDENT');
   const [centerOpen, setCenterOpen] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const [form, setForm] = useState<RegisterPayload>({
     name: '',
     surname: '',
@@ -50,6 +51,30 @@ export function RegisterScreen({ navigation }: Props) {
   const update = <K extends keyof RegisterPayload>(key: K, value: RegisterPayload[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // --- Password validation rules (recomputed only when password changes) ---
+  const passwordRules = useMemo(() => ({
+    minLength: form.password.length >= 8,
+    hasUpper:  /[A-Z]/.test(form.password),
+    hasLower:  /[a-z]/.test(form.password),
+    hasNumber: /[0-9]/.test(form.password),
+  }), [form.password]);
+
+  // Show the checklist while focused or when the user has started typing
+  const showValidation = passwordFocused || form.password.length > 0;
+
+  // Animated value: 0 = hidden, 1 = fully visible
+  const validationAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(validationAnim, {
+      toValue: showValidation ? 1 : 0,
+      useNativeDriver: false, // maxHeight is a layout prop — native driver can't handle it
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [showValidation]);
+
+  // --- Role mapping ---
   const payloadRole: RegisterPayload['role'] = useMemo(() => {
     if (uiRole === 'STUDENT') return 'GAS';
     return uiRole;
@@ -67,7 +92,7 @@ export function RegisterScreen({ navigation }: Props) {
         studyCenter: showStudyCenter ? form.studyCenter : '',
       });
     } catch {
-      // Error stored in zustand
+      // Error is stored in the Zustand store and displayed below
     }
   };
 
@@ -85,9 +110,15 @@ export function RegisterScreen({ navigation }: Props) {
             <Text style={styles.heading}>Skep 'n rekening</Text>
             <Text style={styles.helper}>Voltooi al die velde om voort te gaan</Text>
 
+            {/* Error box — splits comma-joined backend messages into individual rows */}
             {error && (
               <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
+                {error.split(', ').map((msg, i) => (
+                  <View key={i} style={styles.errorRow}>
+                    <Feather name="alert-circle" size={13} color={colors.red} />
+                    <Text style={styles.errorText}>{msg}</Text>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -131,6 +162,8 @@ export function RegisterScreen({ navigation }: Props) {
                 onChangeText={(v) => update('password', v)}
                 secureTextEntry={!passwordVisible}
                 editable={!isLoading}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
               />
               <TouchableOpacity
                 style={styles.eyeBtn}
@@ -146,6 +179,37 @@ export function RegisterScreen({ navigation }: Props) {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Animated live password validation checklist */}
+            <Animated.View style={[
+              styles.validationBox,
+              {
+                opacity: validationAnim,
+                maxHeight: validationAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 130],
+                }),
+                overflow: 'hidden',
+              },
+            ]}>
+              {([
+                { ok: passwordRules.minLength, label: 'Minstens 8 karakters' },
+                { ok: passwordRules.hasUpper,  label: 'Minstens 1 hoofletter' },
+                { ok: passwordRules.hasLower,  label: 'Minstens 1 kleinletter' },
+                { ok: passwordRules.hasNumber, label: 'Minstens 1 syfer' },
+              ] as const).map((rule) => (
+                <View key={rule.label} style={styles.ruleRow}>
+                  <Feather
+                    name={rule.ok ? 'check-circle' : 'circle'}
+                    size={14}
+                    color={rule.ok ? '#16A34A' : colors.textSubtle}
+                  />
+                  <Text style={[styles.ruleText, rule.ok && styles.ruleTextOk]}>
+                    {rule.label}
+                  </Text>
+                </View>
+              ))}
+            </Animated.View>
 
             {showStudyCenter && (
               <TouchableOpacity
@@ -170,7 +234,6 @@ export function RegisterScreen({ navigation }: Props) {
                     style={[styles.roleCard, active && styles.roleCardActive]}
                     onPress={() => {
                       setUiRole(r.value);
-                      // If GAS, clear study center & close dropdown
                       if (r.value === 'GAS') {
                         update('studyCenter', '');
                         setCenterOpen(false);
@@ -247,6 +310,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     formWrap: { width: '100%', maxWidth: 520, alignSelf: 'center' },
     heading: { fontSize: 28, fontWeight: '700', color: colors.text, marginTop: 16 },
     helper: { fontSize: 14, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
+
     errorBox: {
       backgroundColor: colors.surface,
       borderRadius: 10,
@@ -255,7 +319,14 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderColor: colors.red,
       marginBottom: 16,
     },
+    errorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
     errorText: { color: colors.red, fontSize: 13, fontWeight: '600' },
+
     row: { flexDirection: 'row', gap: 8 },
     halfInput: { flex: 1 },
     input: {
@@ -274,11 +345,38 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       position: 'absolute',
       right: 10,
       top: 0,
-      bottom: 12, // account for input marginBottom
+      bottom: 12,
       width: 34,
       alignItems: 'center',
       justifyContent: 'center',
     },
+
+    validationBox: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginTop: -4,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    ruleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 4,
+    },
+    ruleText: {
+      fontSize: 12,
+      color: colors.textSubtle,
+      fontWeight: '500',
+    },
+    ruleTextOk: {
+      color: '#16A34A',
+      fontWeight: '700',
+    },
+
     dropdown: {
       flexDirection: 'row',
       alignItems: 'center',
