@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Font import ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,800;0,9..40,900;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── CSS variables – mirrors apps/mobile/src/theme/theme.ts (light) ─────── */
+:root {
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --color-primary:      #14B8C7;
+  --color-primary-text: #07131A;
+  --color-navy:         #1E3A5F;
+
+  --color-bg:      #F5F9FC;
+  --color-surface: #FFFFFF;
+  --color-border:  #D8E1EA;
+
+  --color-text:        #0F172A;
+  --color-text-subtle: #64748B;
+
+  --color-red:   #DC2626;
+  --color-green: #16A34A;
+  --color-blue:  #1E40AF;
+
+  --color-role-admin:  #5C77A5;
+  --color-role-dosent: #8AB4F8;
+  --color-role-gas:    #F28B82;
+}
+
+.dark {
+  --color-primary:      #14B8C7;
+  --color-primary-text: #07131A;
+
+  --color-bg:      #0B1A24;
+  --color-surface: #0F2533;
+  --color-border:  #1D3B4C;
+
+  --color-text:        #E6EEF6;
+  --color-text-subtle: #8AA4B8;
+
+  --color-red:   #F87171;
+  --color-green: #4ADE80;
+  --color-blue:  #60A5FA;
+}
+
+html {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  .bg-app        { background: var(--color-bg); }
+  .bg-surface    { background: var(--color-surface); }
+  .border-app    { border-color: var(--color-border); }
+  .text-app      { color: var(--color-text); }
+  .text-subtle   { color: var(--color-text-subtle); }
+  .text-primary  { color: var(--color-primary); }
+  .text-red      { color: var(--color-red); }
+  .text-green    { color: var(--color-green); }
+  .bg-primary    { background: var(--color-primary); }
+  .border-red    { border-color: var(--color-red); }
+}

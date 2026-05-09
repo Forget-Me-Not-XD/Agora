@@ -1,0 +1,37 @@
+// ── Mirrors apps/mobile/src/api/client.ts & stores/auth.store.ts ───────────
+// Keep in sync with the backend DTO definitions.
+
+export interface UserResponse {
+  id: string;
+  name: string;
+  surname: string;
+  email: string;
+  role: 'ADMIN' | 'DOSENT' | 'GAS';
+  studyCenter: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  tokenType: 'Bearer';
+  user: UserResponse;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  name: string;
+  surname: string;
+  email: string;
+  password: string;
+  role: 'ADMIN' | 'DOSENT' | 'GAS';
+  studyCenter: string;
+}
+
+export type UserRole = UserResponse['role'];
