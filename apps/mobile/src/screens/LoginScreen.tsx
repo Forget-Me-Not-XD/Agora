@@ -123,14 +123,16 @@ export function LoginScreen({ navigation }: Props) {
 
             <Text style={styles.footer}>POPIA-beskermde aanmeld • SSL</Text>
 
+            <Text style={styles.registerHelper}>
+              Geen rekening? Kontak jou administrateur
+            </Text>
+
             <TouchableOpacity
-              style={styles.registerRow}
+              style={[styles.registerBtn, isLoading && styles.buttonDisabled]}
               onPress={() => navigation.navigate('Register')}
               disabled={isLoading}
             >
-              <Text style={styles.registerText}>
-                Nog nie geregistreer nie? <Text style={styles.registerBold}>Skep 'n rekening</Text>
-              </Text>
+              <Text style={styles.registerBtnText}>Registreer</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -225,8 +227,21 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
 
     footer: { marginTop: 14, textAlign: 'center', color: colors.textSubtle, fontSize: 11 },
 
-    registerRow: { marginTop: 18, alignItems: 'center' },
-    registerText: { color: colors.textSubtle, fontSize: 13 },
-    registerBold: { color: colors.primary, fontWeight: '800' },
+    registerHelper: {
+      marginTop: 20,
+      textAlign: 'center',
+      color: colors.textSubtle,
+      fontSize: 13,
+    },
+    registerBtn: {
+      marginTop: 10,
+      borderRadius: 12,
+      paddingVertical: 13,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    registerBtnText: { color: colors.textSubtle, fontSize: 14, fontWeight: '700' },
   });
 }
