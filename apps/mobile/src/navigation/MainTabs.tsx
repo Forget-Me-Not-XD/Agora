@@ -1,6 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
+import { useAuthStore } from '../stores/auth.store';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
@@ -19,6 +20,8 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabs() {
   const colors = useThemeColors();
+  const user = useAuthStore((s) => s.user);
+  const canViewAi = user?.role === 'ADMIN' || user?.role === 'DOSENT';
 
   return (
     <Tab.Navigator
@@ -71,14 +74,16 @@ export function MainTabs() {
           tabBarIcon: ({ color, size }) => <Feather name="check-square" color={color} size={size ?? 20} />,
         }}
       />
-      <Tab.Screen
-        name="Ai"
-        component={AiScreen}
-        options={{
-          title: 'KI',
-          tabBarIcon: ({ color, size }) => <Feather name="cpu" color={color} size={size ?? 20} />,
-        }}
-      />
+      {canViewAi && (
+        <Tab.Screen
+          name="Ai"
+          component={AiScreen}
+          options={{
+            title: 'KI',
+            tabBarIcon: ({ color, size }) => <Feather name="cpu" color={color} size={size ?? 20} />,
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
 }
