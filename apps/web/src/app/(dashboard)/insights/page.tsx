@@ -169,7 +169,7 @@ export default function InsightsPage() {
                         const event = MOCK_EVENTS.find((e) => e.id === insight.eventId);
                         if (!event) return null;
 
-                        const isPast = insight.totalAttended > 0 || insight.totalRegistered > 0 && event.status === 'past';
+                        const isPast = insight.totalAttended > 0 || (insight.totalRegistered > 0 && event.status === 'past');
                         const colors = attendanceColors(insight.attendanceRate);
 
                         return (
