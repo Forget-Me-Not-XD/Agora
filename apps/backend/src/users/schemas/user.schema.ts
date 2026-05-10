@@ -28,7 +28,7 @@ export class User {
     @Prop({ required: true, enum: Role, default: Role.GAS, index: true })
     role!: Role;
 
-    @Prop({ required: true, trim: true })
+    @Prop({ required: false, trim: true, default: '' })
     studyCenter!: string;
 
     @Prop({ default: true })

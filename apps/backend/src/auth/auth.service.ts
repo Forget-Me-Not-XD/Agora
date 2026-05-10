@@ -50,7 +50,7 @@ import {
         email: dto.email.toLowerCase(),
         passwordHash,
         role: dto.role,
-        studyCenter: dto.studyCenter,
+        studyCenter: dto.studyCenter ?? '',
       });
   
       // Async event — does not block the response
