@@ -39,9 +39,6 @@
 
   --color-jwt-bg:  #0A1929;
 
-  --color-biometric-border: #2A4860;
-  --color-biometric-bg:     #0D1F2D;
-
   --color-red:   #F87171;
   --color-green: #4ADE80;
   --color-blue:  #60A5FA;
@@ -53,16 +50,6 @@ html {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
-}
-
-/* Biometriese Aanmelding knoppie */
-.biometric-btn {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-}
-.dark .biometric-btn {
-  background: var(--color-biometric-bg, #0D1F2D);
-  border-color: var(--color-biometric-border, #2A4860);
 }
 
 /* Utilities */

@@ -1,11 +1,25 @@
+/** @type {import('next').NextConfig} */
+
+const securityHeaders = [
+  { key: 'X-Frame-Options',           value: 'DENY' },
+  { key: 'X-Content-Type-Options',    value: 'nosniff' },
+  { key: 'Referrer-Policy',           value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy',        value: 'camera=(), microphone=(), geolocation=()' },
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+];
+
 const nextConfig = {
+  poweredByHeader: false,
+  compress: true,
+
+  async headers() {
+    return [{ source: '/(.*)', headers: securityHeaders }];
+  },
+
   async rewrites() {
     return [
       {
-        // Proxy all /api/v1/* calls to the NestJS backend.
-        // This way the browser never calls the backend directly —
-        // the cookie is sent same-origin and CORS is not an issue.
-        source: '/api/v1/:path*',
+        source:      '/api/v1/:path*',
         destination: `${process.env.API_URL ?? 'http://localhost:3000'}/api/v1/:path*`,
       },
     ];

@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useMemo, useState, useEffect, useRef, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Circle, ChevronDown, X } from 'lucide-react';
 import { registerAction } from '@/lib/actions/auth.actions';
 import type { RegisterPayload } from '@/lib/types';
@@ -24,16 +24,18 @@ const STUDY_CENTERS = [
 ] as const;
 
 export default function RegisterPage() {
-  const [uiRole, setUiRole]                 = useState<UiRole | null>(null);
-  const [roleOpen, setRoleOpen]             = useState(false);
-  const [centerOpen, setCenterOpen]         = useState(false);
-  const [passwordVisible, setPasswordVisible]   = useState(false);
-  const [confirmVisible, setConfirmVisible]     = useState(false);
-  const [passwordFocused, setPasswordFocused]   = useState(false);
-  const [confirmPassword, setConfirmPassword]   = useState('');
-  const [popiaAccepted, setPopiaAccepted]       = useState(false);
-  const [error, setError]                       = useState<string | null>(null);
-  const [isPending, setIsPending]               = useState(false);
+  const router = useRouter();
+
+  const [uiRole, setUiRole]                   = useState<UiRole | null>(null);
+  const [roleOpen, setRoleOpen]               = useState(false);
+  const [centerOpen, setCenterOpen]           = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible]   = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [popiaAccepted, setPopiaAccepted]     = useState(false);
+  const [error, setError]                     = useState<string | null>(null);
+  const [isPending, startTransition]          = useTransition();
   const roleRef   = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
 
@@ -44,7 +46,6 @@ export default function RegisterPage() {
   const update = <K extends keyof RegisterPayload>(key: K, value: RegisterPayload[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // Wagwoord validation reels
   const passwordRules = useMemo(() => ({
     minLength: form.password.length >= 8,
     hasUpper:  /[A-Z]/.test(form.password),
@@ -55,12 +56,9 @@ export default function RegisterPage() {
   const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
   const showValidation       = passwordFocused || form.password.length > 0;
   const passwordsMatch       = form.password === confirmPassword;
+  const showStudyCenter      = uiRole !== null && uiRole !== 'GAS' && uiRole !== 'STUDENT';
+  const selectedRole         = ROLE_OPTIONS.find((r) => r.value === uiRole) ?? null;
 
-  const showStudyCenter = uiRole !== null && uiRole !== 'GAS' && uiRole !== 'STUDENT';
-
-  const selectedRole = ROLE_OPTIONS.find((r) => r.value === uiRole) ?? null;
-
-  // Form volledigheid
   const formComplete =
     form.name.trim()    !== '' &&
     form.surname.trim() !== '' &&
@@ -73,7 +71,6 @@ export default function RegisterPage() {
     (!showStudyCenter || form.studyCenter !== '') &&
     popiaAccepted;
 
-  // maak dropdowns toe wanneer daar buite die dropdown gedruk word
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (roleRef.current   && !roleRef.current.contains(e.target as Node))   setRoleOpen(false);
@@ -83,7 +80,7 @@ export default function RegisterPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formComplete) return;
     if (!passwordsMatch) {
@@ -91,17 +88,15 @@ export default function RegisterPage() {
       return;
     }
     setError(null);
-    setIsPending(true);
-    try {
+    startTransition(async () => {
       const err = await registerAction({
         ...form,
-        role: (uiRole === 'STUDENT' ? 'GAS' : uiRole) as RegisterPayload['role'],
+        email:       form.email.trim(),
+        role:        (uiRole === 'STUDENT' ? 'GAS' : uiRole) as RegisterPayload['role'],
         studyCenter: showStudyCenter ? form.studyCenter : '',
       });
       if (err) setError(err);
-    } finally {
-      setIsPending(false);
-    }
+    });
   };
 
   const inputStyle = {
@@ -118,16 +113,13 @@ export default function RegisterPage() {
   return (
     <div className="w-full max-w-sm">
 
-      {/* Brand */}
-      <div className="flex flex-col items-center mb-8">
-        <h1
-          className="text-[28px] font-black tracking-tight"
-          style={{ color: 'var(--color-primary)' }}
-        >
-          Akademia
+      {/* Page title */}
+      <div className="flex flex-col items-center mb-6">
+        <h1 className="text-[28px] font-black tracking-tight" style={{ color: 'var(--color-text)' }}>
+          Nuwe Registrasie
         </h1>
         <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
-          Funksiebestuurstelsel
+          Slegs deur &apos;n administrateur voltooi
         </p>
       </div>
 
@@ -139,16 +131,6 @@ export default function RegisterPage() {
           borderColor: 'var(--color-border)',
         }}
       >
-
-        {/* Nuwe Registrasie heading */}
-        <div className="flex flex-col items-center mb-5">
-          <p className="text-[18px] font-black" style={{ color: 'var(--color-text)' }}>
-            Nuwe Registrasie
-          </p>
-        </div>
-
-        {/* Skeidings lyn */}
-        <div className="h-px w-full mb-5" style={{ background: 'var(--color-border)' }} />
 
         {/* Error banner */}
         {error && (
@@ -333,7 +315,6 @@ export default function RegisterPage() {
                 {confirmVisible ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
-            {/* Inline wagwoord mismatch fout */}
             {confirmPassword.length > 0 && !passwordsMatch && (
               <p className="flex items-center gap-1.5 mt-1.5 text-[12px] font-semibold" style={{ color: 'var(--color-red)' }}>
                 <AlertCircle size={12} className="shrink-0" />
@@ -365,8 +346,8 @@ export default function RegisterPage() {
                 <ChevronDown
                   size={16}
                   style={{
-                    color:     'var(--color-text-subtle)',
-                    transform: roleOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    color:      'var(--color-text-subtle)',
+                    transform:  roleOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                     transition: 'transform 0.2s',
                   }}
                 />
@@ -417,7 +398,7 @@ export default function RegisterPage() {
             </div>
           </label>
 
-          {/* Studiesentrum dropdown (slegs as rol != GAS) */}
+          {/* Studiesentrum dropdown */}
           {showStudyCenter && (
             <label className="block mb-3">
               <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
@@ -493,11 +474,11 @@ export default function RegisterPage() {
           <div
             className="rounded-[12px] border px-4 py-3 mb-5"
             style={{
-              background:  'var(--color-bg)',
-              borderColor: 'var(--color-border)',
+              background:  'var(--color-jwt-bg)',
+              borderColor: 'var(--color-primary)',
             }}
           >
-            <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-text)' }}>
+            <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-primary)' }}>
               POPIA Kennisgewing
             </p>
             <p className="text-[11px] mb-3" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
@@ -536,36 +517,39 @@ export default function RegisterPage() {
             </label>
           </div>
 
-          {/* Registreer knoppie */}
-          <button
-            type="submit"
-            disabled={isPending || !formComplete}
-            className="w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
-            style={{
-              background: 'var(--color-primary)',
-              color:      'var(--color-primary-text)',
-            }}
-          >
-            {isPending ? (
-              <><Loader2 size={16} className="animate-spin" /> Besig…</>
-            ) : (
-              'Registreer'
-            )}
-          </button>
+          {/* Kanselleer + Registreer */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => router.push('/login')}
+              disabled={isPending}
+              className="flex-1 rounded-[12px] py-[14px] text-[15px] font-black tracking-wide border transition disabled:opacity-60"
+              style={{
+                background:  'var(--color-surface)',
+                borderColor: 'var(--color-border)',
+                color:       'var(--color-text)',
+              }}
+            >
+              Kanselleer
+            </button>
+            <button
+              type="submit"
+              disabled={isPending || !formComplete}
+              className="flex-1 rounded-[12px] py-[14px] text-[15px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
+              style={{
+                background: 'var(--color-primary)',
+                color:      'var(--color-primary-text)',
+              }}
+            >
+              {isPending ? (
+                <><Loader2 size={16} className="animate-spin" /> Besig…</>
+              ) : (
+                'Registreer'
+              )}
+            </button>
+          </div>
         </form>
       </div>
-
-      {/* Terug na aanmeld */}
-      <p className="mt-5 text-center text-[13px]" style={{ color: 'var(--color-text-subtle)' }}>
-        Het reeds &apos;n rekening?{' '}
-        <Link
-          href="/login"
-          className="font-black"
-          style={{ color: 'var(--color-primary)' }}
-        >
-          Meld aan
-        </Link>
-      </p>
     </div>
   );
 }

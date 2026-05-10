@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
 import { Eye, EyeOff, Loader2, Clock, RefreshCw, Lock, Shield } from 'lucide-react';
 import { loginAction } from '@/lib/actions/auth.actions';
 
@@ -9,8 +8,10 @@ export default function LoginPage() {
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [rememberMe, setRememberMe]           = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [isPending, startTransition]          = useTransition();
+  const [forgotInfo, setForgotInfo]           = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,10 +21,10 @@ export default function LoginPage() {
     startTransition(async () => {
       const err = await loginAction({
         email: email.trim(),
-        password
+        password,
+        rememberMe,
       });
       if (err) setError(err);
-      // As suksesvol, loginAction roep redirect('/dashboard') server-side
     });
   };
 
@@ -67,19 +68,36 @@ export default function LoginPage() {
           <p className="text-[18px] font-black" style={{ color: 'var(--color-text)' }}>
             Aanmeld
           </p>
+          <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-subtle)' }}>
+            Funksiebestuurstelsel
+          </p>
         </div>
 
         {/* Skeidings lyn */}
         <div className="h-px w-full mb-5" style={{ background: 'var(--color-border)' }} />
+
+        {/* Wagwoord vergeet info */}
+        {forgotInfo && (
+          <div
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+            style={{
+              background:  'var(--color-bg)',
+              borderColor: 'var(--color-primary)',
+              color:       'var(--color-text)',
+            }}
+          >
+            Kontak jou administrateur om jou wagwoord te herstel.
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (
           <div
             className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
             style={{
-              background: 'var(--color-bg)',
+              background:  'var(--color-bg)',
               borderColor: 'var(--color-red)',
-              color: 'var(--color-red)',
+              color:       'var(--color-red)',
             }}
           >
             {error}
@@ -148,15 +166,25 @@ export default function LoginPage() {
             </div>
           </label>
 
-          {/* Wagwoord vergeet? */}
+          {/* Onthou my + Wagwoord vergeet? */}
           <div className="flex items-center justify-between mt-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isPending}
+                className="w-4 h-4 rounded accent-[var(--color-primary)] disabled:opacity-60"
+              />
+              <span className="text-[13px] font-semibold" style={{ color: 'var(--color-text-subtle)' }}>
+                Onthou my
+              </span>
+            </label>
             <button
               type="button"
               className="text-[13px] font-bold transition"
               style={{ color: 'var(--color-primary)' }}
-              onClick={() =>
-                alert('Kontak jou administrateur om jou wagwoord te herstel.')
-              }
+              onClick={() => setForgotInfo(true)}
             >
               Wagwoord vergeet?
             </button>
@@ -166,7 +194,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isPending || !email || !password}
-            className="mt-5 w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="mt-5 mb-5 w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
             style={{
               background: 'var(--color-primary)',
               color: 'var(--color-primary-text)',
@@ -180,30 +208,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* of + skeidings lyne */}
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-          <span className="text-[13px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
-            of
-          </span>
-          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-        </div>
-
-        {/* Biometriese Aanmelding */}
-        <button
-          type="button"
-          className="w-full rounded-[12px] py-[13px] text-[14px] font-bold border transition biometric-btn"
-          style={{
-            color: 'var(--color-text-subtle)',
-          }}
-          onClick={() => alert('Funksie huidiglik in ontwikkeling.')}
-        >
-          Biometriese Aanmelding
-        </button>
-
         {/* JWT Sessiebeskerming blok */}
         <div
-          className="mt-4 rounded-[12px] border px-4 py-3"
+          className="rounded-[12px] border px-4 py-3"
           style={{
             background: 'var(--color-jwt-bg)',
             borderColor: 'var(--color-border)',
@@ -231,17 +238,25 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Register link */}
+      {/* Geen rekening */}
       <p className="mt-5 text-center text-[13px]" style={{ color: 'var(--color-text-subtle)' }}>
-        Nog nie geregistreer nie?{' '}
-        <Link
-          href="/register"
-          className="font-black"
-          style={{ color: 'var(--color-primary)' }}
-        >
-          Skep &apos;n rekening
-        </Link>
+        Geen rekening? Kontak jou administrateur
       </p>
+
+      {/* Registreer skakel */}
+      <div className="mt-3">
+        <a
+          href="/register"
+          className="block w-full text-center rounded-[12px] py-[13px] text-[14px] font-bold border transition"
+          style={{
+            background:  'var(--color-surface)',
+            borderColor: 'var(--color-border)',
+            color:       'var(--color-text-subtle)',
+          }}
+        >
+          Registreer
+        </a>
+      </div>
     </div>
   );
 }
