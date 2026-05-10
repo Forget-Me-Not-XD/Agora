@@ -6,6 +6,7 @@ import type { TokenPair, LoginPayload } from '@/lib/types';
 
 const COOKIE_NAME         = 'akademia_token';
 const COOKIE_REFRESH_NAME = 'akademia_refresh_token';
+const COOKIE_USER_NAME    = 'akademia_user';
 const API_URL             = process.env.API_URL ?? 'http://localhost:3000';
 
 /**
@@ -20,24 +21,28 @@ function setAuthCookies(
   data: TokenPair,
   rememberMe = false,
 ) {
-  cookieStore.set(COOKIE_NAME, data.accessToken, {
+  const cookieOpts = {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     path:     '/',
-    maxAge:   60 * 15, // 15 min – dieselfde as backend JWT_ACCESS_EXPIRY
-  });
+  };
+
+  cookieStore.set(COOKIE_NAME, data.accessToken, { ...cookieOpts, maxAge: 60 * 15 });
+
+  // Store the user profile returned by the backend so server components can
+  // read name/surname/role without depending on what the JWT payload contains.
+  if (data.user) {
+    cookieStore.set(COOKIE_USER_NAME, JSON.stringify(data.user), {
+      ...cookieOpts,
+      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
+    });
+  }
 
   if (data.refreshToken) {
     cookieStore.set(COOKIE_REFRESH_NAME, data.refreshToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path:     '/',
-      // rememberMe: hou 30 dae
-      ...(rememberMe
-        ? { maxAge: 60 * 60 * 24 * 30 }  // 30 dae
-        : {}),                             // geen maxAge = session cookie
+      ...cookieOpts,
+      ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
     });
   }
 }
@@ -128,5 +133,6 @@ export async function logoutAction(): Promise<void> {
   const cookieStore = cookies();
   cookieStore.delete(COOKIE_NAME);
   cookieStore.delete(COOKIE_REFRESH_NAME);
+  cookieStore.delete(COOKIE_USER_NAME);
   redirect('/login');
 }

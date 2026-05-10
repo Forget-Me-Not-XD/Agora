@@ -6,7 +6,7 @@ export interface UserResponse {
   name: string;
   surname: string;
   email: string;
-  role: 'ADMIN' | 'DOSENT' | 'GAS';
+  role: 'ADMIN' | 'DOSENT' | 'GAS' | 'STUDENT';
   studyCenter: string;
   isActive: boolean;
   createdAt: string;
