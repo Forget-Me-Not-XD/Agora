@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* light mode */
+:root {
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --color-primary:      #0891B2;
+  --color-primary-text: #FFFFFF;
+
+  --color-bg:      #F4F9FF;
+  --color-surface: #FFFFFF;
+  --color-border:  #C8D8E8;
+
+  --color-text:        #1A2840;
+  --color-text-subtle: #7090B0;
+  --color-text-muted:  #90A8C0;
+
+  --color-jwt-bg:  #F0F7FF;
+
+  --color-red:   #DC2626;
+  --color-green: #16A34A;
+  --color-blue:  #1E40AF;
+}
+
+/* dark mode */
+.dark {
+  --color-primary:      #0DC9D0;
+  --color-primary-text: #020D18;
+
+  --color-bg:      #0A1929;
+  --color-surface: #112233;
+  --color-border:  #1E3A4A;
+
+  --color-text:        #E8F4F8;
+  --color-text-subtle: #4A6B80;
+  --color-text-muted:  #4A6B80;
+
+  --color-jwt-bg:  #0A1929;
+
+  --color-red:   #F87171;
+  --color-green: #4ADE80;
+  --color-blue:  #60A5FA;
+}
+
+/* Base */
+html {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utilities */
+@layer utilities {
+  .bg-app        { background: var(--color-bg); }
+  .bg-surface    { background: var(--color-surface); }
+  .border-app    { border-color: var(--color-border); }
+  .text-app      { color: var(--color-text); }
+  .text-subtle   { color: var(--color-text-subtle); }
+  .text-muted    { color: var(--color-text-muted); }
+  .text-primary  { color: var(--color-primary); }
+  .text-red      { color: var(--color-red); }
+  .text-green    { color: var(--color-green); }
+  .bg-primary    { background: var(--color-primary); }
+  .border-red    { border-color: var(--color-red); }
+}
