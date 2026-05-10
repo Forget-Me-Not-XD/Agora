@@ -56,7 +56,7 @@ export default function RegisterPage() {
   const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
   const showValidation       = passwordFocused || form.password.length > 0;
   const passwordsMatch       = form.password === confirmPassword;
-  const showStudyCenter      = uiRole !== null && uiRole !== 'GAS' && uiRole !== 'STUDENT';
+  const showStudyCenter      = uiRole !== null && uiRole !== 'GAS';
   const selectedRole         = ROLE_OPTIONS.find((r) => r.value === uiRole) ?? null;
 
   const formComplete =
