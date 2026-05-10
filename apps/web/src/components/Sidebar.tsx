@@ -1,0 +1,131 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+    LayoutDashboard,
+    Calendar,
+    CalendarDays,
+    PlusCircle,
+    BarChart2,
+    Wallet,
+    Users,
+    X,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useCurrentUser } from './UserContext';
+import {
+    canCreateEvents,
+    canViewInsights,
+    canViewBudget,
+    canManageUsers,
+    getRoleLabel,
+    getRoleBadgeColor,
+} from '@/lib/rbac';
+
+interface NavItem {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+}
+
+interface SidebarProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+    const pathname = usePathname();
+    const user = useCurrentUser();
+    const role = user.role;
+
+    const navItems: NavItem[] = [
+        { href: '/dashboard', label: 'Oorsig', icon: LayoutDashboard },
+        { href: '/events', label: 'Geleenthede', icon: Calendar },
+        { href: '/calendar', label: 'Kalender', icon: CalendarDays },
+        ...(canCreateEvents(role)
+            ? [{ href: '/events/create', label: 'Skep Geleentheid', icon: PlusCircle }]
+            : []),
+        ...(canViewInsights(role)
+            ? [{ href: '/insights', label: 'KI Insigte', icon: BarChart2 }]
+            : []),
+        ...(canViewBudget(role)
+            ? [{ href: '/budget', label: 'Begroting', icon: Wallet }]
+            : []),
+        ...(canManageUsers(role)
+            ? [{ href: '/users', label: 'Gebruikers', icon: Users }]
+            : []),
+    ];
+
+    return (
+        <>
+            {isOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+                    onClick={onClose}
+                />
+            )}
+
+            <aside
+                className={[
+                    'fixed lg:static inset-y-0 left-0 z-30',
+                    'w-64 flex flex-col shrink-0',
+                    'bg-[var(--color-surface)] border-r border-[var(--color-border)]',
+                    'transition-transform duration-200',
+                    isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+                ].join(' ')}
+            >
+                <div className="flex items-center justify-between p-5 border-b border-[var(--color-border)]">
+                    <div>
+                        <h1 className="text-lg font-bold text-[var(--color-text)]">SPAN</h1>
+                        <p className="text-xs text-[var(--color-text-subtle)]">Akademia Portaal</p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="lg:hidden p-1 rounded text-[var(--color-text-subtle)] hover:text-[var(--color-text)]"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    {navItems.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = pathname === item.href;
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={[
+                                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                                    isActive
+                                        ? 'bg-[var(--color-primary)] text-white'
+                                        : 'text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]',
+                                ].join(' ')}
+                            >
+                                <Icon size={18} />
+                                {item.label}
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                <div className="p-4 border-t border-[var(--color-border)]">
+                    <div className="px-3 py-2.5">
+                        <p className="text-sm font-medium text-[var(--color-text)] truncate">
+                            {user.name} {user.surname}
+                        </p>
+                        <p className="text-xs text-[var(--color-text-subtle)] truncate mb-1.5">
+                            {user.email}
+                        </p>
+                        <span
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(role)}`}
+                        >
+                            {getRoleLabel(role)}
+                        </span>
+                    </div>
+                </div>
+            </aside>
+        </>
+    );
+}
