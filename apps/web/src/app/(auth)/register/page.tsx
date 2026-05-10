@@ -9,10 +9,10 @@ import type { RegisterPayload } from '@/lib/types';
 type UiRole = 'GAS' | 'STUDENT' | 'DOSENT' | 'ADMIN';
 
 const ROLE_OPTIONS: Array<{ value: UiRole; label: string; subtitle: string }> = [
-  { value: 'GAS',     label: 'GAS',    subtitle: 'Gas'           },
-  { value: 'STUDENT', label: 'STUDENT',subtitle: 'Student'       },
-  { value: 'DOSENT',  label: 'DOSENT', subtitle: 'Dosent'        },
-  { value: 'ADMIN',   label: 'ADMIN',  subtitle: 'Administrateur' },
+  { value: 'GAS',     label: 'GAS',     subtitle: 'Gas'            },
+  { value: 'STUDENT', label: 'STUDENT', subtitle: 'Student'        },
+  { value: 'DOSENT',  label: 'DOSENT',  subtitle: 'Dosent'         },
+  { value: 'ADMIN',   label: 'ADMIN',   subtitle: 'Administrateur'  },
 ];
 
 const STUDY_CENTERS = [
@@ -23,16 +23,19 @@ const STUDY_CENTERS = [
   'Somerset Wes',
 ] as const;
 
-type Center = (typeof STUDY_CENTERS)[number];
-
 export default function RegisterPage() {
-  const [uiRole, setUiRole]                   = useState<UiRole>('STUDENT');
-  const [centerOpen, setCenterOpen]           = useState(false);
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-  const [error, setError]                     = useState<string | null>(null);
-  const [isPending, setIsPending]             = useState(false);
-  const dropdownRef                           = useRef<HTMLDivElement>(null);
+  const [uiRole, setUiRole]                 = useState<UiRole | null>(null);
+  const [roleOpen, setRoleOpen]             = useState(false);
+  const [centerOpen, setCenterOpen]         = useState(false);
+  const [passwordVisible, setPasswordVisible]   = useState(false);
+  const [confirmVisible, setConfirmVisible]     = useState(false);
+  const [passwordFocused, setPasswordFocused]   = useState(false);
+  const [confirmPassword, setConfirmPassword]   = useState('');
+  const [popiaAccepted, setPopiaAccepted]       = useState(false);
+  const [error, setError]                       = useState<string | null>(null);
+  const [isPending, setIsPending]               = useState(false);
+  const roleRef   = useRef<HTMLDivElement>(null);
+  const centerRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState<RegisterPayload>({
     name: '', surname: '', email: '', password: '', role: 'GAS', studyCenter: '',
@@ -41,7 +44,7 @@ export default function RegisterPage() {
   const update = <K extends keyof RegisterPayload>(key: K, value: RegisterPayload[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  // Password validation
+  // Wagwoord validation reels
   const passwordRules = useMemo(() => ({
     minLength: form.password.length >= 8,
     hasUpper:  /[A-Z]/.test(form.password),
@@ -49,22 +52,32 @@ export default function RegisterPage() {
     hasNumber: /[0-9]/.test(form.password),
   }), [form.password]);
 
-  const showValidation = passwordFocused || form.password.length > 0;
+  const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
+  const showValidation       = passwordFocused || form.password.length > 0;
+  const passwordsMatch       = form.password === confirmPassword;
 
-  // Role → payload mapping
-  const payloadRole: RegisterPayload['role'] = useMemo(() => {
-    if (uiRole === 'STUDENT') return 'GAS';
-    return uiRole as RegisterPayload['role'];
-  }, [uiRole]);
+  const showStudyCenter = uiRole !== null && uiRole !== 'GAS' && uiRole !== 'STUDENT';
 
-  const showStudyCenter = uiRole !== 'GAS';
+  const selectedRole = ROLE_OPTIONS.find((r) => r.value === uiRole) ?? null;
 
-  // Close dropdown on outside click
+  // Form volledigheid
+  const formComplete =
+    form.name.trim()    !== '' &&
+    form.surname.trim() !== '' &&
+    form.email.trim()   !== '' &&
+    form.password       !== '' &&
+    confirmPassword     !== '' &&
+    passwordsMatch &&
+    allPasswordRulesPass &&
+    uiRole !== null &&
+    (!showStudyCenter || form.studyCenter !== '') &&
+    popiaAccepted;
+
+  // maak dropdowns toe wanneer daar buite die dropdown gedruk word
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setCenterOpen(false);
-      }
+      if (roleRef.current   && !roleRef.current.contains(e.target as Node))   setRoleOpen(false);
+      if (centerRef.current && !centerRef.current.contains(e.target as Node)) setCenterOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -72,272 +85,478 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formComplete) return;
+    if (!passwordsMatch) {
+      setError('Wagwoorde stem nie ooreen nie.');
+      return;
+    }
     setError(null);
     setIsPending(true);
     try {
       const err = await registerAction({
         ...form,
-        role: payloadRole,
+        role: (uiRole === 'STUDENT' ? 'GAS' : uiRole) as RegisterPayload['role'],
         studyCenter: showStudyCenter ? form.studyCenter : '',
       });
       if (err) setError(err);
-      // On success, registerAction calls redirect('/dashboard')
     } finally {
       setIsPending(false);
     }
   };
 
-  const inputBase =
-    'w-full rounded-[10px] px-[14px] py-3 text-[15px] border text-app placeholder:text-subtle focus:outline-none transition disabled:opacity-60';
   const inputStyle = {
-    background: 'var(--color-bg)',
+    background:  'var(--color-bg)',
     borderColor: 'var(--color-border)',
   };
-  const focusHandlers = {
-    onFocus: (e: React.FocusEvent<HTMLInputElement>) =>
-      (e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)'),
-    onBlur: (e: React.FocusEvent<HTMLInputElement>) =>
-      (e.currentTarget.style.boxShadow = ''),
-  };
+  const onFocus = (e: React.FocusEvent<HTMLInputElement>) =>
+    (e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)');
+  const onBlur = (e: React.FocusEvent<HTMLInputElement>) =>
+    (e.currentTarget.style.boxShadow = '');
+  const inputClass =
+    'w-full rounded-[10px] px-[14px] py-3 text-[15px] border focus:outline-none transition disabled:opacity-60';
 
   return (
     <div className="w-full max-w-sm">
 
-      {/* ── Heading ────────────────────────────────────────────────────── */}
-      <h1 className="text-[28px] font-bold text-app mb-1">Skep &apos;n rekening</h1>
-      <p className="text-[14px] text-subtle mb-6">Voltooi al die velde om voort te gaan</p>
-
-      {/* ── Error box – splits comma-joined backend messages ─────────── */}
-      {error && (
-        <div
-          className="mb-4 px-4 py-3 rounded-[10px] border text-[13px] font-semibold space-y-1"
-          style={{ background: 'var(--color-bg)', borderColor: 'var(--color-red)' }}
+      {/* Brand */}
+      <div className="flex flex-col items-center mb-8">
+        <h1
+          className="text-[28px] font-black tracking-tight"
+          style={{ color: 'var(--color-primary)' }}
         >
-          {error.split(', ').map((msg, i) => (
-            <p key={i} className="flex items-center gap-1.5" style={{ color: 'var(--color-red)' }}>
-              <AlertCircle size={13} className="shrink-0" />
-              {msg}
-            </p>
-          ))}
-        </div>
-      )}
+          Akademia
+        </h1>
+        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
+          Funksiebestuurstelsel
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit} noValidate>
+      {/* Form card */}
+      <div
+        className="rounded-[16px] border p-6"
+        style={{
+          background:  'var(--color-surface)',
+          borderColor: 'var(--color-border)',
+        }}
+      >
 
-        {/* ── Name row ─────────────────────────────────────────────────── */}
-        <div className="flex gap-2 mb-3">
-          <input
-            className={inputBase}
-            style={inputStyle}
-            placeholder="Naam"
-            value={form.name}
-            onChange={(e) => update('name', e.target.value)}
-            disabled={isPending}
-            {...focusHandlers}
-          />
-          <input
-            className={inputBase}
-            style={inputStyle}
-            placeholder="Van"
-            value={form.surname}
-            onChange={(e) => update('surname', e.target.value)}
-            disabled={isPending}
-            {...focusHandlers}
-          />
+        {/* Nuwe Registrasie heading */}
+        <div className="flex flex-col items-center mb-5">
+          <p className="text-[18px] font-black" style={{ color: 'var(--color-text)' }}>
+            Nuwe Registrasie
+          </p>
         </div>
 
-        {/* ── Email ────────────────────────────────────────────────────── */}
-        <input
-          type="email"
-          autoComplete="email"
-          className={`${inputBase} mb-3`}
-          style={inputStyle}
-          placeholder="E-pos"
-          value={form.email}
-          onChange={(e) => update('email', e.target.value)}
-          disabled={isPending}
-          {...focusHandlers}
-        />
+        {/* Skeidings lyn */}
+        <div className="h-px w-full mb-5" style={{ background: 'var(--color-border)' }} />
 
-        {/* ── Password + toggle ─────────────────────────────────────────── */}
-        <div className="relative mb-0">
-          <input
-            type={passwordVisible ? 'text' : 'password'}
-            autoComplete="new-password"
-            className={`${inputBase} pr-11`}
-            style={inputStyle}
-            placeholder="Wagwoord (min. 8 karakters)"
-            value={form.password}
-            onChange={(e) => update('password', e.target.value)}
-            disabled={isPending}
-            onFocus={(e) => {
-              setPasswordFocused(true);
-              e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)';
-            }}
-            onBlur={(e) => {
-              setPasswordFocused(false);
-              e.currentTarget.style.boxShadow = '';
-            }}
-          />
-          <button
-            type="button"
-            aria-label={passwordVisible ? 'Versteek wagwoord' : 'Wys wagwoord'}
-            onClick={() => setPasswordVisible((v) => !v)}
-            disabled={isPending}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-subtle hover:text-app transition disabled:opacity-50"
-          >
-            {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-          </button>
-        </div>
-
-        {/* ── Live password validation checklist (animates in/out) ─────── */}
-        <div
-          className="overflow-hidden transition-all duration-300 ease-in-out mb-3"
-          style={{ maxHeight: showValidation ? '130px' : '0px', opacity: showValidation ? 1 : 0 }}
-        >
+        {/* Error banner */}
+        {error && (
           <div
-            className="mt-2 mb-3 rounded-[10px] px-3 py-2 border"
-            style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold space-y-1"
+            style={{
+              background:  'var(--color-bg)',
+              borderColor: 'var(--color-red)',
+            }}
           >
-            {(
-              [
+            {error.split(', ').map((msg, i) => (
+              <p key={i} className="flex items-center gap-1.5" style={{ color: 'var(--color-red)' }}>
+                <AlertCircle size={13} className="shrink-0" />
+                {msg}
+              </p>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} noValidate>
+
+          {/* Naam + Van */}
+          <div className="flex gap-2 mb-3">
+            <div className="flex-1">
+              <label className="block mb-1">
+                <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                  Naam <span style={{ color: 'var(--color-primary)' }}>*</span>
+                </span>
+              </label>
+              <input
+                className={inputClass}
+                style={{ ...inputStyle, color: 'var(--color-text)' }}
+                placeholder="Naam"
+                value={form.name}
+                onChange={(e) => update('name', e.target.value)}
+                disabled={isPending}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block mb-1">
+                <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                  Van <span style={{ color: 'var(--color-primary)' }}>*</span>
+                </span>
+              </label>
+              <input
+                className={inputClass}
+                style={{ ...inputStyle, color: 'var(--color-text)' }}
+                placeholder="Van"
+                value={form.surname}
+                onChange={(e) => update('surname', e.target.value)}
+                disabled={isPending}
+                onFocus={onFocus}
+                onBlur={onBlur}
+              />
+            </div>
+          </div>
+
+          {/* E-pos */}
+          <label className="block mb-3">
+            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+              E-pos adres <span style={{ color: 'var(--color-primary)' }}>*</span>
+            </span>
+            <input
+              type="email"
+              autoComplete="email"
+              className={`${inputClass} mt-1`}
+              style={{ ...inputStyle, color: 'var(--color-text)' }}
+              placeholder="naam@akademia.ac.za"
+              value={form.email}
+              onChange={(e) => update('email', e.target.value)}
+              disabled={isPending}
+              onFocus={onFocus}
+              onBlur={onBlur}
+            />
+          </label>
+
+          {/* Wagwoord */}
+          <label className="block mb-0">
+            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+              Wagwoord <span style={{ color: 'var(--color-primary)' }}>*</span>
+            </span>
+            <div className="relative mt-1">
+              <input
+                type={passwordVisible ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={`${inputClass} pr-11`}
+                style={{ ...inputStyle, color: 'var(--color-text)' }}
+                placeholder="Minimum 8 karakters"
+                value={form.password}
+                onChange={(e) => update('password', e.target.value)}
+                disabled={isPending}
+                onFocus={(e) => {
+                  setPasswordFocused(true);
+                  e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                }}
+                onBlur={(e) => {
+                  setPasswordFocused(false);
+                  e.currentTarget.style.boxShadow = '';
+                }}
+              />
+              <button
+                type="button"
+                aria-label={passwordVisible ? 'Versteek wagwoord' : 'Wys wagwoord'}
+                onClick={() => setPasswordVisible((v) => !v)}
+                disabled={isPending}
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition disabled:opacity-50"
+                style={{ color: 'var(--color-text-subtle)' }}
+              >
+                {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+          </label>
+
+          {/* Wagwoord validasie blok */}
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ maxHeight: showValidation ? '140px' : '0px', opacity: showValidation ? 1 : 0 }}
+          >
+            <div
+              className="mt-2 rounded-[10px] px-3 py-2 border"
+              style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+            >
+              {([
                 { ok: passwordRules.minLength, label: 'Minstens 8 karakters'  },
                 { ok: passwordRules.hasUpper,  label: 'Minstens 1 hoofletter'  },
                 { ok: passwordRules.hasLower,  label: 'Minstens 1 kleinletter' },
                 { ok: passwordRules.hasNumber, label: 'Minstens 1 syfer'       },
-              ] as const
-            ).map((rule) => (
-              <div key={rule.label} className="flex items-center gap-2 py-1">
-                {rule.ok
-                  ? <CheckCircle size={13} style={{ color: 'var(--color-green)' }} />
-                  : <Circle size={13} className="text-subtle" />
-                }
-                <span
-                  className="text-[12px] font-medium"
-                  style={{ color: rule.ok ? 'var(--color-green)' : 'var(--color-text-subtle)', fontWeight: rule.ok ? 700 : 500 }}
-                >
-                  {rule.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Study centre dropdown (hidden for GAS role) ───────────────── */}
-        {showStudyCenter && (
-          <div className="relative mb-3" ref={dropdownRef}>
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => setCenterOpen((o) => !o)}
-              className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[15px] transition disabled:opacity-60"
-              style={{
-                background: 'var(--color-bg)',
-                borderColor: 'var(--color-border)',
-                color: form.studyCenter ? 'var(--color-text)' : 'var(--color-text-subtle)',
-                fontWeight: form.studyCenter ? 600 : 400,
-              }}
-            >
-              <span>{form.studyCenter || 'Studiesentrum'}</span>
-              <ChevronDown
-                size={16}
-                className="text-subtle transition-transform"
-                style={{ transform: centerOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              />
-            </button>
-
-            {centerOpen && (
-              <div
-                className="absolute z-50 mt-1 w-full rounded-[16px] border shadow-lg overflow-hidden"
-                style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                {/* Header row */}
-                <div
-                  className="flex items-center justify-between px-4 py-3 border-b"
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <span className="text-[15px] font-black text-app">Kies studiesentrum</span>
-                  <button
-                    type="button"
-                    onClick={() => setCenterOpen(false)}
-                    className="text-subtle hover:text-app"
+              ] as const).map((rule) => (
+                <div key={rule.label} className="flex items-center gap-2 py-1">
+                  {rule.ok
+                    ? <CheckCircle size={13} style={{ color: 'var(--color-green)' }} />
+                    : <Circle      size={13} style={{ color: 'var(--color-text-subtle)' }} />
+                  }
+                  <span
+                    className="text-[12px]"
+                    style={{
+                      color:      rule.ok ? 'var(--color-green)' : 'var(--color-text-subtle)',
+                      fontWeight: rule.ok ? 700 : 500,
+                    }}
                   >
-                    <X size={16} />
-                  </button>
+                    {rule.label}
+                  </span>
                 </div>
-                {STUDY_CENTERS.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => { update('studyCenter', c); setCenterOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-[14px] font-bold text-app hover:bg-app transition border-b last:border-b-0"
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        )}
 
-        {/* ── Role grid ────────────────────────────────────────────────── */}
-        <p className="text-[14px] font-semibold text-app mb-2 mt-1">Rol</p>
-        <div className="grid grid-cols-2 gap-2.5 mb-4">
-          {ROLE_OPTIONS.map((r) => {
-            const active = uiRole === r.value;
-            return (
+          {/* Bevestig Wagwoord */}
+          <label className="block mt-3 mb-3">
+            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+              Bevestig Wagwoord <span style={{ color: 'var(--color-primary)' }}>*</span>
+            </span>
+            <div className="relative mt-1">
+              <input
+                type={confirmVisible ? 'text' : 'password'}
+                autoComplete="new-password"
+                className={`${inputClass} pr-11`}
+                style={{
+                  ...inputStyle,
+                  color:       'var(--color-text)',
+                  borderColor: confirmPassword.length > 0 && !passwordsMatch
+                    ? 'var(--color-red)'
+                    : 'var(--color-border)',
+                }}
+                placeholder="Herhaal wagwoord"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isPending}
+                onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)')}
+                onBlur={(e)  => (e.currentTarget.style.boxShadow = '')}
+              />
               <button
                 type="button"
-                key={r.value}
+                aria-label={confirmVisible ? 'Versteek wagwoord' : 'Wys wagwoord'}
+                onClick={() => setConfirmVisible((v) => !v)}
                 disabled={isPending}
-                onClick={() => {
-                  setUiRole(r.value);
-                  if (r.value === 'GAS') update('studyCenter', '');
-                }}
-                className="rounded-[14px] border py-[14px] px-3 flex flex-col items-center transition disabled:opacity-60"
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition disabled:opacity-50"
+                style={{ color: 'var(--color-text-subtle)' }}
+              >
+                {confirmVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+            {/* Inline wagwoord mismatch fout */}
+            {confirmPassword.length > 0 && !passwordsMatch && (
+              <p className="flex items-center gap-1.5 mt-1.5 text-[12px] font-semibold" style={{ color: 'var(--color-red)' }}>
+                <AlertCircle size={12} className="shrink-0" />
+                Wagwoorde stem nie ooreen nie.
+              </p>
+            )}
+          </label>
+
+          {/* Rol Toeken dropdown */}
+          <label className="block mb-3">
+            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+              Rol Toeken <span style={{ color: 'var(--color-primary)' }}>*</span>
+            </span>
+            <div className="relative mt-1" ref={roleRef}>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setRoleOpen((o) => !o)}
+                className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[15px] transition disabled:opacity-60 focus:outline-none"
                 style={{
-                  background:   active ? 'var(--color-primary)' : 'var(--color-surface)',
-                  borderColor:  active ? 'var(--color-primary)' : 'var(--color-border)',
+                  background:  'var(--color-bg)',
+                  borderColor: 'var(--color-border)',
+                  color:       selectedRole ? 'var(--color-text)' : 'var(--color-text-subtle)',
                 }}
               >
-                <span
-                  className="text-[14px] font-black tracking-wide"
-                  style={{ color: active ? 'var(--color-primary-text)' : 'var(--color-text)' }}
-                >
-                  {r.label}
+                <span style={{ fontWeight: selectedRole ? 600 : 400 }}>
+                  {selectedRole ? selectedRole.subtitle : 'Rol Toeken'}
                 </span>
-                <span
-                  className="text-[12px] font-bold mt-1"
-                  style={{ color: active ? 'var(--color-primary-text)' : 'var(--color-text-subtle)' }}
-                >
-                  {r.subtitle}
-                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    color:     'var(--color-text-subtle)',
+                    transform: roleOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s',
+                  }}
+                />
               </button>
-            );
-          })}
-        </div>
 
-        {/* ── Submit ───────────────────────────────────────────────────── */}
-        <button
-          type="submit"
-          disabled={isPending}
-          className="w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
-          style={{
-            background: 'var(--color-primary)',
-            color: 'var(--color-primary-text)',
-          }}
-        >
-          {isPending ? (
-            <><Loader2 size={16} className="animate-spin" /> Besig…</>
-          ) : (
-            'Registreer'
+              {roleOpen && (
+                <div
+                  className="absolute z-50 mt-1 w-full rounded-[16px] border shadow-lg overflow-hidden"
+                  style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                >
+                  <div
+                    className="flex items-center justify-between px-4 py-3 border-b"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <span className="text-[15px] font-black" style={{ color: 'var(--color-text)' }}>
+                      Kies rol
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setRoleOpen(false)}
+                      style={{ color: 'var(--color-text-subtle)' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {ROLE_OPTIONS.map((r) => (
+                    <button
+                      type="button"
+                      key={r.value}
+                      onClick={() => {
+                        setUiRole(r.value);
+                        if (r.value === 'GAS') update('studyCenter', '');
+                        setRoleOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-3 text-[14px] transition border-b last:border-b-0"
+                      style={{
+                        borderColor: 'var(--color-border)',
+                        background:  uiRole === r.value ? 'var(--color-primary)' : 'transparent',
+                        color:       uiRole === r.value ? 'var(--color-primary-text)' : 'var(--color-text)',
+                        fontWeight:  uiRole === r.value ? 700 : 400,
+                      }}
+                    >
+                      {r.subtitle}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </label>
+
+          {/* Studiesentrum dropdown (slegs as rol != GAS) */}
+          {showStudyCenter && (
+            <label className="block mb-3">
+              <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                Studiesentrum <span style={{ color: 'var(--color-primary)' }}>*</span>
+              </span>
+              <div className="relative mt-1" ref={centerRef}>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => setCenterOpen((o) => !o)}
+                  className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[15px] transition disabled:opacity-60 focus:outline-none"
+                  style={{
+                    background:  'var(--color-bg)',
+                    borderColor: 'var(--color-border)',
+                    color:       form.studyCenter ? 'var(--color-text)' : 'var(--color-text-subtle)',
+                    fontWeight:  form.studyCenter ? 600 : 400,
+                  }}
+                >
+                  <span>{form.studyCenter || 'Studiesentrum'}</span>
+                  <ChevronDown
+                    size={16}
+                    style={{
+                      color:      'var(--color-text-subtle)',
+                      transform:  centerOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s',
+                    }}
+                  />
+                </button>
+
+                {centerOpen && (
+                  <div
+                    className="absolute z-50 mt-1 w-full rounded-[16px] border shadow-lg overflow-hidden"
+                    style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
+                  >
+                    <div
+                      className="flex items-center justify-between px-4 py-3 border-b"
+                      style={{ borderColor: 'var(--color-border)' }}
+                    >
+                      <span className="text-[15px] font-black" style={{ color: 'var(--color-text)' }}>
+                        Kies studiesentrum
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCenterOpen(false)}
+                        style={{ color: 'var(--color-text-subtle)' }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    {STUDY_CENTERS.map((c) => (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => { update('studyCenter', c); setCenterOpen(false); }}
+                        className="w-full text-left px-4 py-3 text-[14px] transition border-b last:border-b-0"
+                        style={{
+                          borderColor: 'var(--color-border)',
+                          background:  form.studyCenter === c ? 'var(--color-primary)' : 'transparent',
+                          color:       form.studyCenter === c ? 'var(--color-primary-text)' : 'var(--color-text)',
+                          fontWeight:  form.studyCenter === c ? 700 : 400,
+                        }}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </label>
           )}
-        </button>
-      </form>
 
-      {/* ── Back to login ──────────────────────────────────────────────── */}
-      <p className="mt-[20px] text-center text-[14px] text-subtle">
+          {/* POPIA Kennisgewing */}
+          <div
+            className="rounded-[12px] border px-4 py-3 mb-5"
+            style={{
+              background:  'var(--color-bg)',
+              borderColor: 'var(--color-border)',
+            }}
+          >
+            <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-text)' }}>
+              POPIA Kennisgewing
+            </p>
+            <p className="text-[11px] mb-3" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
+              Persoonlike data word verwerk ooreenkomstig die Protection of Personal
+              Information Act (POPIA). Data word slegs gebruik vir stelseltoegangsbeheer
+              en sal NIE met derde partye gedeel word nie.
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={popiaAccepted}
+                onClick={() => setPopiaAccepted((v) => !v)}
+                disabled={isPending}
+                className="w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center flex-shrink-0 transition disabled:opacity-60"
+                style={{
+                  background:  'var(--color-surface)',
+                  borderColor: 'var(--color-border)',
+                }}
+              >
+                {popiaAccepted && (
+                  <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                    <path
+                      d="M1 4L4 7L10 1"
+                      stroke="var(--color-primary)"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+              <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                Ek stem saam met die POPIA voorwaardes
+              </span>
+            </label>
+          </div>
+
+          {/* Registreer knoppie */}
+          <button
+            type="submit"
+            disabled={isPending || !formComplete}
+            className="w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
+            style={{
+              background: 'var(--color-primary)',
+              color:      'var(--color-primary-text)',
+            }}
+          >
+            {isPending ? (
+              <><Loader2 size={16} className="animate-spin" /> Besig…</>
+            ) : (
+              'Registreer'
+            )}
+          </button>
+        </form>
+      </div>
+
+      {/* Terug na aanmeld */}
+      <p className="mt-5 text-center text-[13px]" style={{ color: 'var(--color-text-subtle)' }}>
         Het reeds &apos;n rekening?{' '}
         <Link
           href="/login"
