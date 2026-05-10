@@ -55,10 +55,24 @@ export function DashboardScreen() {
 
         <Text style={styles.sectionTitle}>Oorsig</Text>
         <View style={styles.statsGrid}>
-          <StatCard styles={styles} label="Totale RSVPs" value={user.role === 'ADMIN' ? '1 847' : '—'} delta={user.role === 'ADMIN' ? '+8.2%' : undefined} />
-          <StatCard styles={styles} label="Funksies OT" value={user.role === 'ADMIN' || user.role === 'DOSENT' ? '24' : '—'} delta={user.role === 'ADMIN' || user.role === 'DOSENT' ? '+12%' : undefined} />
-          <StatCard styles={styles} label="Bywoning" value={user.role === 'ADMIN' || user.role === 'DOSENT' ? '82%' : '—'} delta={user.role === 'ADMIN' || user.role === 'DOSENT' ? '+6.8%' : undefined} />
-          <StatCard styles={styles} label="Begroting" value={user.role === 'ADMIN' ? 'R187k' : '—'} delta={user.role === 'ADMIN' ? '-3.1%' : undefined} />
+          {user.role === 'ADMIN' && (
+            <StatCard styles={styles} label="Totale RSVPs" value="1 847" delta="+8.2%" />
+          )}
+          {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
+            <StatCard styles={styles} label="Funksies OT" value="24" delta="+12%" />
+          )}
+          {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
+            <StatCard styles={styles} label="Bywoning" value="82%" delta="+6.8%" />
+          )}
+          {user.role === 'ADMIN' && (
+            <StatCard styles={styles} label="Begroting" value="R187k" delta="-3.1%" />
+          )}
+          {(user.role === 'STUDENT' || user.role === 'GAS') && (
+            <StatCard styles={styles} label="Jou RSVPs" value="3" />
+          )}
+          {(user.role === 'STUDENT' || user.role === 'GAS') && (
+            <StatCard styles={styles} label="Aankomend" value="5" />
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Volgende</Text>

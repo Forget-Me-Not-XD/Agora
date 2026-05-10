@@ -38,6 +38,8 @@ export function RegisterScreen({ navigation }: Props) {
   const [uiRole, setUiRole] = useState<UiRole>('STUDENT');
   const [centerOpen, setCenterOpen] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [form, setForm] = useState<RegisterPayload>({
     name: '',
@@ -58,6 +60,9 @@ export function RegisterScreen({ navigation }: Props) {
     hasLower:  /[a-z]/.test(form.password),
     hasNumber: /[0-9]/.test(form.password),
   }), [form.password]);
+
+  const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
+  const passwordsMatch       = form.password === confirmPassword;
 
   // Show the checklist while focused or when the user has started typing
   const showValidation = passwordFocused || form.password.length > 0;
@@ -85,6 +90,7 @@ export function RegisterScreen({ navigation }: Props) {
 
   const handleSubmit = async () => {
     clearError();
+    if (!allPasswordRulesPass || !passwordsMatch) return;
     try {
       await register({
         ...form,
@@ -210,6 +216,42 @@ export function RegisterScreen({ navigation }: Props) {
                 </View>
               ))}
             </Animated.View>
+
+            {/* Herhaal wagwoord */}
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.inputWithIcon,
+                  confirmPassword.length > 0 && !passwordsMatch && styles.inputError,
+                ]}
+                placeholder="Herhaal wagwoord"
+                placeholderTextColor={colors.textSubtle}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!confirmVisible}
+                editable={!isLoading}
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setConfirmVisible((v) => !v)}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel={confirmVisible ? 'Versteek wagwoord' : 'Wys wagwoord'}
+              >
+                <Feather
+                  name={confirmVisible ? 'eye-off' : 'eye'}
+                  size={18}
+                  color={colors.textSubtle}
+                />
+              </TouchableOpacity>
+            </View>
+            {confirmPassword.length > 0 && !passwordsMatch && (
+              <View style={styles.matchErrorRow}>
+                <Feather name="alert-circle" size={12} color={colors.red} />
+                <Text style={styles.matchErrorText}>Wagwoorde stem nie ooreen nie.</Text>
+              </View>
+            )}
 
             {showStudyCenter && (
               <TouchableOpacity
@@ -341,6 +383,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     inputWrap: { position: 'relative' },
     inputWithIcon: { paddingRight: 44 },
+    inputError: { borderColor: colors.red },
     eyeBtn: {
       position: 'absolute',
       right: 10,
@@ -376,6 +419,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       color: '#16A34A',
       fontWeight: '700',
     },
+
+    matchErrorRow: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      gap: 6,
+      marginTop: -8,
+      marginBottom: 12,
+    },
+    matchErrorText: { color: colors.red, fontSize: 12, fontWeight: '600' as const },
 
     dropdown: {
       flexDirection: 'row',
