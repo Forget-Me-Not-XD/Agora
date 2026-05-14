@@ -42,7 +42,8 @@ import {
      * Publishes auth.user.registered → triggers welcome email + audit log.
      */
     async register(dto: RegisterDto): Promise<TokenPairDto> {
-      const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
+      const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS)
+      const passwordHash = await bcrypt.hash(dto.password, salt)
   
       const user = await this.usersService.create({
         name: dto.name,
