@@ -31,7 +31,6 @@ export class AuditConsumer implements OnModuleInit {
         payload: Record<string, unknown>,
         msg: ConsumeMessage,
     ): Promise<void> {
-    // Routing key tells us what kind of event this is
     const routingKey = msg.fields.routingKey;
 
     await this.auditModel.create({
@@ -41,17 +40,29 @@ export class AuditConsumer implements OnModuleInit {
         resourceId: (payload.userId as string) ?? null,
         ipAddress:  (payload.ipAddress as string) ?? '',
         userAgent:  (payload.userAgent as string) ?? '',
-        newValue:   payload,
-        statusCode: 200,
-        timestamp:  new Date((payload.timestamp as string) ?? Date.now()),
+        newValue:   this.sanitizePayload(payload),
+        statusCode: this.deriveStatusCode(routingKey),
+        timestamp:  new Date(),
     });
 
     this.logger.debug(`Audit logged: ${routingKey}`);
 }
 
     private deriveResource(routingKey: string): string {
-        // 'auth.user.registered' → 'user'
         const parts = routingKey.split('.');
         return parts[1] ?? routingKey;
+    }
+
+    private deriveStatusCode(routingKey: string): number {
+        if (routingKey.includes('failed') || routingKey.includes('error')) return 401;
+        if (routingKey.includes('locked') || routingKey.includes('inactive'))  return 403;
+        return 200;
+    }
+
+    private sanitizePayload(payload: Record<string, unknown>): Record<string, unknown> {
+        const REDACTED = new Set(['password', 'passwordhash', 'token', 'secret', 'pin', 'otp']);
+        return Object.fromEntries(
+            Object.entries(payload).filter(([key]) => !REDACTED.has(key.toLowerCase())),
+        );
     }
 }

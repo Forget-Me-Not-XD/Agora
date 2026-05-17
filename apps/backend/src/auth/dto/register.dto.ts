@@ -23,11 +23,12 @@ export class RegisterDto {
    * - At least one uppercase letter
    * - At least one lowercase letter
    * - At least one digit
+   * - At least one symbol (eg. !@#$%^&*)
    */
     @IsString()
     @MinLength(8)
     @MaxLength(72)   // bcrypt's hard limit
-    @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
+    @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9\s]).+$/, {
     message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
     })
     password!: string;

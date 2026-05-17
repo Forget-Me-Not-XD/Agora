@@ -25,11 +25,16 @@ export class NotificationsConsumer implements OnModuleInit {
     private async handleEmail(event: UserRegisteredEvent): Promise<void> {
     // Simulate work — replace with real SendGrid/SMTP call in production
     this.logger.log(
-        `-- [EMAIL] Sending welcome message to ${event.email}\n` +
+        `-- [EMAIL] Sending welcome message to ${this.maskEmail(event.email)}\n` +
         `        Hi ${event.name}! Your Akademia account (${event.role}) is ready.`,
     );
 
     // In production:
     //   await this.sendgrid.send({ to: event.email, template: 'welcome', ... });
+    }
+
+    private maskEmail(email: string): string {
+        const [local = '', domain = ''] = email.split('@');
+        return `${local.slice(0, 2)}***@${domain}`;
     }
 }

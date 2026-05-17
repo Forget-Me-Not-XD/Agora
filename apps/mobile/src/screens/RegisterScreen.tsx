@@ -59,6 +59,7 @@ export function RegisterScreen({ navigation }: Props) {
     hasUpper:  /[A-Z]/.test(form.password),
     hasLower:  /[a-z]/.test(form.password),
     hasNumber: /[0-9]/.test(form.password),
+    hasSymbol:  /[^a-zA-Z0-9\s]/.test(form.password),
   }), [form.password]);
 
   const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
@@ -193,16 +194,17 @@ export function RegisterScreen({ navigation }: Props) {
                 opacity: validationAnim,
                 maxHeight: validationAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0, 130],
+                  outputRange: [0, 160],
                 }),
                 overflow: 'hidden',
               },
             ]}>
               {([
-                { ok: passwordRules.minLength, label: 'Minstens 8 karakters' },
-                { ok: passwordRules.hasUpper,  label: 'Minstens 1 hoofletter' },
+                { ok: passwordRules.minLength, label: 'Minstens 8 karakters'   },
+                { ok: passwordRules.hasUpper,  label: 'Minstens 1 hoofletter'  },
                 { ok: passwordRules.hasLower,  label: 'Minstens 1 kleinletter' },
-                { ok: passwordRules.hasNumber, label: 'Minstens 1 syfer' },
+                { ok: passwordRules.hasNumber, label: 'Minstens 1 syfer'       },
+                { ok: passwordRules.hasSymbol, label: 'Minstens 1 simbool'     },
               ] as const).map((rule) => (
                 <View key={rule.label} style={styles.ruleRow}>
                   <Feather

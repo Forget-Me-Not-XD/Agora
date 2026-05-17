@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Role } from '../../common/enums/role.enums';
+import { UsersService } from '../../users/users.service';
 
 export interface JwtPayload {
   sub: string;       // User _id
@@ -15,7 +16,10 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private readonly usersService: UsersService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -23,14 +27,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  /**
-   * Called automatically by Passport after JWT signature is verified.
-   * Whatever this method returns is attached to req.user.
-   */
-  validate(payload: JwtPayload): JwtPayload {
+  async validate(payload: JwtPayload): Promise<JwtPayload> {
     if (!payload.sub || !payload.email || !payload.role) {
       throw new UnauthorizedException('Invalid token payload');
     }
+
+    const user = await this.usersService.findById(payload.sub).catch(() => null);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Account no longer exists');
+    }
+
     return payload;
   }
 }
