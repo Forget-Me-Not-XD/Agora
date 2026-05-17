@@ -5,6 +5,7 @@ import * as amqp from 'amqp-connection-manager';
 import { ChannelWrapper } from 'amqp-connection-manager';
 import { Channel, ConsumeMessage } from 'amqplib';
 import { EXCHANGES, QUEUES, ROUTING_KEYS } from './events.constants';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Centralised RabbitMQ connection + publisher/consumer service.
@@ -38,6 +39,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     // Channel wrapper auto-reconnects and re-asserts topology
     this.channelWrapper = this.connection.createChannel({
       json: true,
+      confirm: true,
       setup: async (channel: Channel) => {
         await this.setupTopology(channel);
       },
@@ -58,32 +60,52 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
    * Idempotent — safe to call multiple times.
    */
   private async setupTopology(channel: Channel): Promise<void> {
-    // ── Exchanges (topic = pattern-based routing) ──
-    await channel.assertExchange(EXCHANGES.AUTH,         'topic', { durable: true });
-    await channel.assertExchange(EXCHANGES.NOTIFICATION, 'topic', { durable: true });
-    await channel.assertExchange(EXCHANGES.AUDIT,        'topic', { durable: true });
+  // ── Dead-Letter Exchange — catches all nacked/expired/overflow messages ──
+  await channel.assertExchange(EXCHANGES.DEAD_LETTER, 'topic', { durable: true });
+  await channel.assertQueue(QUEUES.DEAD_LETTER, { durable: true });
+  await channel.bindQueue(QUEUES.DEAD_LETTER, EXCHANGES.DEAD_LETTER, '#');
 
-    // ── Queues ────────────────────────────────────
-    await channel.assertQueue(QUEUES.NOTIFICATION_EMAIL, { durable: true });
-    await channel.assertQueue(QUEUES.NOTIFICATION_SMS,   { durable: true });
-    await channel.assertQueue(QUEUES.NOTIFICATION_PUSH,  { durable: true });
-    await channel.assertQueue(QUEUES.AUDIT_LOG,          { durable: true });
+  // ── Exchanges (topic = pattern-based routing) ──
+  await channel.assertExchange(EXCHANGES.AUTH,         'topic', { durable: true });
+  await channel.assertExchange(EXCHANGES.NOTIFICATION, 'topic', { durable: true });
+  await channel.assertExchange(EXCHANGES.AUDIT,        'topic', { durable: true });
 
-    // ── Bindings ──────────────────────────────────
-    // Email queue listens to all notification.email.* events
-    await channel.bindQueue(QUEUES.NOTIFICATION_EMAIL, EXCHANGES.NOTIFICATION, 'notification.email.*');
-    await channel.bindQueue(QUEUES.NOTIFICATION_SMS,   EXCHANGES.NOTIFICATION, 'notification.sms.*');
-    await channel.bindQueue(QUEUES.NOTIFICATION_PUSH,  EXCHANGES.NOTIFICATION, 'notification.push.*');
+  // ── Shared queue hardening: DLX redirect + memory/TTL caps ──
+  const baseQueueOptions = {
+    durable: true,
+    arguments: {
+      'x-dead-letter-exchange': EXCHANGES.DEAD_LETTER,
+      'x-message-ttl':          86_400_000,    // 24 h — stale notifications discarded
+      'x-max-length':           10_000,         // reject publisher if queue fills
+      'x-overflow':             'reject-publish',
+    },
+  };
 
-    // Audit queue listens to ALL auth events (for security trail)
-    await channel.bindQueue(QUEUES.AUDIT_LOG, EXCHANGES.AUTH,  'auth.#');
-    await channel.bindQueue(QUEUES.AUDIT_LOG, EXCHANGES.AUDIT, 'audit.#');
+  // ── Queues ────────────────────────────────────
+  await channel.assertQueue(QUEUES.NOTIFICATION_EMAIL, baseQueueOptions);
+  await channel.assertQueue(QUEUES.NOTIFICATION_SMS,   baseQueueOptions);
+  await channel.assertQueue(QUEUES.NOTIFICATION_PUSH,  baseQueueOptions);
+  await channel.assertQueue(QUEUES.AUDIT_LOG, {
+    ...baseQueueOptions,
+    arguments: {
+      ...baseQueueOptions.arguments,
+      'x-message-ttl': 2_592_000_000,   // 30 days — audit logs must be kept longer
+    },
+  });
 
-    // Welcome-email when user registers
-    await channel.bindQueue(QUEUES.NOTIFICATION_EMAIL, EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED);
+  // ── Bindings ──────────────────────────────────
+  await channel.bindQueue(QUEUES.NOTIFICATION_EMAIL, EXCHANGES.NOTIFICATION, 'notification.email.*');
+  await channel.bindQueue(QUEUES.NOTIFICATION_SMS,   EXCHANGES.NOTIFICATION, 'notification.sms.*');
+  await channel.bindQueue(QUEUES.NOTIFICATION_PUSH,  EXCHANGES.NOTIFICATION, 'notification.push.*');
 
-    this.logger.debug('Topology asserted: 3 exchanges, 4 queues, 6 bindings');
-  }
+  await channel.bindQueue(QUEUES.AUDIT_LOG, EXCHANGES.AUTH,  'auth.#');
+  await channel.bindQueue(QUEUES.AUDIT_LOG, EXCHANGES.AUDIT, 'audit.#');
+
+  await channel.bindQueue(QUEUES.NOTIFICATION_EMAIL, EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED);
+
+  this.logger.debug('Topology asserted: 3 exchanges + 1 DLX, 4 queues + 1 DLQ, 6 bindings');
+}
+
 
   /**
    * Publish a message to an exchange.
@@ -92,9 +114,11 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   async publish<T>(exchange: string, routingKey: string, payload: T): Promise<boolean> {
     try {
       await this.channelWrapper.publish(exchange, routingKey, payload, {
-        persistent: true,
-        timestamp: Date.now(),
+        persistent:  true,
+        timestamp:   Math.floor(Date.now() / 1000),
         contentType: 'application/json',
+        messageId:   uuidv4(),
+        appId:       'akademia-backend',
       });
       this.logger.debug(`Published ${routingKey}`);
       return true;
@@ -114,10 +138,21 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     await this.channelWrapper.addSetup(async (channel: Channel) => {
       await channel.prefetch(10);   // Process up to 10 in flight per consumer
+      const MAX_MESSAGE_BYTES = 1_048_576; // 1 MB hard cap
+
       await channel.consume(queue, async (msg) => {
         if (!msg) return;
-        try {
-          const payload = JSON.parse(msg.content.toString()) as T;
+
+        if (msg.content.length > MAX_MESSAGE_BYTES) {
+          this.logger.warn(
+            `Oversized message on ${queue}: ${msg.content.length} bytes — discarding`,
+          );
+          channel.nack(msg, false, false);
+          return;
+        }
+
+  try {
+    const payload = JSON.parse(msg.content.toString()) as T;
           await handler(payload, msg);
           channel.ack(msg);
         } catch (err) {

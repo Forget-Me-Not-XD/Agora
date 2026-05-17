@@ -51,6 +51,7 @@ export default function RegisterPage() {
     hasUpper:  /[A-Z]/.test(form.password),
     hasLower:  /[a-z]/.test(form.password),
     hasNumber: /[0-9]/.test(form.password),
+    hasSymbol: /[^a-zA-Z0-9\s]/.test(form.password),
   }), [form.password]);
 
   const allPasswordRulesPass = Object.values(passwordRules).every(Boolean);
@@ -249,17 +250,18 @@ export default function RegisterPage() {
           {/* Wagwoord validasie blok */}
           <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ maxHeight: showValidation ? '140px' : '0px', opacity: showValidation ? 1 : 0 }}
+            style={{ maxHeight: showValidation ? '165px' : '0px', opacity: showValidation ? 1 : 0 }}
           >
             <div
               className="mt-2 rounded-[10px] px-3 py-2 border"
               style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
             >
               {([
-                { ok: passwordRules.minLength, label: 'Minstens 8 karakters'  },
+                { ok: passwordRules.minLength, label: 'Minstens 8 karakters'   },
                 { ok: passwordRules.hasUpper,  label: 'Minstens 1 hoofletter'  },
                 { ok: passwordRules.hasLower,  label: 'Minstens 1 kleinletter' },
                 { ok: passwordRules.hasNumber, label: 'Minstens 1 syfer'       },
+                { ok: passwordRules.hasSymbol, label: 'Minstens 1 simbool'     },
               ] as const).map((rule) => (
                 <div key={rule.label} className="flex items-center gap-2 py-1">
                   {rule.ok
