@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
     imports: [
@@ -32,6 +33,7 @@ import { AuditModule } from '../audit/audit.module';
     AuthModule,
     NotificationsModule,
     AuditModule,
+    EventsModule,
     ],
 })
 export class AppModule {}
