@@ -1,9 +1,11 @@
 // ========== Imports: ==========
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';
 import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventDto } from './dto/update-event.dto';
+import { Role } from '../common/enums/role.enums';
 
 @Injectable()
 export class EventsService {
@@ -40,5 +42,50 @@ export class EventsService {
         const event = await this.eventModel.findById(id).exec();
         if (!event) throw new NotFoundException(`Event ${id} not found`);
         return event;
+    }
+
+    async updateEvent (
+        id: string,
+        dto: UpdateEventDto,
+        requesterId: string,
+        requesterRole: Role,
+    ): Promise <EventDocument> {
+
+        const event = await this.findById(id);
+
+        this.assertOwnership(event, requesterId, requesterRole);
+
+        const { date, ...rest } = dto;
+        Object.assign(event, rest);
+        if (date) event.date = new Date(date);
+
+        return event.save();
+    }
+
+    async deleteEvent (
+        id: string,
+        requesterId: string,
+        requesterRole: Role,
+    ): Promise <void> {
+
+        const event = await this.findById(id);
+
+        this.assertOwnership(event, requesterId, requesterRole);
+
+        await event.deleteOne();
+    }
+
+    private assertOwnership(
+        event: EventDocument,
+        requesterId: string,
+        requesterRole: Role,
+    ): void {
+        if (requesterRole === Role.ADMIN) return;
+
+        if (event.createdBy.toString() !== requesterId) {
+            throw new ForbiddenException(
+                `You do not have permission to modify this event`,
+            );
+        }
     }
 }
