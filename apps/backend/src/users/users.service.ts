@@ -4,6 +4,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
 
 @Injectable()
 export class UsersService {
@@ -57,4 +59,13 @@ export class UsersService {
       { $set: { failedLoginAttempts: 0, lockedUntil: null } },
     ).exec();
   }
+
+  async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
+    
+    const updated = await this.userModel.findByIdAndUpdate(id, { $set: updateUserDto }, { new: true }).exec();
+
+    if (!updated) throw new NotFoundException(`User ${id} not found`);
+
+    return UserResponseDto.fromDocument(updated);
+}
 }
