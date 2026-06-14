@@ -1,4 +1,5 @@
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -15,6 +16,8 @@ import {
   type EventStatus,
 } from '../lib/mock-data';
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { createEvent } from '../api/events';
 
 const STATUS_PILL: Record<EventStatus, { bg: string; text: string }> = {
   upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
@@ -32,6 +35,18 @@ export function EventDetailScreen() {
   const { user } = useAuthStore();
   const colors = useThemeColors();
   const styles = makeStyles(colors);
+
+  const isCreating = route.params.eventId === 'new';
+
+  if (isCreating) {
+    return (
+      <CreateEventForm
+        navigation={navigation}
+        colors={colors}
+        styles={styles}
+      />
+    );
+  }
 
   const event = MOCK_EVENTS.find((e) => e.id === route.params.eventId);
   const role = user?.role ?? 'STUDENT';
@@ -201,6 +216,258 @@ export function EventDetailScreen() {
           </TouchableOpacity>
         )}
 
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function CreateEventForm({
+  navigation,
+  colors,
+  styles,
+}: {
+  navigation: Nav;
+  colors: ReturnType<typeof useThemeColors>;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startHour, setStartHour] = useState('');
+  const [startMinute, setStartMinute] = useState('');
+  const [endHour, setEndHour] = useState('');
+  const [endMinute, setEndMinute] = useState('');
+  const [location, setLocation] = useState('');
+  const [maxCapacity, setMaxCapacity] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    if (!title.trim() || !location.trim() || !maxCapacity.trim()) {
+      setError('Vul asseblief alle velde in.');
+      return;
+    }
+
+    if (!startHour.trim() || !startMinute.trim()) {
+      setError('Vul asseblief die begintyd in.');
+      return;
+    }
+
+    const sh = parseInt(startHour, 10);
+    const sm = parseInt(startMinute, 10);
+    if (isNaN(sh) || sh < 0 || sh > 23 || isNaN(sm) || sm < 0 || sm > 59) {
+      setError('Begintyd is ongeldig.');
+      return;
+    }
+
+    const cap = parseInt(maxCapacity, 10);
+    if (isNaN(cap) || cap <= 0) {
+      setError('Kapasiteit moet \'n positiewe getal wees.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await createEvent({
+        title: title.trim(),
+        description: description.trim(),
+        date: (() => {
+          const d = new Date(date);
+          d.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
+          return d.toISOString();
+        })(),
+        location: location.trim(),
+        maxCapacity: cap,
+      });
+      navigation.goBack();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
+      const raw = axiosErr?.response?.data?.message;
+      const msg =
+        typeof raw === 'string'
+          ? raw
+          : Array.isArray(raw)
+          ? raw.join(', ')
+          : 'Kon nie funksie skep nie. Probeer weer.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.backIconBtn}
+          onPress={() => navigation.goBack()}
+          disabled={isSubmitting}
+        >
+          <Feather name="arrow-left" size={20} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.topBarTitle}>Nuwe Funksie</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {error && (
+          <View style={styles.errorBox}>
+            <Feather name="alert-circle" size={14} color={colors.red} />
+            <Text style={styles.errorBoxText}>{error}</Text>
+          </View>
+        )}
+
+        <View style={styles.formCard}>
+          <Text style={styles.fieldLabel}>Titel *</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="bv. Gradeplegtigheid 2026"
+            placeholderTextColor={colors.textSubtle}
+            value={title}
+            onChangeText={setTitle}
+            editable={!isSubmitting}
+            returnKeyType="next"
+          />
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Beskrywing</Text>
+          <TextInput
+            style={[styles.textInput, styles.textArea]}
+            placeholder="Opsionele beskrywing..."
+            placeholderTextColor={colors.textSubtle}
+            value={description}
+            onChangeText={setDescription}
+            editable={!isSubmitting}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Datum *</Text>
+          <TouchableOpacity
+            style={styles.textInput}
+            onPress={() => setShowDatePicker(true)}
+            disabled={isSubmitting}
+          >
+            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>
+              {date.toLocaleDateString('af-ZA', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="calendar"
+              minimumDate={new Date()}
+              onChange={(_, selected) => {
+                setShowDatePicker(false);
+                if (selected) setDate(selected);
+              }}
+            />
+          )}
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Begintyd *</Text>
+          <View style={styles.timeRow}>
+            <TextInput
+              style={[styles.textInput, styles.timeInput]}
+              placeholder="HH"
+              placeholderTextColor={colors.textSubtle}
+              value={startHour}
+              onChangeText={(v) => setStartHour(v.replace(/[^0-9]/g, '').slice(0, 2))}
+              editable={!isSubmitting}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={styles.timeColon}>:</Text>
+            <TextInput
+              style={[styles.textInput, styles.timeInput]}
+              placeholder="MM"
+              placeholderTextColor={colors.textSubtle}
+              value={startMinute}
+              onChangeText={(v) => setStartMinute(v.replace(/[^0-9]/g, '').slice(0, 2))}
+              editable={!isSubmitting}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+          </View>
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Eindtyd (opsioneel)</Text>
+          <View style={styles.timeRow}>
+            <TextInput
+              style={[styles.textInput, styles.timeInput]}
+              placeholder="HH"
+              placeholderTextColor={colors.textSubtle}
+              value={endHour}
+              onChangeText={(v) => setEndHour(v.replace(/[^0-9]/g, '').slice(0, 2))}
+              editable={!isSubmitting}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={styles.timeColon}>:</Text>
+            <TextInput
+              style={[styles.textInput, styles.timeInput]}
+              placeholder="MM"
+              placeholderTextColor={colors.textSubtle}
+              value={endMinute}
+              onChangeText={(v) => setEndMinute(v.replace(/[^0-9]/g, '').slice(0, 2))}
+              editable={!isSubmitting}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+          </View>
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Ligging *</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="bv. Hoofsaal, Kampus A"
+            placeholderTextColor={colors.textSubtle}
+            value={location}
+            onChangeText={setLocation}
+            editable={!isSubmitting}
+            returnKeyType="next"
+          />
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Kapasiteit *</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="bv. 200"
+            placeholderTextColor={colors.textSubtle}
+            value={maxCapacity}
+            onChangeText={setMaxCapacity}
+            editable={!isSubmitting}
+            keyboardType="number-pad"
+            returnKeyType="done"
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, isSubmitting && styles.btnDisabled]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting
+            ? <ActivityIndicator color={colors.surface} />
+            : <Feather name="check" size={16} color={colors.surface} />
+          }
+          <Text style={styles.primaryBtnText}>
+            {isSubmitting ? 'Besig om te skep...' : 'Skep Funksie'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.secondaryBtn, { marginTop: 10 }]}
+          onPress={() => navigation.goBack()}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.secondaryBtnText}>Kanselleer</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -391,5 +658,64 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 10,
     },
     backBtnText: { fontSize: 14, fontWeight: '800', color: colors.surface },
+    
+    btnDisabled: { opacity: 0.7 },
+
+    errorBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.red,
+      borderRadius: 12,
+      padding: 12,
+    },
+    errorBoxText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.red },
+
+    formCard: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      padding: 16,
+    },
+    fieldLabel: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.textSubtle,
+      marginBottom: 6,
+      letterSpacing: 0.3,
+    },
+    textInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: colors.text,
+      fontWeight: '600',
+    },
+    textArea: {
+      height: 100,
+      paddingTop: 12,
+    },
+
+    timeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    timeInput: {
+      flex: 1,
+      textAlign: 'center',
+    },
+    timeColon: {
+      fontSize: 20,
+      fontWeight: '900',
+      color: colors.text,
+    },
   });
 }
