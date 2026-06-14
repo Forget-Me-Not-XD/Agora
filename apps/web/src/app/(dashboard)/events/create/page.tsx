@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useTransition } from 'react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { useCurrentUser } from '@/components/UserContext';
 import { canCreateEvents } from '@/lib/rbac';
+import { createEventAction } from '@/lib/actions/event.actions';
 
 const STUDY_CENTERS = [
     'Centurion - Leriba',
@@ -15,7 +15,6 @@ const STUDY_CENTERS = [
 ];
 
 export default function CreateEventPage() {
-    const router = useRouter();
     const user = useCurrentUser();
 
     const [formData, setFormData] = useState({
@@ -30,8 +29,9 @@ export default function CreateEventPage() {
         studyCenter: user.studyCenter,
     });
 
-    const [submitted, setSubmitted] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [apiError, setApiError]       = useState<string | null>(null);
+    const [isPending, startTransition]  = useTransition();
+    const [errors, setErrors]           = useState<Record<string, string>>({});
 
     if (!canCreateEvents(user.role)) {
         return (
@@ -66,27 +66,22 @@ export default function CreateEventPage() {
             setErrors(newErrors);
             return;
         }
-        setSubmitted(true);
-        setTimeout(() => router.push('/events'), 2000);
+        setApiError(null);
+        startTransition(async () => {
+            const err = await createEventAction({
+                title:       formData.title,
+                description: formData.description,
+                date:        `${formData.date}T${formData.time}`,
+                location:    formData.location,
+                maxCapacity: Number(formData.capacity),
+            });
+            if (err) setApiError(err);
+        });
     }
 
     function handleChange(field: string, value: string) {
         setFormData((prev) => ({ ...prev, [field]: value }));
         if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
-    }
-
-    if (submitted) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-center py-24">
-                <CheckCircle size={48} className="text-[var(--color-green)] mb-4" />
-                <h2 className="text-xl font-bold text-[var(--color-text)] mb-2">
-                    Geleentheid Geskep
-                </h2>
-                <p className="text-[var(--color-text-subtle)] text-sm">
-                    Jy word aangestuur na die geleentheidsblad...
-                </p>
-            </div>
-        );
     }
 
     const inputClass = (field: string) =>
@@ -257,11 +252,29 @@ export default function CreateEventPage() {
                     </div>
                 </div>
 
+                {apiError && (
+                    <div
+                        className="px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+                        style={{
+                            background:  'var(--color-bg)',
+                            borderColor: 'var(--color-red)',
+                            color:       'var(--color-red)',
+                        }}
+                    >
+                        {apiError}
+                    </div>
+                )}
+
                 <button
                     type="submit"
-                    className="w-full py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                    disabled={isPending}
+                    className="w-full py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                    Skep Geleentheid
+                    {isPending ? (
+                        <><Loader2 size={16} className="animate-spin" /> Besig om te skep...</>
+                    ) : (
+                        'Skep Geleentheid'
+                    )}
                 </button>
             </form>
         </div>
