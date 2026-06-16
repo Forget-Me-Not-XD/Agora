@@ -1,11 +1,12 @@
 // ========== Imports: ==========
-import { ConflictException, Injectable } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from 'mongoose';
+import { isValidObjectId, Model } from 'mongoose';
 import { randomUUID } from "crypto";
-import { Rsvp, RsvpDocument } from './schemas/rsvp.schema';
+import { Rsvp, RsvpDocument, RsvpStatus } from './schemas/rsvp.schema';
 import { CreateRsvpDto } from "./dto/create-rsvp.dto";
 import { EventsService } from "../events/events.service";
+import { Role } from '../common/enums/role.enums';
 
 @Injectable()
 export class RsvpService {
@@ -46,5 +47,33 @@ export class RsvpService {
         .find({ user: userId })
         .populate('event')
         .exec();
+    }
+
+    async findRsvpsByEvent(eventId: string): Promise<RsvpDocument[]>{
+        await this.eventsService.findById(eventId);
+        return this.rsvpModel
+        .find({ event: eventId })
+        .populate('user')
+        .exec();
+    }
+
+    async cancelRsvp(rsvpId: string, requesterId: string, requesterRole: Role): Promise<void> {
+        if (!isValidObjectId(rsvpId)) {
+            throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+        }
+
+        const rsvp = await this.rsvpModel.findById(rsvpId).exec();
+        if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+
+        if (requesterRole !== Role.ADMIN && rsvp.user.toString() !== requesterId) {
+            throw new ForbiddenException('Jy mag slegs jou eie RSVP kanselleer');
+        }
+
+        rsvp.status = RsvpStatus.GEKANSELLEER;
+        await rsvp.save();
+
+        const event = await this.eventsService.findById(rsvp.event.toString());
+        event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
+        await event.save();
     }
 }
