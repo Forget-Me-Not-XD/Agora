@@ -34,5 +34,18 @@ export class RsvpController {
     @Get('event/:eventId')
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
-    
+    async findRsvpsByEvent(
+        @Param('eventId') eventId: string,
+    ): Promise<RsvpDocument[]> {
+        return this.rsvpService.findRsvpsByEvent(eventId);
+    }
+
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async cancelRsvp(
+        @Param('id') id: string,
+        @CurrentUser() user: JwtPayload,
+    ): Promise<void> {
+        return this.rsvpService.cancelRsvp(id, user.sub, user.role);
+    }
 }
