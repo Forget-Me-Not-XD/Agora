@@ -22,5 +22,9 @@ export class RsvpController {
     }
 
     @Get('my')
-    async findMyRsvps
+    async findMyRsvps(
+        @CurrentUser() user: JwtPayload,
+    ): Promise <RsvpDocument[]> {
+        return this.rsvpService.findMyRsvps(user.sub);
+    }
 }
