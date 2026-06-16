@@ -3,29 +3,26 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
 export enum RsvpStatus {
-    CONFIRMED = 'CONFIRMED',
-    HANGING = 'HANGING',
-    CANCELLED = 'CANCELLED',
+    BEVESTIG = 'BEVESTIG',
+    HANGENDE = 'HANGENDE',
+    GEKANSELLEER = 'GEKANSELLEER',
 }
 
 export type RsvpDocument = HydratedDocument<Rsvp>;
 
 @Schema({ timestamps: true, collection: 'rsvps' })
 export class Rsvp {
-    @Prop ({ required: true, type: Types.ObjectId, ref: 'User', index: true })
+    @Prop ({ required: true, type: Types.ObjectId, ref: 'Event', index: true })
     event!: Types.ObjectId;
 
     @Prop ({ required: true, type: Types.ObjectId, ref: 'User', index: true })
     user!: Types.ObjectId;
 
-    @Prop ({ required: true, enum: RsvpStatus, default: RsvpStatus.HANGING })
+    @Prop ({ required: true, enum: RsvpStatus, default: RsvpStatus.HANGENDE })
     status!: RsvpStatus;
 
     @Prop ({ required: true, trim: true })
     qrPayload!: string;
-
-    @Prop ({ default: false })
-    checkdeIn!: string;
 
     @Prop ({ default: false })
     checkedIn!: boolean;
