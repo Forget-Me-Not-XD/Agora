@@ -14,13 +14,13 @@ import { RsvpModule } from '../rsvp/rsvp.module';
 
 @Module({
     imports: [
-    // â”€â”€ Global configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ========== Global configuration ==========
     ConfigModule.forRoot({
         isGlobal: true,
         load: [configuration],
     }),
 
-    // â”€â”€ MongoDB connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ========== MongoDB connection ==========
     MongooseModule.forRootAsync({
         imports: [ConfigModule],
         inject: [ConfigService],
@@ -29,8 +29,8 @@ import { RsvpModule } from '../rsvp/rsvp.module';
         }),
     }),
 
-    // â”€â”€ Domain modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    MessagingModule,    // RabbitMQ â€” must load before consumers
+    // ========== Domain modules ==========
+    MessagingModule,    // RabbitMQ must load before consumers
     UsersModule,
     AuthModule,
     NotificationsModule,
