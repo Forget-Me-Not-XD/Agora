@@ -2,7 +2,8 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { isValidObjectId, Model } from 'mongoose';
-import { randomUUID } from "crypto";
+import { v4 as uuidv4 } from 'uuid';
+import { toBuffer } from 'qrcode';
 import { Rsvp, RsvpDocument, RsvpStatus } from './schemas/rsvp.schema';
 import { CreateRsvpDto } from "./dto/create-rsvp.dto";
 import { EventsService } from "../events/events.service";
@@ -32,7 +33,7 @@ export class RsvpService {
         const rsvp = new this.rsvpModel({
             event: dto.eventId,
             user: userId,
-            qrPayload: randomUUID(),
+            qrPayload: uuidv4(),
         });
         const saved = await rsvp.save();
 
@@ -75,5 +76,21 @@ export class RsvpService {
         const event = await this.eventsService.findById(rsvp.event.toString());
         event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
         await event.save();
+    }
+
+    async getQrCode(rsvpId: string, requesterId: string, requesterRole: Role):Promise<Buffer>{
+        if (!isValidObjectId(rsvpId)) {
+            throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+        }
+
+        const rsvp = await this.rsvpModel.findById(rsvpId).exec();
+        if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+
+        if (requesterRole !== Role.ADMIN && rsvp.user.toString() !== requesterId) {
+            throw new ForbiddenException(`Jy mag nie hierdie QR-kode opvra nie`);
+        }
+        
+
+        return toBuffer(rsvp.qrPayload);
     }
 }

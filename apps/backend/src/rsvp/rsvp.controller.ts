@@ -1,5 +1,6 @@
-// ========== Imports: ==========
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+﻿// ========== Imports: ==========
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -38,6 +39,17 @@ export class RsvpController {
         @Param('eventId') eventId: string,
     ): Promise<RsvpDocument[]> {
         return this.rsvpService.findRsvpsByEvent(eventId);
+    }
+
+    @Get (':id/qr')
+    async getQrCode(
+        @Param('id') id: string,
+        @CurrentUser() user: JwtPayload,
+        @Res ({ passthrough: true }) res: Response,
+    ): Promise <StreamableFile> {
+        const buffer = await this.rsvpService.getQrCode(id, user.sub, user.role);
+        res.set('Content-Type', 'image/png');
+        return new StreamableFile(buffer);
     }
 
     @Delete(':id')
