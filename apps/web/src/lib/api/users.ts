@@ -1,6 +1,4 @@
 // ========== Imports: ==========
-import { getToken } from '../session';
-
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 // Mirror backend: UserTitle enumerator 
@@ -32,9 +30,7 @@ export interface UpdateUserDto {
     title?: UserTitle;
 }
 
-export async function updateUser(id: string, payload: UpdateUserDto): Promise<UserResponseDto> {
-    const token = getToken();
-
+export async function updateUser(id: string, payload: UpdateUserDto, token?: string): Promise<UserResponseDto> {
     const res = await fetch(`${BASE_URL}/api/v1/users/${id}`, {
         method: 'PATCH',
         headers: {

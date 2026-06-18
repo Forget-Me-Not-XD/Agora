@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useTransition } from 'react';
 import { Menu, Bell, Sun, Moon, LogOut, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -43,9 +45,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[var(--color-primary)] rounded-full" />
                 </button>
 
-                <div className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-white text-sm font-semibold ml-1">
+                <Link href="/profile" 
+                className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-white text-sm font-semibold ml-1 hover:opacity-80 transition-opacity"
+                title="My Profiel">
                     {user.name.charAt(0)}{user.surname.charAt(0)}
-                </div>
+                </Link>
 
                 <button
                     onClick={handleLogout}
