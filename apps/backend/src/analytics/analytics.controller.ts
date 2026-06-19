@@ -11,6 +11,8 @@ import { LstmService, TrainingDataItem } from './lstm.service';
 export class AnalyticsController {
     constructor(private readonly lstmService: LstmService) {}
 
+    // Returns the full training dataset ( all past events with features + labels ).
+    // Admin only - This is internal data the ML pipeline consumes, not as user-facing feature
     @Get ('training-data')
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
