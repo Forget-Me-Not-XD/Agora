@@ -10,6 +10,7 @@ export interface MockUser {
     role: UserRole;
     studyCenter: string;
     isActive: boolean;
+    title?: string;
 }
 
 export interface MockEvent {

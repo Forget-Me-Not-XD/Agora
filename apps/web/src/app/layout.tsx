@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="af" className={inter.className} suppressHydrationWarning>
-      <body className="bg-app text-app min-h-screen">
+      <body className="bg-app text-app min-h-screen" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
