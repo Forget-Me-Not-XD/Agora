@@ -1,4 +1,4 @@
-// ========== Imports: ==========
+﻿// ========== Imports: ==========
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { isValidObjectId, Model } from 'mongoose';
@@ -8,6 +8,14 @@ import { Rsvp, RsvpDocument, RsvpStatus } from './schemas/rsvp.schema';
 import { CreateRsvpDto } from "./dto/create-rsvp.dto";
 import { EventsService } from "../events/events.service";
 import { Role } from '../common/enums/role.enums';
+import { User } from '../users/schemas/user.schema';
+import { Event } from '../events/schemas/event.schema';
+
+export interface ScanResponse {
+    guestName: string;
+    eventTitle: string;
+    eventDate: Date;
+}
 
 @Injectable()
 export class RsvpService {
@@ -92,5 +100,32 @@ export class RsvpService {
         
 
         return toBuffer(rsvp.qrPayload);
+    }
+
+    async scanRsvp(qrPayload: string): Promise <ScanResponse> {
+        const rsvp = await this.rsvpModel
+        .findOne({ qrPayload })
+        .populate<{ user: User }>('user')
+        .populate<{ event: Event }>('event')
+        .exec();
+
+        if (!rsvp) {
+            throw new NotFoundException('Ongeldige QR-kode');
+        }
+
+        if (rsvp.checkedIn) {
+            throw new ConflictException('Gas het reeds ingecheck');
+        }
+
+        rsvp.checkedIn = true;
+        rsvp.checkedInAt = new Date();
+        rsvp.status = RsvpStatus.BEVESTIG;
+        await rsvp.save();
+
+        return {
+            guestName: `${rsvp.user.name} ${rsvp.user.surname}`,
+            eventTitle: rsvp.event.title,
+            eventDate: rsvp.event.date,
+        };
     }
 }
