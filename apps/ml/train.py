@@ -65,5 +65,120 @@ def load_from_api(base_url: str, token: str) -> list:
 
 
 def load_from_file(path: str) -> list:
-    print(f"Loading..........")
+    print(f"Loading training data from {path} ...")
+    with open(path, encoding='utf-8') as f:
+        items = json.load(f)
+    print(f"Loaded {len(items)} events.\n")
+    return items
+
+
+def parse_items(items: list) -> tuple:
+    """Convert the raw JSON list into numpy arrays, sorted chronologically"""
+    items = sorted(items, key=lambda e: e.get('date', ''))
+    
+    x = np.array([e['features'] for e in items], dtype=np.float32)
+    y = np.array(
+        [[e['labels']['fillRate'], e['labels']['noShowRate']] for e in items],
+        dtype=np.float32,
+    )
+    return x, y
+
+
+# ============================================================
+# FEATURE NORMALISATION:
+# ============================================================
+
+def fit_and_save_scaler(X_train: np.ndarray, output_dir: str) -> MinMaxScaler:
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    scaler.fit(X_train)
+    
+    path = os.path.join(output_dir, 'scaler.pkl')
+    with open(path, 'wb') as f:
+        pickle.dump(scaler, f)
+    print(f"Scaler saved -> {path}")
+    labels = ['capacity', 'dayOfWeek', 'month', 'daysInAdvance']
+    for label, lo, hi in zip(labels, scaler.data_min_, scaler.data_max_):
+        print(f"{label:15s}: [{lo:.of}, {hi:.0f}] -> scaled to [0, 1]")
+        print()
+        return scaler
+    
+    
+# ============================================================
+# SLIDING WINDOW SEQUENCE:
+# ============================================================
+
+def create_sequence(X: np.ndarray, y: np.ndarray) -> tuple:
+    X_out, y_out = [], []
+    for i in range(len(X) - SEQUENCE_LENGTH + 1):
+        X_out.append(X[i : i + SEQUENCE_LENGTH])    # (SEQUENCE LENGTH, 4)
+        y_out.append(y[i + SEQUENCE_LENGTH - 1])    # Labels of last event
+    return np.array(X_out, dtype=np.float32), np.array(y_out, dtype=np.float32)
+
+
+# ============================================================
+# MODEL ARCHITECTURE:
+# ============================================================
+
+def build_model() -> keras.Model:
+    model = keras.Sequential([
+        keras.layers.LSTM(
+            units = LSTM_UNITS,
+            input_shape = (SEQUENCE_LENGTH, NUM_FEATURES),
+            name = 'lstm'
+        ),
+        keras.layers.Dropout(DROPOUT_RATE, name='dropout_lstm'),
+        keras.layers.Desne(DENSE_UNITS, activation='relu', name='dense_hidden'),
+        keras.layers.Dropout(DROPOUT_RATE / 2, name='dropout_dense'),
+        keras.layers.Dense(NUM_OUTPUTS, activation='sigmoid', name='output'),
+    ])
+    
+    model.compile(
+        optimizer = keras.optimizers.Adam(learning_rate = LEARNING_RATE),
+        loss = 'mae',
+        metrics = ['mae'],
+    )
+    return model
+
+
+# ============================================================
+# TRAINING WITH CALLBACKS:
+# ============================================================
+
+def train_model(model, X_train, y_train, X_val, y_val):
+    callbacks = [
+        # EarlyStopping - Most important safeguard against overfitting
+        # Monitors val_loss. If it hasn't improved for PATIENCE consecutive expochs, training stops
+        # Model rewinds to use best weights
+        keras.callbacks.EarlyStopping(
+            monitor = 'val_loss',
+            patience = PATIENCE,
+            restore_best_weights = True,
+            verbose = 1,
+        ),
+        # SECONDARY SafeGuard - If val_loss stagnates for 10 epochs, halve the learning rate This lets the model take smaller more careful steps
+        keras.callbacks.ReduceLROnPlateau(
+            monitor = 'val_loss',
+            factor = 0.5,
+            patience = 10,
+            min_lr = 1e - 6,
+            verbose = 1
+        ),
+    ]
+    
+    print(f"Training: {len(X_train)} sequences | Validation: {len(X_val)} sequences")
+    history = model.fit(
+        X_train, y_train,
+        validation_data = (X_val, y_val),
+        epochs = MAX_EPOCHS,
+        batch_size = BATCH_SIZE,
+        callbacks = callbacks,
+        verbose = 1,
+    )
+    return history
+
+
+# ============================================================
+# KERAS -> TFLITE CONVERSION:
+# ============================================================
+
 
