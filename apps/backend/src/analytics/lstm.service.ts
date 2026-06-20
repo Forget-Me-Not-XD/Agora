@@ -13,6 +13,7 @@ import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
 export interface TrainingDataItem {
     eventId: string;
     title: string;
+    date: string;
     // Tuple [ MaxCapacity, dayOfWeek, month, daysInAdvance ]
     features: [number, number, number, number];
     labels: {
@@ -55,7 +56,7 @@ export class LstmService {
 
         // Label: no-show rate:
         const checkedInCount = await this.rsvpModel
-            .countDocuments({ events: event._id, checkedIn: true })
+            .countDocuments({ event: event._id, checkedIn: true })
             .exec();
 
         const noShowRate = event.confirmedAttendees > 0
@@ -73,6 +74,7 @@ export class LstmService {
         return {
             eventId: event._id.toString(),
             title: event.title,
+            date: event.date.toISOString(),
             features: [
                 event.maxCapacity,              //<-- Seats available
                 event.date.getDay(),            //<-- 0 = Sunday, 1 = Monday, 2 = Tuesday, ...
