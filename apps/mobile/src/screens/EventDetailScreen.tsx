@@ -18,6 +18,7 @@ import {
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createEvent } from '../api/events';
+import { createRsvp } from '../api/rsvp';
 
 const STATUS_PILL: Record<EventStatus, { bg: string; text: string }> = {
   upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
@@ -35,6 +36,8 @@ export function EventDetailScreen() {
   const { user } = useAuthStore();
   const colors = useThemeColors();
   const styles = makeStyles(colors);
+
+  const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
 
   const isCreating = route.params.eventId === 'new';
 
@@ -79,6 +82,36 @@ export function EventDetailScreen() {
 
   function handleQrScanner() {
     navigation.navigate('QrScanner', { eventId: event!.id });
+  }
+
+  async function handleRsvp() {
+    setRsvpSubmitting(true);
+    try {
+      await createRsvp(event!.id);
+      Alert.alert(
+        'Ingeskryf!',
+        'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
+        [{ text: 'OK' }],
+      );
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { status?: number; data?: { message?: string | string[] } };
+      };
+      const status = axiosErr?.response?.status;
+      const raw = axiosErr?.response?.data?.message;
+      const backendMsg = Array.isArray(raw) ? raw.join(', ') : raw ?? '';
+
+      const msg =
+        status === 409
+          ? backendMsg.toLowerCase().includes('vol')
+            ? 'Hierdie geleentheid is ongelukkig vol bespreek'
+            : 'Jy het reeds vir hierdie geleentheid ingeskryf'
+          : backendMsg || 'Kon nie inskryf nie. Probeer asseblief weer.';
+
+      Alert.alert('RSVP', msg, [{ text: 'OK' }]);
+    } finally {
+      setRsvpSubmitting(false);
+    }
   }
 
   return (
@@ -207,12 +240,19 @@ export function EventDetailScreen() {
 
         {!canManageCheckIns(role) && event.status === 'upcoming' && (
           <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => Alert.alert('RSVP', 'RSVP-funksionaliteit koms binnekort.')}
+            style={[styles.primaryBtn, rsvpSubmitting && { opacity: 0.6 }]}
+            onPress={handleRsvp}
+            disabled={rsvpSubmitting}
             accessibilityLabel="RSVP vir hierdie funksie"
           >
-            <Feather name="check-circle" size={16} color={colors.surface} />
-            <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
+            {rsvpSubmitting ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <>
+                <Feather name="check-circle" size={16} color={colors.surface} />
+                <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
+              </>
+            )}
           </TouchableOpacity>
         )}
 
