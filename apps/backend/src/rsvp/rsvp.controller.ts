@@ -7,9 +7,10 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { Role } from '../common/enums/role.enums';
-import { RsvpService } from './rsvp.service';
+import { RsvpService, ScanResponse } from './rsvp.service';
 import { CreateRsvpDto } from './dto/create-rsvp.dto';
 import { RsvpDocument } from './schemas/rsvp.schema';
+import { ScanRsvpDto } from './dto/scan-rsvp.dto';
 
 @Controller('rsvp')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +24,16 @@ export class RsvpController {
         @CurrentUser() user: JwtPayload,
     ): Promise <RsvpDocument> {
         return this.rsvpService.createRsvp(dto, user.sub);
+    }
+
+    @Post('scan')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    @HttpCode(HttpStatus.OK)
+    async scanRsvp(
+        @Body() dto: ScanRsvpDto,
+    ): Promise <ScanResponse> {
+        return this.rsvpService.scanRsvp(dto.qrPayload);
     }
 
     @Get('my')
