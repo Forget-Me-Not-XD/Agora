@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Image,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,20 +18,25 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import {
   MOCK_EVENTS,
-  MOCK_RSVPS,
   STATUS_LABELS,
   MONTHS_SHORT_AF,
-  type MockRsvp,
   type EventStatus,
 } from '../lib/mock-data';
-import { canManageCheckIns } from '../lib/rbac';
+import { canManageCheckIns, filterEventsForUser } from '../lib/rbac';
+import {
+  getMyRsvps,
+  cancelRsvp,
+  getRsvpQrDataUri,
+  type RsvpWithEvent,
+  type RsvpStatus,
+} from '../api/rsvp';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const RSVP_STATUS_CONFIG: Record<MockRsvp['status'], { label: string; bg: string; text: string; icon: string }> = {
-  bevestig:    { label: 'Bevestig',    bg: '#D1FAE5', text: '#065F46', icon: 'check-circle' },
-  hangende:    { label: 'Hangende',    bg: '#FEF3C7', text: '#92400E', icon: 'clock' },
-  gekanselleer:{ label: 'Gekanselleer', bg: '#FEE2E2', text: '#991B1B', icon: 'x-circle' },
+const RSVP_STATUS_CONFIG: Record<RsvpStatus, { label: string; bg: string; text: string; icon: string }> = {
+  BEVESTIG:     { label: 'Bevestig',     bg: '#D1FAE5', text: '#065F46', icon: 'check-circle' },
+  HANGENDE:     { label: 'Hangende',     bg: '#FEF3C7', text: '#92400E', icon: 'clock' },
+  GEKANSELLEER: { label: 'Gekanselleer', bg: '#FEE2E2', text: '#991B1B', icon: 'x-circle' },
 };
 
 const EVENT_STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
@@ -46,31 +53,63 @@ export function RsvpScreen() {
   const styles = makeStyles(colors);
 
   const role = user?.role ?? 'STUDENT';
-  const userId = user?.id ?? 'user-3';
-
-  const [filter, setFilter] = useState<MockRsvp['status'] | 'alles'>('alles');
-
-  // For admin/dosent: show all events with RSVP stats
-  // For student/GAS: show personal RSVPs
   const isManager = canManageCheckIns(role);
 
-  const myRsvps = useMemo(
-    () => MOCK_RSVPS.filter((r) => r.userId === userId),
-    [userId],
-  );
+  const[filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
+
+  // my rsvps (student/gas)
+  const [rsvps, setRsvps] = useState<RsvpWithEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // QR per inskrywing
+  const [openQrId, setOpenQrId] = useState<string | null>(null);
+  const [qrUriById, setQrUriById] = useState<Record<string, string>>({});
+  const [qrLoadingId, setQrLoadingId] = useState<string | null>(null);
+
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isManager) return;        // manager-aansig gebruik nog die oorsig
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const data = await getMyRsvps();
+        if (active) setRsvps(data);
+      } catch {
+        if (active) setLoadError('Kon nie jou RSVPs laai nie.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [isManager]);
 
   const filteredRsvps = useMemo(
-    () => filter === 'alles' ? myRsvps : myRsvps.filter((r) => r.status === filter),
-    [myRsvps, filter],
+    () => (filter === 'alles' ? rsvps : rsvps.filter((r) => r.status === filter)),
+    [rsvps, filter],
   );
 
-  // Build enriched list
-  const enriched = useMemo(() =>
-    filteredRsvps.map((rsvp) => ({
-      rsvp,
-      event: MOCK_EVENTS.find((e) => e.id === rsvp.eventId),
-    })).filter((item) => !!item.event),
-  [filteredRsvps]);
+  async function toggleQr(rsvpId: string) {
+    if (openQrId === rsvpId) {
+      setOpenQrId(null);
+      return;
+    }
+    setOpenQrId(rsvpId);
+    if (qrUriById[rsvpId]) return; // klaar gelaai;
+    setQrLoadingId(rsvpId);
+    try {
+      const uri = await getRsvpQrDataUri(rsvpId);
+      setQrUriById((prev) => ({ ...prev, [rsvpId]: uri }));
+    } catch {
+      Alert.alert('QR-kode', 'Kon nie die QR-kode laai nie. Probeer asseblief weer.');
+      setOpenQrId(null);
+    } finally {
+      setQrLoadingId(null);
+    }
+  }
 
   function handleCancelRsvp(rsvpId: string, eventTitle: string) {
     Alert.alert(
@@ -79,17 +118,30 @@ export function RsvpScreen() {
       [
         { text: 'Nee', style: 'cancel' },
         {
-          text: 'Ja, kanselleer',
-          style: 'destructive',
-          onPress: () => Alert.alert('RSVP Gekanselleer', 'RSVP-bestuur koms binnekort.'),
-        },
-      ],
-    );
+          text: 'Ja', style: 'destructive',
+          onPress: async () => {
+            setCancelingId(rsvpId);
+            try {
+              await cancelRsvp(rsvpId);
+              setRsvps((prev) =>
+                prev.map((r) =>
+                  r._id === rsvpId ? { ...r, status: 'GEKANSeLLEER' as RsvpStatus} : r,
+                ),
+              );
+            } catch {
+              Alert.alert('Kanselleer', 'Kon nie die RSVP kanselleer nie. Probeer asseblief weer.');
+            } finally {
+              setCancelingId(null);
+            }
+          }
+        }
+      ]
+    )
   }
 
-  function formatDate(dateStr: string): string {
-    const [, m, d] = dateStr.split('-').map(Number);
-    return `${d} ${MONTHS_SHORT_AF[m - 1]}`;
+  function formatDate(dateStr: string): { day: number; month: string } {
+    const d = new Date(dateStr);
+    return { day: d.getDate(), month: MONTHS_SHORT_AF[d.getMonth()] };
   }
 
   // Manager view: show event overview with RSVP stats
@@ -201,12 +253,14 @@ export function RsvpScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>My RSVPs</Text>
-        <Text style={styles.pageSubtitle}>{myRsvps.length} inskrywing{myRsvps.length !== 1 ? 's' : ''}</Text>
+        <Text style={styles.pageSubtitle}>
+          {rsvps.length} inskrywing{rsvps.length !== 1 ? 's' : ''}
+        </Text>
       </View>
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
-        {(['alles', 'bevestig', 'hangende', 'gekanselleer'] as const).map((s) => (
+        {(['alles', 'BEVESTIG', 'HANGENDE', 'GEKANSELLEER'] as const).map((s) => (
           <TouchableOpacity
             key={s}
             style={[
@@ -225,36 +279,40 @@ export function RsvpScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {enriched.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Feather name="alert-circle" size={32} color={colors.red} />
+            <Text style={styles.emptyTitle}>{loadError}</Text>
+          </View>
+        ) : filteredRsvps.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="check-square" size={32} color={colors.textSubtle} />
             <Text style={styles.emptyTitle}>
-              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_CONFIG[filter as MockRsvp['status']].label.toLowerCase()} RSVPs nie`}
+              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_CONFIG[filter].label.toLowerCase()} RSVPs nie`}
             </Text>
             <Text style={styles.emptySubtitle}>
-              Gaan na Funksies om te RSVP vir aankomende geleenthede.
+              Gaan na Funksies om vir aankomende geleenthede te RSVP.
             </Text>
           </View>
         ) : (
-          enriched.map(({ rsvp, event }) => {
-            if (!event) return null;
-            const cfg = RSVP_STATUS_CONFIG[rsvp.status];
+          filteredRsvps.map(({ _id, status, checkedIn, event }) => {
+            const cfg = RSVP_STATUS_CONFIG[status];
+            const { day, month } = formatDate(event.date);
+            const showQr = openQrId === _id;
             return (
-              <TouchableOpacity
-                key={rsvp.id}
-                style={styles.rsvpCard}
-                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                activeOpacity={0.75}
-                accessibilityLabel={`${event.title} RSVP - ${cfg.label}`}
-              >
+              <View key={_id} style={styles.rsvpCard}>
                 <View style={styles.rsvpCardTop}>
                   <View style={styles.rsvpDateBadge}>
-                    <Text style={styles.rsvpDay}>{formatDate(event.date).split(' ')[0]}</Text>
-                    <Text style={styles.rsvpMonth}>{formatDate(event.date).split(' ')[1]}</Text>
+                    <Text style={styles.rsvpDay}>{day}</Text>
+                    <Text style={styles.rsvpMonth}>{month}</Text>
                   </View>
                   <View style={styles.rsvpInfo}>
                     <Text style={styles.rsvpTitle} numberOfLines={1}>{event.title}</Text>
-                    <Text style={styles.rsvpMeta}>{event.time} · {event.location}</Text>
+                    <Text style={styles.rsvpMeta} numberOfLines={1}> {event.location}</Text>
                   </View>
                   <View style={[styles.rsvpBadge, { backgroundColor: cfg.bg }]}>
                     <Feather name={cfg.icon as any} size={12} color={cfg.text} />
@@ -266,30 +324,55 @@ export function RsvpScreen() {
                     <Text style={styles.rsvpDetailLabel}>Status</Text>
                     <Text style={[styles.rsvpDetailValue, { color: cfg.text }]}>{cfg.label}</Text>
                   </View>
-                  {rsvp.dietary && (
-                    <View style={styles.rsvpDetailRow}>
-                      <Text style={styles.rsvpDetailLabel}>Dieet</Text>
-                      <Text style={styles.rsvpDetailValue}>{rsvp.dietary}</Text>
-                    </View>
-                  )}
                   <View style={styles.rsvpDetailRow}>
                     <Text style={styles.rsvpDetailLabel}>Ingemeld</Text>
                     <Text style={styles.rsvpDetailValue}>
-                      {rsvp.checkedIn ? 'Ja' : 'Nee'}
+                      {checkedIn ? 'Ja' : 'Nee'}
                     </Text>
                   </View>
                 </View>
 
-                {rsvp.status !== 'gekanselleer' && event.status === 'upcoming' && (
-                  <TouchableOpacity
-                    style={styles.cancelBtn}
-                    onPress={() => handleCancelRsvp(rsvp.id, event.title)}
-                    accessibilityLabel={`Kanselleer RSVP vir ${event.title}`}
-                  >
-                    <Text style={styles.cancelBtnText}>Kanselleer RSVP</Text>
-                  </TouchableOpacity>
+                {showQr && (
+                  <view style={styles.qrBox}>
+                    {qrLoadingId === _id ? (
+                      <ActivityIndicator color={colors.primary} />
+                    ) : qrUriById[_id] ? (
+                      <Image
+                        source={{uri: qrUriById[_id] }}
+                        style={styles.qrImage}
+                        resizeMode="contain"
+                        accessibilityLabel="Jou QR-kode"
+                      />
+                    ) : null}
+                  </view>
                 )}
-              </TouchableOpacity>
+
+                <View style={styles.rsvpActions}>
+                  <TouchableOpacity
+                    style={styles.qrBtn}
+                    onPress={() => toggleQr(_id)}
+                    accessibilityLabel={showQr ? 'Versteek Qr-Kode' : 'Wys QR-kode'}
+                  >
+                    <Feather name="maximize" size={13} color={colors.primary} />
+                    <Text style={styles.qrBtnText}>{showQr ? 'Versteek QR' : 'Wys QR'}</Text>
+                  </TouchableOpacity>
+
+                  {status !== 'GEKANSELLEER' && (
+                    <TouchableOpacity
+                      style={styles.cancelBtn}
+                      onPress={() => handleCancelRsvp(_id,event.title)}
+                      disabled={cancelingId === _id}
+                      accessibilityLabel={`Kanselleer RSVP vir ${event.title}`}
+                    >
+                      {cancelingId === _id ? (
+                        <ActivityIndicator size="small" color={colors.textSubtle} />
+                      ) : (
+                        <Text style={styles.cancelBtnText}>Kanselleer RSVP</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             );
           })
         )}
@@ -387,6 +470,32 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 6,
     },
     cancelBtnText: { fontSize: 12, fontWeight: '700', color: colors.textSubtle },
+
+    rsvpActions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+    qrBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    qrBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary},
+    qrBox: {
+      alignSelf: 'center',
+      width: 200,
+      height: 200,
+      borderRadius: 16,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+    },
+    qrImage: { width: '100%', height: '100%' },
 
     // Manager card
     managerCard: {

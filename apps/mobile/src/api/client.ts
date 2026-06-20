@@ -86,6 +86,26 @@ class ApiClient {
         const { data } = await this.axios.delete<T>(path);
         return data;
     }
+
+    async getImageDataUri(path: string): Promise<string> {
+        const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+
+        const res = await fetch(`${API_URL}${path}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!res.ok) {
+            throw new Error(`[${res.status}] Kon nie die beeld laai nie`);
+        }
+
+        const blob = await res.blob();
+        return new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror   = () => reject(new Error('Kon nie die beeld lees nie'));
+            reader.readAsDataURL(blob);
+        });
+    }
 }
 
 export const apiClient = new ApiClient();
