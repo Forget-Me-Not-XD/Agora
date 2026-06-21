@@ -1,0 +1,20 @@
+# Pi inference dependencies — do NOT add tensorflow here.
+# Full TensorFlow (~500 MB) will not install cleanly on Raspberry Pi OS Bookworm.
+
+# tflite-runtime vs ai-edge-litert — the tradeoff:
+#   tflite-runtime  uses: import tflite_runtime.interpreter  (what predict.py uses)
+#   ai-edge-litert  uses: import ai_edge_litert.interpreter  (Google's newer replacement)
+# Google deprecated tflite-runtime after 2.14.0 and released ai-edge-litert 1.0+
+# as its successor. We stay on tflite-runtime because predict.py already uses its
+# import path. If you ever retrain with TF 2.15+ and need to upgrade, switch to
+# ai-edge-litert and update the import at the top of predict.py accordingly.
+tflite-runtime>=2.13.0,<2.15.0
+
+# Array operations — building and reshaping the (1, 5, 4) input tensor.
+numpy>=1.24.0
+
+# Required to deserialise scaler.pkl.
+# pickle.load() must reconstruct a MinMaxScaler object, which means Python
+# needs sklearn.preprocessing available at load time — even though we never
+# call any sklearn functions directly in predict.py.
+scikit-learn>=1.3.0

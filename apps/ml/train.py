@@ -183,17 +183,29 @@ def train_model(model, X_train, y_train, X_val, y_val):
 
 def convert_to_tflite(model: keras.Model, output_dir: str) -> None:
     print("Converting to TFlite...")
-    converter  = tf.lite.TFLiteConverter.from_keras_model(model)
+
+    # from_keras_model traces with dynamic shapes, causing TensorListReserve
+    # to fail. from_concrete_functions with a fixed input_signature makes all
+    # tensor shapes static, which TFLite requires for LSTM conversion.
+    @tf.function(input_signature=[
+        tf.TensorSpec(shape=[1, SEQUENCE_LENGTH, NUM_FEATURES], dtype=tf.float32)
+    ])
+    def predict_fn(x):
+        return model(x, training=False)
+
+    converter = tf.lite.TFLiteConverter.from_concrete_functions(
+        [predict_fn.get_concrete_function()]
+    )
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    
+
     tflite_model = converter.convert()
-    
+
     path = os.path.join(output_dir, 'model.tflite')
     with open(path, 'wb') as f:
         f.write(tflite_model)
-    
+
     size_kb = len(tflite_model) / 1024
-    print(f"Saved -. {path} ({size_kb:.1f} KB with quanmtization)\n")
+    print(f"Saved -> {path} ({size_kb:.1f} KB with quantization)\n")
 
 
 # ============================================================
