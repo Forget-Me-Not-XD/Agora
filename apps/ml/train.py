@@ -133,7 +133,7 @@ def build_model() -> keras.Model:
     ])
     
     model.compile(
-        optimizer = keras.optimizers.Adam(learning_rate = LEARNING_RATE),
+        optimizer = keras.optimizers.Adam(learning_rate = LEARNING_RATE, clipnorm = 1.0),
         loss = 'mse',
         metrics = ['mae'],
     )
@@ -211,7 +211,7 @@ def convert_to_tflite(model: keras.Model, output_dir: str) -> None:
 # ============================================================
 # EVALUATION:
 # ============================================================
-def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray) -> None:
+def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=None) -> None:
     preds = model.predict(X_val, verbose=0)    # shape(n_val, 2)
     
     fill_mae = float(np.mean(np.abs(preds[:, 0] - y_val[:, 0])))
@@ -240,7 +240,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray) -> None:
     
     _plot_history_ref = None    # Populated in main()
     
-    if hasattr(evaluate, '_history'):
+    if history is not None:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
         history = evaluate._history
         
@@ -268,6 +268,8 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray) -> None:
 # MAIN
 # ============================================================
 def main() -> None:
+    np.random.seed(42)
+    tf.random.set_seed(42)
     parser = argparse.ArgumentParser(
         description = "Train LSTM model for event attendance prediction"
     )
@@ -330,7 +332,6 @@ def main() -> None:
     print(f"\nBest epoch : {best_epoch}  |  best val_loss : {best_val_loss:.6f}\n")
 
     # == Evaluate ======================================================================
-    evaluate._history = history  # pass history to the evaluator for the plot
     evaluate(model, X_val_seq, y_val_seq)
 
     # == Convert to TFLite ============================================================
