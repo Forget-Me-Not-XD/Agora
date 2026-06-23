@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { EventsModule } from '../events/events.module';
 import { Rsvp, RsvpSchema } from '../rsvp/schemas/rsvp.schema';
 import { LstmService } from './lstm.service';
+import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
 
 
@@ -14,7 +15,7 @@ import { AnalyticsController } from './analytics.controller';
         EventsModule,
         MongooseModule.forFeature([{ name: Rsvp.name, schema: RsvpSchema}]),
     ],
-    providers: [LstmService],
+    providers: [LstmService, AnalyticsService],
     controllers: [AnalyticsController],
     exports: [],
 })
