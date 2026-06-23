@@ -1,343 +1,343 @@
-# NOTE TO SELF: WEEK OF MONTH MOET OOK IN AG GENEEM WORD VIR PREDICTIONS - EK IS TE MOEG OM VANAAND AAN TE GAAN :)
+# LET OP: WEEK VAN MAAND MOET OOK IN AG GENEEM WORD VIR VOORSPELLINGS - EK WAS TE MOEG OM VANAAND AAN TE GAAN :)
 
-# apps/ml — LSTM Attendance Prediction
+# apps/ml — LSTM Bywoningsvoorspelling
 
-> Scripts that train a small LSTM neural network to predict event fill rates
-> and no-show rates for university events, then serve predictions on a
-> Raspberry Pi 5.
+> Scripts wat 'n klein LSTM-neurale netwerk oplei om funksie-vulkoerse
+> en nie-opkoms-koerse vir universiteitsgeleenthede te voorspel, en dan
+> voorspellings op 'n Raspberry Pi 5 lewer.
 
 ---
 
-## Test Envirionment
+## Toetsomgewing
 
-| Component | Version | Notes |
+| Komponent | Weergawe | Notas |
 |---|---|---|
-| Python ( dev machine ) | **3.11.9** | 3.12+ not supported by TensorFlow |
-| Python (Raspberry pi server) | **3.11.9** | Default on Raspberry pi OS Bookworm |
-| Tensorflow | **2.15.1** | Training only - never installed on Pi |
-| tflite-runtime | **2.14.0** | Inference only - Pi only |
-| scikit-learn | **>=1.3.0** | Both envirionments ( needed to deserialise scaler.pkl) |
-| numpy | **>=1.24.0, < 2.0.0** | numpy 2.x has breaking changes incompatible with TF2.15 |
-| OS (dev) | Windows 11 | |
-| OS (pi server) | Raspberry Pi Os Bookworm (ARM 64) | |
+| Python (ontwikkelingsmasjien) | **3.11.9** | 3.12+ word nie deur TensorFlow ondersteun nie |
+| Python (Raspberry Pi-bediener) | **3.11.9** | Verstek op Raspberry Pi OS Bookworm |
+| TensorFlow | **2.15.1** | Slegs opleiding — word nooit op die Pi geïnstalleer nie |
+| tflite-runtime | **2.14.0** | Slegs inferensie — net op die Pi |
+| scikit-learn | **>=1.3.0** | Beide omgewings (benodig om scaler.pkl te deserialiseer) |
+| numpy | **>=1.24.0, < 2.0.0** | numpy 2.x het brekende veranderinge wat onversoenbaar is met TF2.15 |
+| OS (ontwikkeling) | Windows 11 | |
+| OS (Pi-bediener) | Raspberry Pi OS Bookworm (ARM 64) | |
 
 ---
 
-## Table of Contents
+## Inhoudsopgawe
 
-1. [Overview](#1-overview)
-2. [System Architecture](#2-system-architecture)
-3. [How the Neural Network Works](#3-how-the-neural-network-works)
-4. [Understanding the Training Curves](#4-understanding-the-training-curves)
-5. [Complete Setup Guide — From Step 1](#5-complete-setup-guide--from-step-1)
-6. [Deploying Artifacts to the Raspberry Pi](#6-deploying-artifacts-to-the-raspberry-pi)
-7. [Testing predict.py Manually](#7-testing-predictpy-manually)
-8. [Understanding the Output JSON](#8-understanding-the-output-json)
-9. [Retraining as Real Events Accumulate](#9-retraining-as-real-events-accumulate)
+1. [Oorsig](#1-oorsig)
+2. [Stelselargitektuur](#2-stelselargitektuur)
+3. [Hoe die Neurale Netwerk Werk](#3-hoe-die-neurale-netwerk-werk)
+4. [Die Opleidingskurwes Verstaan](#4-die-opleidingskurwes-verstaan)
+5. [Volledige Opstelgids — Van Stap 1 Af](#5-volledige-opstelgids--van-stap-1-af)
+6. [Artefakte na die Raspberry Pi Ontplooi](#6-artefakte-na-die-raspberry-pi-ontplooi)
+7. [predict.py Handmatig Toets](#7-predictpy-handmatig-toets)
+8. [Die Uitvoer JSON Verstaan](#8-die-uitvoer-json-verstaan)
+9. [Heroplei Soos Werklike Gebeure Ophoop](#9-heroplei-soos-werklike-gebeure-ophoop)
 
 ---
 
-## 1. Overview
+## 1. Oorsig
 
-Two Python scripts handle the full ML lifecycle:
+Twee Python-skrips hanteer die volledige ML-lewensiklus:
 
-| Script | Runs on | Purpose |
+| Skrip | Loop op | Doel |
 |---|---|---|
-| `train.py` | Dev machine | Fetches historical event data from the NestJS API, trains the LSTM, saves `model.tflite` and `scaler.pkl` |
-| `predict.py` | Raspberry Pi 5 | Loaded by the NestJS backend as a child process; reads the saved artifacts and returns a JSON prediction |
+| `train.py` | Ontwikkelingsmasjien | Haal historiese geleentheiddata van die NestJS API, lei die LSTM op, stoor `model.tflite` en `scaler.pkl` |
+| `predict.py` | Raspberry Pi 5 | Word deur die NestJS-backend as 'n kindproses gelaai; lees die gestoorde artefakte en gee 'n JSON-voorspelling terug |
 
-Training is intentionally separated from inference. The Pi only ever runs
-`predict.py` — it never trains. Training happens on a development machine
-with full TensorFlow installed, producing two small artifact files that are
-then copied to the Pi.
+Opleiding is doelbewus van inferensie geskei. Die Pi laat slegs
+`predict.py` loop — dit lei nooit op nie. Opleiding gebeur op 'n
+ontwikkelingsmasjien met volledige TensorFlow geïnstalleer, en produseer twee
+klein artefaklêers wat dan na die Pi gekopieer word.
 
 ---
 
-## 2. System Architecture
+## 2. Stelselargitektuur
 
 ```
 ╔══════════════════════════════════════════════════════════════════╗
-║                        DEV MACHINE                               ║
+║                        ONTWIKKELINGSMASJIEN                      ║
 ║                                                                  ║
 ║   MongoDB ──► GET /analytics/training-data ──► train.py          ║
-║   (events,     (NestJS API, port 3000)           │               ║
-║    RSVPs)                                        │               ║
-║                                          ┌───────┴────────┐      ║
+║   (gebeure,    (NestJS API, poort 3000)           │              ║
+║    RSVPs)                                         │              ║
+║                                          ┌────────┴───────┐      ║
 ║                                          │  model.tflite  │      ║
 ║                                          │  scaler.pkl    │      ║
-║                                          └───────┬────────┘      ║
-╚══════════════════════════════════════════════════╪═══════════════╝
-                                                   │
-                                          scp (copy over network)
-                                                   │
-╔══════════════════════════════════════════════════╪═══════════════╗
-║                   RASPBERRY PI 5                 │               ║
-║                                                  ▼               ║
-║   Mobile App ◄── NestJS API ◄── spawn() ◄── predict.py           ║
-║               (port 3000)      child process    │                ║
+║                                          └────────┬───────┘      ║
+╚═══════════════════════════════════════════════════╪══════════════╝
+                                                    │
+                                         scp (kopieer oor netwerk)
+                                                    │
+╔═══════════════════════════════════════════════════╪══════════════╗
+║                   RASPBERRY PI 5                  │              ║
+║                                                   |              ║
+║   Mobiele App ◄── NestJS API ◄── spawn() ◄── predict.py          ║
+║                (poort 3000)     kindproses      │                ║
 ║                                                 ├── model.tflite ║
 ║                                                 └── scaler.pkl   ║
 ╚══════════════════════════════════════════════════════════════════╝
 ```
 
-**Why two separate environments?**  
-Full TensorFlow (~500 MB) is required to train but cannot be installed cleanly
-on Raspberry Pi OS Bookworm. The TFLite runtime (`tflite-runtime`, ~6 MB) can
-only *run* a pre-trained model, not build one. Training on a powerful machine
-and shipping only the frozen artifact to the Pi is the standard embedded ML
-deployment pattern.
+**Hoekom twee afsonderlike omgewings?**  
+Volledige TensorFlow (~500 MB) is nodig vir opleiding maar kan nie skoon
+op Raspberry Pi OS Bookworm geïnstalleer word nie. Die TFLite-runtime
+(`tflite-runtime`, ~6 MB) kan slegs 'n vooraf-opgeleide model *uitvoer*, nie
+bou nie. Opleiding op 'n kragtige masjien en slegs die bevrore artefak na
+die Pi stuur is die standaard ingebedde ML-ontplooipatroon.
 
 ---
 
-## 3. How the Neural Network Works
+## 3. Hoe die Neurale Netwerk Werk
 
-### 3.1 Why LSTM and not a simpler model?
+### 3.1 Hoekom LSTM en nie 'n eenvoudiger model nie?
 
-A standard feedforward neural network treats each event in isolation — it has
-no concept of time or sequence. University event attendance is not isolated:
-fill rates in February (orientation) are structurally different from fill rates
-in May (exams). An LSTM (Long Short-Term Memory network) is designed for
-exactly this kind of sequential data. It reads a window of consecutive events
-and builds up an internal "memory" of patterns before making a prediction for
-the next event.
+'n Standaard deurvoer-neurale netwerk behandel elke geleentheid afsonderlik —
+dit het geen begrip van tyd of volgorde nie. Universiteitsgeleentheidsbywoning
+is nie geïsoleerd nie: vulkoerse in Februarie (oriëntering) is struktureel anders
+as vulkoerse in Mei (eksamens). 'n LSTM (Long Short-Term Memory network) is
+ontwerp vir presies hierdie soort opeenvolgende data. Dit lees 'n venster van
+opeenvolgende gebeure en bou 'n interne "geheue" van patrone op voordat dit 'n
+voorspelling vir die volgende geleentheid maak.
 
-Our model reads a window of **5 consecutive events** (controlled by
-`SEQUENCE_LENGTH = 5` in `train.py`). During training this window slides across
-the entire chronologically sorted event history, producing one training sample
-per position.
+Ons model lees 'n venster van **5 opeenvolgende gebeure** (beheer deur
+`SEQUENCE_LENGTH = 5` in `train.py`). Tydens opleiding skuif hierdie venster
+oor die hele chronologies-gesorteerde geleentheidsgeskiedenis en produseer een
+opleidingsmonster per posisie.
 
-### 3.2 Input Features
+### 3.2 Invoerkenmerke
 
-Every event is described by exactly **4 numbers** (`NUM_FEATURES = 4`):
+Elke geleentheid word deur presies **4 getalle** beskryf (`NUM_FEATURES = 4`) - dit gaan wel in die toekoms vermeerder word:
 
-| Index | Feature | What it captures |
+| Indeks | Kenmerk | Wat dit vasvang |
 |---|---|---|
-| 0 | `maxCapacity` | Venue size — large venues fill proportionally less |
-| 1 | `dayOfWeek` | 0 = Sunday … 6 = Saturday — Fridays are busiest |
-| 2 | `month` | 1–12 — academic calendar effects (exams, orientation) |
-| 3 | `daysInAdvance` | Days between event creation and event date — promotion time |
+| 0 | `maxCapacity` | Lokaalgrootte — groot lokale word proporsioneel minder gevul |
+| 1 | `dayOfWeek` | 0 = Sondag … 6 = Saterdag — Vrydae is die besigste |
+| 2 | `month` | 1–12 — akademiese kalendereffekte (eksamens, oriëntering) |
+| 3 | `daysInAdvance` | Dae tussen die skep van die geleentheid en die datum — promosietyd |
 
-These are the same 4 features the NestJS `LstmService.toTrainingItem()` method
-builds from the database, so training data and live prediction data always
-have the same shape.
+Dit is dieselfde 4 kenmerke wat die NestJS `LstmService.toTrainingItem()`-metode
+vanuit die databasis bou, sodat opleidingsdata en regstreekse voorspellingsdata
+altyd dieselfde vorm het.
 
-### 3.3 Feature Normalisation
+### 3.3 Kenmerknormalisering
 
-Raw feature values have very different scales: `maxCapacity` might be 500 while
-`dayOfWeek` is 0–6. Neural networks learn much faster when all inputs are on
-the same scale.
+Rou kenmerkwaardes het baie verskillende skale: `maxCapacity` kan 500 wees
+terwyl `dayOfWeek` 0–6 is. Neurale netwerke leer baie vinniger wanneer alle
+invoere op dieselfde skaal is.
 
-A `MinMaxScaler` from scikit-learn is fit on the training set and maps each
-feature to the range **[0, 1]** using the formula:
-
-```
-scaled_value = (raw_value - feature_min) / (feature_max - feature_min)
-```
-
-The scaler is saved to `scaler.pkl` so that `predict.py` can apply the **exact
-same scaling** at inference time. If the scaler were discarded and a new one
-fit on a single prediction point, the scaled values would be meaningless to the
-model.
-
-### 3.4 Network Architecture
+'n `MinMaxScaler` van scikit-learn word op die opleidingstel gepas en map
+elke kenmerk na die reeks **[0, 1]** met die formule:
 
 ```
-         INPUT TENSOR  shape: (1, 5, 4)
+geskaleerde_waarde = (rou_waarde - kenmerk_min) / (kenmerk_max - kenmerk_min)
+```
+
+Die scaler word in `scaler.pkl` gestoor sodat `predict.py` presies
+**dieselfde skalering** tydens inferensie kan toepas. As die scaler weggegooi
+word en 'n nuwe een op 'n enkele voorspellingspunt gepas word, sal die
+geskaleerde waardes useless vir die model wees.
+
+### 3.4 Netwerk-argitektuur
+
+```
+         INVOERTENSOR  vorm: (1, 5, 4)
          ─────────────────────────────────────────
-         1 sample │ 5 timesteps │ 4 features each
+         1 monster │ 5 tydstappe │ 4 kenmerke elk
          
          ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  ┌──────┐
-         │  t₁  │ │  t₂  │ │  t₃  │ │  t₄  │  │  t₅  │   ← 5 timesteps
-         │ [4f] │ │ [4f] │ │ [4f] │ │ [4f] │  │ [4f] │   ← 4 features each
+         │  t₁  │ │  t₂  │ │  t₃  │ │  t₄  │  │  t₅  │   ← 5 tydstappe
+         │ [4k] │ │ [4k] │ │ [4k] │ │ [4k] │  │ [4k] │   ← 4 kenmerke elk
          └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘  └──┬───┘
             └────────┴────────┴────────┴─────────┘
                                 │
                                 ▼
          ╔══════════════════════════════════════════╗
-         ║         LSTM Layer  —  32 units          ║
+         ║         LSTM-laag  —  32 eenhede         ║
          ║                                          ║
-         ║  Reads all 5 timesteps in sequence.      ║
-         ║  Each internal cell passes its state     ║
-         ║  to the next, accumulating context.      ║
-         ║  Output: 32-number summary vector.       ║
+         ║  Lees al 5 tydstappe in volgorde.        ║
+         ║  Elke interne sel stuur sy toestand      ║
+         ║  na die volgende, en bou konteks op.     ║
+         ║  Uitvoer: 32-getal opsommingsvektor.     ║
          ║                                          ║
          ║  Parameters: ~5,376                      ║
          ╚══════════════════╤═══════════════════════╝
-                            │ 32 values
+                            │ 32 waardes
                             ▼
          ╔══════════════════════════════════════════╗
-         ║         Dropout  —  rate 0.25            ║
+         ║         Dropout  —  koers 0.25           ║
          ║                                          ║
-         ║  Training only: randomly zeroes 8 of     ║
-         ║  the 32 values each forward pass.        ║
-         ║  Forces the model to learn redundant,    ║
-         ║  robust patterns — not to memorise.      ║
-         ║  At inference: fully disabled.           ║
+         ║  Slegs tydens opleiding: skakel 8 van    ║
+         ║  die 32 waardes ewekansig na nul.        ║
+         ║  Dwing die model om robuuste patrone     ║
+         ║  te leer — nie te memoriseer nie.        ║
+         ║  Tydens inferensie: volledig gedeaktiveer║
          ╚══════════════════╤═══════════════════════╝
-                            │ 32 values
+                            │ 32 waardes
                             ▼
          ╔═══════════════════════════════════════════╗
-         ║     Dense Layer  —  16 units  (ReLU)      ║
+         ║     Dense-laag  —  16 eenhede  (ReLU)     ║
          ║                                           ║
-         ║  Fully-connected: each of the 32 inputs   ║
-         ║  connects to all 16 outputs.              ║
-         ║  ReLU clips any negative value to zero,   ║
-         ║  keeping only meaningful positive signals.║
+         ║  Volledig verbind: elk van die 32 invoere ║
+         ║  koppel aan al 16 uitvoere.               ║
+         ║  ReLU sny enige negatiewe waarde na nul,  ║
+         ║  en hou slegs betekenisvolle seine.       ║
          ║                                           ║
          ║  Parameters: 32×16 + 16 bias = 528        ║
          ╚══════════════════╤════════════════════════╝
-                            │ 16 values
+                            │ 16 waardes
                             ▼
          ╔══════════════════════════════════════════╗
-         ║         Dropout  —  rate 0.125           ║
+         ║         Dropout  —  koers 0.125          ║
          ║                                          ║
-         ║  Lighter dropout before the output layer.║
-         ║  12.5% of 16 values zeroed out.          ║
+         ║  Ligter dropout voor die uitvoerlaag.    ║
+         ║  12.5% van 16 waardes word uitgeskakel.  ║
          ╚══════════════════╤═══════════════════════╝
-                            │ 16 values
+                            │ 16 waardes
                             ▼
          ╔══════════════════════════════════════════╗
-         ║   Output Layer  —  2 units  (Sigmoid)    ║
+         ║   Uitvoerlaag  —  2 eenhede  (Sigmoid)   ║
          ║                                          ║
-         ║  Maps 16 → 2 values.                     ║
-         ║  Sigmoid squashes each output to [0, 1], ║
-         ║  matching our labels which are both      ║
-         ║  proportions (rates between 0 and 1).    ║
+         ║  Map 16 → 2 waardes.                     ║
+         ║  Sigmoid druk elke uitvoer na [0, 1],    ║
+         ║  wat ooreenstem met ons etikette wat     ║
+         ║  beide proporsies (koerse) is.           ║
          ║                                          ║
          ║  Parameters: 16×2 + 2 bias = 34          ║
          ╚══════════════╤═══════════════╤═══════════╝
                         │               │
                         ▼               ▼
-                   output[0]       output[1]
-                  fillRate        noShowRate
-                 (0.0 – 1.0)     (0.0 – 1.0)
+                   uitvoer[0]       uitvoer[1]
+                   fillRate         noShowRate
+                  (0.0 – 1.0)      (0.0 – 1.0)
                  
-         Total trainable parameters: ~5,938
-         (Compare: ResNet-50 has 25,000,000)
+         Totale opleibare parameters: ~5,938
 ```
 
-### 3.5 The LSTM Cell Explained
+### 3.5 Die LSTM-sel Verduidelik
 
-A regular neural network layer applies a formula once and forgets. An LSTM cell
-has two pieces of state it carries from timestep to timestep:
+'n Gewone neurale netwerplaag pas 'n formule eenmalig toe en vergeet. 'n
+LSTM-sel het twee stukke toestand wat dit van tydstap na tydstap dra:
 
 ```
             ┌─────────────────────────────────────────────────────────┐
-            │                    LSTM CELL                            │
+            │                    LSTM-SEL                             │
             │                                                         │
-            │   Three gates control what is remembered and forgotten: │
+            │   Drie hekke beheer wat onthou en vergeet word:         │
             │                                                         │
-            │   FORGET GATE ──► "How much of my long-term memory      │
-            │                    should I erase?"                     │
-            │                   (sigmoid: 0 = forget, 1 = keep)       │
+            │   VERGEET-HEK ──► "Hoeveel van my langtermyngeheue      │
+            │                    moet ek uitvee?"                     │
+            │                   (sigmoid: 0 = vergeet, 1 = behou)     │
             │                                                         │
-            │   INPUT GATE  ──► "What new information should I        │
-            │                    write into long-term memory?"        │
+            │   INVOER-HEK  ──► "Watter nuwe inligting moet ek        │
+            │                    in langtermyngeheue skryf?"          │
             │                   (sigmoid × tanh)                      │
             │                                                         │
-            │   OUTPUT GATE ──► "What part of my long-term memory     │
-            │                    should I expose right now?"          │
-            │                   (sigmoid × tanh of cell state)        │
+            │   UITVOER-HEK ──► "Watter deel van my langtermyngeheue  │
+            │                    moet ek nou blootstel?"              │
+            │                   (sigmoid × tanh van seltoestand)      │
             │                                                         │
-  ───────►  hidden state (short-term)                                 ├──────►
-  previous  cell state   (long-term)                                  │       next
-  states    └─────────────────────────────────────────────────────────┘       states
+  ───────►  verborge toestand (korttermyn)                            ├──────►
+  vorige    seltoestand       (langtermyn)                            │       volgende
+  toestande └─────────────────────────────────────────────────────────┘       toestande
 ```
 
-In plain terms: imagine reading 5 event records one at a time. The forget gate
-lets the model say "the season from 3 events ago is no longer relevant." The
-input gate lets it say "this is exam month — write that into memory." The output
-gate decides which part of that accumulated context to use when making the
-final prediction.
+In gewone taal: stel jou voor jy lees 5 geleentheidsrekords een vir een. Die
+vergeet-hek laat die model sê "die seisoen van 3 gebeure terug is nie meer
+relevant nie." Die invoer-hek laat dit sê "dit is eksamensmaand — skryf dit
+in geheue." Die uitvoer-hek besluit watter deel van daardie opgehoopte konteks
+om te gebruik wanneer die finale voorspelling gemaak word.
 
-### 3.6 Training vs Inference — The Window Repeat Problem
+### 3.6 Opleiding vs Inferensie — Die Vensterherhalingsprobleem
 
-During training, the model sees **real sequences of 5 consecutive historical
-events**, so it can genuinely learn temporal patterns.
+Tydens opleiding sien die model **werklike reekse van 5 opeenvolgende
+historiese gebeure**, sodat dit werklik temporale patrone kan aanleer.
 
-At inference time, we are predicting a **future event** for which no history
-exists. To satisfy the LSTM's required input shape of `(1, 5, 4)` we repeat the
-single event's features 5 times:
+Tydens inferensie voorspel ons 'n **toekomstige geleentheid** waarvoor
+geen geskiedenis bestaan nie. Om aan die LSTM se vereiste invoervorm van
+`(1, 5, 4)` te voldoen, herhaal ons die enkele geleentheid se kenmerke 5 keer:
 
 ```
-         Inference input (all 5 rows are identical):
+         Inferensie-invoer (al 5 rye is identies):
 
-         t₁: [200, 5, 2, 30]   ← the event we want to predict
-         t₂: [200, 5, 2, 30]   ← same event repeated
-         t₃: [200, 5, 2, 30]   ← same event repeated
-         t₄: [200, 5, 2, 30]   ← same event repeated
-         t₅: [200, 5, 2, 30]   ← same event repeated
+         t₁: [200, 5, 2, 30]   ← die geleentheid wat ons wil voorspel
+         t₂: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
+         t₃: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
+         t₄: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
+         t₅: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
 ```
 
-This is acceptable because the LSTM's ability to exploit "what happened in the
-last 4 events" is absent — but the patterns it learned about **feature values
-themselves** (capacity, day, month, lead time) still apply through the Dense
-layers. The model degrades to a sophisticated feedforward network for this path,
-which is sufficient for single-event prediction.
+Dit is aanvaarbaar omdat die LSTM se vermoë om "wat in die laaste 4 gebeure
+gebeur het" te benut afwesig is — maar die patrone wat dit oor
+**kenmerkwaardes self** aangeleer het (kapasiteit, dag, maand, voorlooptyd)
+geld steeds deur die Dense-lae. Die model verswak na 'n gesofistikeerde
+deurvoer-netwerk vir hierdie pad, wat voldoende is vir enkelsoortige
+geleentheidsvoorspelling.
 
-A future improvement would cache the 4 most recent past events and prepend them
-as the leading timesteps, restoring true sequential context.
+'n Toekomstige verbetering sou die 4 mees onlangse vorige gebeure kas en
+dit as die voorste tydstappe invoeg, wat ware opeenvolgende konteks herstel.
 
 ---
 
-## 4. Understanding the Training Curves
+## 4. Die opleidingskurwes Verstaan
 
-Running `train.py` with matplotlib installed saves `training_curves.png` in
-`apps/ml/`. The plot has two panels:
+As `train.py` met matplotlib geïnstalleer loop, stoor dit `training_curves.png`
+in `apps/ml/`. Die plot het twee panele:
 
-**Left panel — MSE Loss over epochs**
+**Linkerpaneel — MAE-verlies oor epochs**
 ```
-Loss
+Verlies
 │╲
-│ ╲         train loss
+│ ╲         opleidingsverlies
 │  ╲___________________
-│   ╲  val loss
+│   ╲  valideringsverlies
 │    ╲_______________
 │
-└──────────────────── Epochs
+└──────────────────── Epoch
 ```
-- Both lines should fall together and then flatten.  
-- If **val loss rises while train loss keeps falling**, the model is overfitting
-  (memorising training data). The Dropout layers and early stopping are designed
-  to prevent this.  
-- If **both lines plateau very early at a high value**, the model is
-  underfitting — consider increasing `LSTM_UNITS` or `DENSE_UNITS` in
-  `train.py`.
+- Beide lyne moet saam daal en dan af plat.  
+- As **valideringsverlies styg terwyl opleidingsverlies aanhou daal**, pas die
+  model te veel aan (memoriseer opleidingsdata). Die Dropout-lae en vroeë
+  stop is ontwerp om dit te voorkom.  
+- As **beide lyne baie vroeg op 'n hoë waarde plato**, pas die model te min aan
+  — oorweeg om `LSTM_UNITS` of `DENSE_UNITS` in `train.py` te verhoog.
 
-**Right panel — MAE over epochs**  
-MAE (Mean Absolute Error) is more interpretable than loss: an MAE of 0.08 on
-fill rate means predictions are off by about 8 percentage points on average.
-For a university event planner, an 8–12 point MAE is operationally useful.
+**Regterpaneel — MAE oor epochs**  
+MAE (Gemiddelde Absolute Fout) is meer interpreteerbaar as verlies: 'n MAE
+van 0.08 op vulkoers beteken voorspellings is gemiddeld met sowat 8
+persentasiepunte af. Vir 'n universiteitsgebeurteniebeplanner is 'n MAE van
+8–12 punte operasioneel nuttig.
 
 ---
 
-## 5. Complete Setup Guide — From Step 1
+## 5. Volledige Opstelgids — Van Stap 1 Af
 
-### 5.1 Prerequisites
+### 5.1 Vereistes
 
-Ensure the following are installed on your **dev machine**:
+Verseker die volgende is op jou **ontwikkelingsmasjien** geïnstalleer:
 
-- Docker Desktop (for MongoDB)
-- Node.js 18+ and npm
-- Python 3.10 or 3.11
+- Docker Desktop (vir MongoDB)
+- Node.js 18+ en npm
+- Python 3.10 of 3.11
 - Git
 
-### 5.2 Start MongoDB
+### 5.2 Begin MongoDB
 
-From the monorepo root:
+Vanuit die monorepo-hoof:
 
 ```bash
 docker compose up -d
 ```
 
-Verify MongoDB is running:
+Verifieer dat MongoDB loop:
 
 ```bash
 docker ps
-# Should show a container on port 27017
+# Moet 'n houer op poort 27017 wys
 ```
 
-### 5.3 Install Backend Dependencies and Start the API
+### 5.3 Installeer Backend-afhanklikhede en Begin die API
 
 ```bash
 cd apps/backend
@@ -345,22 +345,22 @@ npm install
 npm run start:dev
 ```
 
-The API will be available at `http://localhost:3000/api/v1`.
-Leave this terminal running.
+Die API sal beskikbaar wees by `http://localhost:3000/api/v1`.
+Laat hierdie terminaal loop.
 
-### 5.4 Seed the Database
+### 5.4 Saai die Databasis
 
-Open a new terminal from the monorepo root:
+Maak 'n nuwe terminaal oop vanuit die monorepo-hoof:
 
 ```bash
 cd apps/backend
 npx ts-node src/database/seeds/seed-analytics-mock-data.ts
 ```
 
-This inserts 300 synthetic historical events (July 2021 – June 2026) and
-~25,460 RSVP documents with realistic SA academic calendar patterns baked in.
+Dit voeg 300 sintetiese historiese gebeure in (Julie 2021 – Junie 2026) en
+~25,460 RSVP-dokumente met realistiese SA akademiese kalenderpatrone (Sal in die tokeoms maybe verhoog).
 
-### 5.5 Get an Admin JWT Token
+### 5.5 Kry 'n Admin JWT-token
 
 ```bash
 curl -s -X POST http://localhost:3000/api/v1/auth/login \
@@ -369,38 +369,37 @@ curl -s -X POST http://localhost:3000/api/v1/auth/login \
   | grep -o '"access_token":"[^"]*"'
 ```
 
-Copy the token value — you will need it in the next step.
+Kopieer die tokenwaarde — jy sal dit in die volgende stap nodig hê.
 
-### 5.6 Install Training Dependencies
+### 5.6 Installeer Opleidingsafhanklikhede
 
 ```bash
 cd apps/ml
 pip install -r requirements-train.txt
 ```
 
-This installs full TensorFlow, scikit-learn, numpy, matplotlib, and requests.
-**Do not run this on the Raspberry Pi.**
+Dit installeer volledige TensorFlow, scikit-learn, numpy, matplotlib en requests. Alles op die ontwikkelaar masjien.
 
-### 5.7 Run Training
+### 5.7 Voer Opleiding Uit
 
-**Option A — fetch live from the running API (recommended):**
+**Opsie A — haal regstreeks van die lopende API (aanbeveel):**
 
 ```bash
-python train.py --api http://localhost:3000/api/v1 --token YOUR_JWT_TOKEN_HERE
+python train.py --api http://localhost:3000/api/v1 --token JOU_JWT_TOKEN_HIER
 ```
 
-**Option B — from a saved JSON file (useful for offline retraining):**
+**Opsie B — van 'n gestoorde JSON-lêer (nuttig vir aflyn-heropleiding):**
 
 ```bash
-# First dump the data
-curl -H "Authorization: Bearer YOUR_JWT_TOKEN_HERE" \
+# Dump eers die data
+curl -H "Authorization: Bearer JOU_JWT_TOKEN_HIER" \
      http://localhost:3000/api/v1/analytics/training-data > data.json
 
-# Then train from the file
+# Lei dan op vanuit die lêer
 python train.py --json data.json
 ```
 
-Training output you will see:
+Opleidingsuitvoer wat jy sal sien:
 
 ```
 Fetching training data from http://localhost:3000/api/v1/analytics/training-data ...
@@ -432,50 +431,50 @@ Converting to TFLite...
 Saved -> apps/ml/model.tflite (18.4 KB with quantization)
 ```
 
-### 5.8 Verify the Artifacts
+### 5.8 Verifieer die Artefakte
 
-After training completes, confirm these files exist in `apps/ml/`:
+Nadat opleiding voltooi is, bevestig dat hierdie lêers in `apps/ml/` bestaan:
 
 ```bash
 ls -lh apps/ml/model.tflite apps/ml/scaler.pkl
 ```
 
-Expected output:
+Verwagte uitvoer:
 
 ```
 -rw-r--r--  model.tflite   ~18 KB
 -rw-r--r--  scaler.pkl     ~1 KB
 ```
 
-If `model.tflite` is missing, training failed — check the error output.  
-If `scaler.pkl` is missing, the scaler was not saved — this should not happen
-unless the training data was too small.
+As `model.tflite` ontbreek, het opleiding misluk — kyk na die foutuitvoer.  
+As `scaler.pkl` ontbreek, is die scaler nie gestoor nie — dit behoort nie te
+gebeur tensy die opleidingsdata te klein was nie.
 
 ---
 
-## 6. Deploying Artifacts to the Raspberry Pi
+## 6. Artefakte na die Raspberry Pi Ontplooi
 
-Only two files need to be transferred. They must live in the same directory
-as `predict.py` on the Pi.
+Slegs twee lêers moet oorgedra word. Hulle moet in dieselfde gids as
+`predict.py` op die Pi woon.
 
 ```bash
-# Replace PI_USER and PI_IP with your Pi's credentials
-scp apps/ml/model.tflite PI_USER@PI_IP:~/span4/apps/ml/
-scp apps/ml/scaler.pkl   PI_USER@PI_IP:~/span4/apps/ml/
+# Vervang PI_GEBRUIKER en PI_IP met jou Pi se besonderhede
+scp apps/ml/model.tflite PI_GEBRUIKER@PI_IP:~/span4/apps/ml/
+scp apps/ml/scaler.pkl   PI_GEBRUIKER@PI_IP:~/span4/apps/ml/
 ```
 
-**First-time Pi setup** — install inference dependencies on the Pi:
+**Eerste keer Pi-opstel** — installeer inferensie-afhanklikhede op die Pi:
 
 ```bash
-# SSH into the Pi first
-ssh PI_USER@PI_IP
+# SSH eers in die Pi
+ssh PI_GEBRUIKER@PI_IP
 
-# Then install inference-only dependencies (no TensorFlow)
+# Installeer dan slegs-inferensie-afhanklikhede (geen TensorFlow nie)
 cd ~/span4/apps/ml
 pip install -r requirements-infer.txt
 ```
 
-Verify the Pi can import the runtime correctly:
+Verifieer dat die Pi die runtime korrek kan invoer:
 
 ```bash
 python -c "import tflite_runtime.interpreter; print('TFLite OK')"
@@ -484,45 +483,45 @@ python -c "import sklearn; print('scikit-learn OK')"
 
 ---
 
-## 7. Testing predict.py Manually
+## 7. predict.py Handmatig Toets
 
-Run from the `apps/ml/` directory on the Pi (or dev machine if artifacts are
-present there):
+Loop vanuit die `apps/ml/`-gids op die Pi (of ontwikkelingsmasjien as
+artefakte daar is):
 
 ```bash
-# python predict.py <capacity> <dayOfWeek> <month> <daysInAdvance>
-# dayOfWeek: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday,
-#            5=Friday, 6=Saturday
+# python predict.py <kapasiteit> <dagVanWeek> <maand> <daeVooruit>
+# dayOfWeek: 0=Sondag, 1=Maandag, 2=Dinsdag, 3=Woensdag, 4=Donderdag,
+#            5=Vrydag, 6=Saterdag
 
 python predict.py 200 5 2 30
 ```
 
-This simulates a 200-seat event on a Friday in February, created 30 days in
-advance.
+Dit simuleer 'n 200-sitplek geleentheid op 'n Vrydag in Februarie, 30 dae
+vooruit geskep.
 
-**To test edge cases:**
+**Om randgevalle te toets:**
 
 ```bash
-# Small last-minute event on a Sunday in exam month
+# Klein laaste-minuut geleentheid op 'n Sondag in eksamensmaand
 python predict.py 30 0 5 2
 
-# Large venue, well in advance, mid-semester Thursday
+# Groot lokaal, goed vooruit, middelsemester Donderdag
 python predict.py 800 4 3 60
 ```
 
-**To confirm error handling works (model missing):**
+**Om fouthantering te bevestig (model ontbreek):**
 
 ```bash
 mv model.tflite model.tflite.bak
-python predict.py 200 5 2 30   # should exit 1 with error on stderr
+python predict.py 200 5 2 30   # moet met kode 1 uitsluit en fout na stderr skryf
 mv model.tflite.bak model.tflite
 ```
 
 ---
 
-## 8. Understanding the Output JSON
+## 8. Die Uitvoer JSON Verstaan
 
-`predict.py` prints one JSON object to stdout and exits with code 0:
+`predict.py` druk een JSON-objek na stdout en sluit af met kode 0:
 
 ```json
 {
@@ -540,80 +539,82 @@ mv model.tflite.bak model.tflite
 }
 ```
 
-| Field | Source | Meaning |
+| Veld | Bron | Betekenis |
 |---|---|---|
-| `predictedFillRate` | LSTM output[0] | Fraction of seats expected to be filled (0–1) |
-| `estimatedRsvps` | `fillRate × capacity` | Number of people expected to confirm |
-| `predictedNoShowRate` | LSTM output[1] | Fraction of confirmed attendees expected not to show (0–1) |
-| `estimatedAttendees` | `rsvps × (1 - noShowRate)` | Number of people expected to physically arrive |
-| `estimatedBudgetZAR` | `attendees×R250 + venue hire` | Estimated event cost in South African Rand |
-| `reasoning` | Rule-based engine | Plain-language Afrikaans explanations derived from input feature values |
+| `predictedFillRate` | LSTM uitvoer[0] | Breukdeel van sitplekke wat verwag word om gevul te word (0–1) |
+| `estimatedRsvps` | `fillRate × kapasiteit` | Getal mense wat verwag word om te bevestig |
+| `predictedNoShowRate` | LSTM uitvoer[1] | Breukdeel van bevestigde byeeners wat verwag word om nie op te daag nie (0–1) |
+| `estimatedAttendees` | `rsvps × (1 - noShowRate)` | Getal mense wat verwag word om fisies aan te kom |
+| `estimatedBudgetZAR` | `byeeners×R250 + lokaalverhuur` | Beraamde geleentheidskostes in Suid-Afrikaanse Rand |
+| `reasoning` | Reëlgebaseerde enjin | Gewone Afrikaanse verduidelikings afgelei van invoerkenmerkwaardes |
 
-**Budget breakdown:**
+**Begrotingsuiteensetting:**
 
 ```
-estimatedBudgetZAR = (estimatedAttendees × R200 catering)
-                   + venue hire (tiered by capacity)
-                   + (estimatedAttendees × R50 materials)
+estimatedBudgetZAR = (beraamde byeeners × R200 verversings)
+                   + lokaalverhuur (gelaagd per kapasiteit)
+                   + (beraamde byeeners × R50 materiaal)
 
-Venue hire tiers:
-  < 50  seats  →  R500
-  < 200 seats  →  R1,500
-  < 500 seats  →  R3,000
-  500+ seats   →  R8,000
+Lokaalverhuur-vlakke:
+  < 50  sitplekke  →  R500
+  < 200 sitplekke  →  R1,500
+  < 500 sitplekke  →  R3,000
+  500+ sitplekke   →  R8,000
 ```
 
-Any error (missing model, bad arguments, Python exception) writes a plain-text
-message to **stderr** and exits with a **non-zero code** — never to stdout.
-The NestJS backend treats any non-zero exit as a 503 Service Unavailable.
+Enige fout (ontbrekende model, verkeerde argumente, Python-uitsondering) skryf
+'n gewone teksberig na **stderr** en sluit af met 'n **nie-nul kode** — nooit
+na stdout nie. Die NestJS-backend behandel enige nie-nul uitsluiting as
+503 Service Unavailable.
 
 ---
 
-## 9. Retraining as Real Events Accumulate
+## 9. Heroplei Soos Werklike Gebeure Ophoop
 
-The model was initially trained on 300 synthetic events. As real events happen
-and RSVP data is recorded, retraining on real data will improve accuracy.
+Die model is aanvanklik op 300 sintetiese gebeure opgelei. Soos werklike
+gebeure plaasvind en RSVP-data aangeteken word, sal heropleiding op werklike
+data die akkuraatheid verbeter.
 
-### When to retrain
+### Wanneer om te heroplei
 
-- After **~50 or more new past events** have accumulated in the database
-- After any structural change to how events or RSVPs are captured
-- If predicted fill rates are consistently far off after one full academic
-  semester of real data
+- Nadat **~50 of meer nuwe vorige gebeure** in die databasis opgehoop het
+- Na enige strukturele verandering aan hoe gebeure of RSVPs vasgelê word
+- As voorspelde vulkoerse konsekwent ver af is na een volledige akademiese
+  semester se werklike data
 
-### Steps
+### Stappe
 
-**1. Dump fresh training data:**
+**1. Dump vars opleidingsdata:**
 
 ```bash
-curl -H "Authorization: Bearer YOUR_ADMIN_JWT" \
+curl -H "Authorization: Bearer JOU_ADMIN_JWT" \
      http://localhost:3000/api/v1/analytics/training-data > data.json
 ```
 
-**2. Retrain on the dev machine:**
+**2. Heroplei op die ontwikkelingsmasjien:**
 
 ```bash
 cd apps/ml
 python train.py --json data.json
 ```
 
-**3. Review validation metrics** printed at the end of training. Compare the
-new MAE values to the previous run. If MAE has improved, the new model is
-better. If it has gotten worse, investigate whether the new data has unusual
-patterns or whether more data is needed before retraining.
+**3. Hersien die valideringsstatistieke** wat aan die einde van opleiding gedruk
+word. Vergelyk die nuwe MAE-waardes met die vorige lopie. As MAE verbeter het,
+is die nuwe model beter. As dit slegter geword het, ondersoek of die nuwe data
+ongewone patrone het of of meer data benodig word voor heropleiding.
 
-**4. Deploy both new artifacts to the Pi:**
+**4. Ontplooi beide nuwe artefakte na die Pi:**
 
 ```bash
-scp apps/ml/model.tflite PI_USER@PI_IP:~/span4/apps/ml/
-scp apps/ml/scaler.pkl   PI_USER@PI_IP:~/span4/apps/ml/
+scp apps/ml/model.tflite PI_GEBRUIKER@PI_IP:~/span4/apps/ml/
+scp apps/ml/scaler.pkl   PI_GEBRUIKER@PI_IP:~/span4/apps/ml/
 ```
 
-**5.** The NestJS backend picks up the new files on the next incoming request.
-No restart is required.
+**5.** Die NestJS-backend tel die nuwe lêers op by die volgende inkomende
+versoek. Geen herstart is nodig nie.
 
-> **Always copy both files together.**  
-> The scaler's min/max ranges are recalculated from scratch on every training
-> run. A new `model.tflite` paired with an old `scaler.pkl` will produce
-> incorrectly scaled inputs and unreliable predictions. Treat them as a matched
-> pair — they are only valid together.
+> **Kopieer altyd beide lêers saam.**  
+> Die scaler se min/maks-reekse word van nuuts af herbereken by elke
+> opleidingslopie. 'n Nuwe `model.tflite` saam met 'n ou `scaler.pkl` sal
+> verkeerd geskaleerde invoere produseer en onbetroubare voorspellings lewer.
+> Behandel hulle as 'n gepaarde stel — hulle is slegs saam geldig.

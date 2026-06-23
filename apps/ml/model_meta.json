@@ -1,0 +1,8 @@
+{
+  "trained_at": "2026-06-23T17:34:16.762470Z",
+  "n_events": 300,
+  "best_epoch": 51,
+  "best_val_loss": 0.020838,
+  "fill_mae": 0.1423,
+  "noshow_mae": 0.0841
+}

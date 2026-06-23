@@ -3,7 +3,7 @@
 
 # TensorFlow: the full training framework + TFLite converter
 # Pin to a specific minor version so scaler.pkl stays compatible.
-tensorflow>=2.13.0,<2.16.0
+tensorflow>=2.15.1
 
 # scikit-learn: MinMaxScaler — saves as scaler.pkl for predict.py
 scikit-learn>=1.3.0

@@ -21,10 +21,12 @@ Run from apps/ml/ :
 
 # ========== Imports: ==========
 import argparse
+import datetime
 import json
 import os
 import pickle
 import sys
+import math
 
 import numpy as np
 import requests
@@ -218,7 +220,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
     noshow_mae = float(np.mean(np.abs(preds[:, 1] - y_val[:, 1])))
     
     print("== Validation Metrics ========================================")
-    print(f" Fille Rate MAE: {fill_mae:.4f} ({fill_mae * 100:.1f} percentage points avg error)")
+    print(f" Fill Rate MAE: {fill_mae:.4f} ({fill_mae * 100:.1f} percentage points avg error)")
     print(f" No-Show Rate MAE: {noshow_mae:.4f} ({noshow_mae * 100:.1f} percentage points avg error)")
     print()
     print("== Sample predictions vs actual (first 8 validation sequences) ==")
@@ -228,7 +230,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
         fp, nsp = preds[i]
         print(f"  {fa:>12.3f}  {fp:>10.3f}  {nsa:>14.3f}  {nsp:>12.3f}")
     print()
-    
+
     # ==============================
     # Optional training curve plot (Requires matplotlib in requirements-train.txt)
     # ==============================
@@ -236,14 +238,11 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
         import matplotlib.pyplot as plt
     except ImportError:
         print("(matplotlib not installed - skipping training curve plot)")
-        return
-    
-    _plot_history_ref = None    # Populated in main()
-    
+        return fill_mae, noshow_mae
+
     if history is not None:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-        history = evaluate._history
-        
+        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
         ax1.plot(history.history['loss'],     label='train loss')
         ax1.plot(history.history['val_loss'], label='val loss')
         ax1.set_title('MSE Loss over Epochs')
@@ -262,7 +261,9 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
         plt.savefig(chart_path, dpi=150)
         print(f"Training curve saved → {chart_path}")
         plt.close()
-        
+
+    return fill_mae, noshow_mae
+
 
 # ============================================================
 # MAIN
@@ -288,7 +289,7 @@ def main() -> None:
     # == LOAD ============================================================
     items = load_from_api(args.api, args.token) if args.api else load_from_file(args.json)
     
-    min_required = SEQUENCE_LENGTH + 5
+    min_required = math.ceil(SEQUENCE_LENGTH / VAL_SPLIT)
     if len(items) < min_required:
         print(f"ERROR: Need at least {min_required} events. Got {len(items)}.")
         sys.exit(1)
@@ -332,10 +333,24 @@ def main() -> None:
     print(f"\nBest epoch : {best_epoch}  |  best val_loss : {best_val_loss:.6f}\n")
 
     # == Evaluate ======================================================================
-    evaluate(model, X_val_seq, y_val_seq)
+    fill_mae, noshow_mae = evaluate(model, X_val_seq, y_val_seq, history)
 
     # == Convert to TFLite ============================================================
     convert_to_tflite(model, output_dir)
+    
+    # == Save metadata ===============================================================
+    meta = {
+        "trained_at":    datetime.datetime.utcnow().isoformat() + "Z",
+        "n_events":      len(X_raw),
+        "best_epoch":    best_epoch,
+        "best_val_loss": round(best_val_loss, 6),
+        "fill_mae":      round(fill_mae, 4),
+        "noshow_mae":    round(noshow_mae, 4)
+    }
+    meta_path = os.path.join(output_dir, 'model_meta.json')
+    with open(meta_path, 'w') as f:
+        json.dump(meta, f, indent=2)
+    print(f"Model metadata saved -> {meta_path}")
 
     # == Done ======================================================================
     print("═" * 60)
@@ -343,6 +358,7 @@ def main() -> None:
     print("into the same directory as predict.py:")
     print("  model.tflite")
     print("  scaler.pkl")
+    print("  model_meta.json")
     print("═" * 60)
 
 
