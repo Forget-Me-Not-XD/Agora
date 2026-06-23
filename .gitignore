@@ -30,3 +30,4 @@ web-build/
 Thumbs.db
 .idea/
 .vscode/
+apps/ml/venv/*

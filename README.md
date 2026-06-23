@@ -15,80 +15,80 @@ Die **Akademia Funksiebestuurstelsel** is 'n omvattende platform wat ontwikkel i
 
 # Akademia Funksiebestuurstelsel — Pre-Alpha
 
-## Quick Start
+## Vinnige Begin
 
 ```bash
-# 1. Copy environment file
+# 1. Kopieer die omgewingslêer
 cp .env.example .env
 
-# 2. Generate a strong JWT secret and replace in .env
+# 2. Genereer 'n sterk JWT-geheim en vervang dit in .env
 openssl rand -hex 32
 
-# 3. Start all services
+# 3. Begin alle dienste
 docker compose up --build
 
-# 4. Verify services are healthy
+# 4. Verifieer dat alle dienste gesond is
 docker compose ps
 
-# 5. Open RabbitMQ management UI
-open http://localhost:15672  # user: akademia, pass: see .env
+# 5. Maak die RabbitMQ-bestuurskoppelvlak oop
+open http://localhost:15672  # gebruiker: akademia, wagwoord: sien .env
 ```
 
-## Endpoints
+## Eindpunte
 
 - Backend API: `http://localhost:3000`
 - MongoDB: `mongodb://localhost:27017`
 - RabbitMQ AMQP: `amqp://localhost:5672`
-- RabbitMQ UI: `http://localhost:15672`
+- RabbitMQ-koppelvlak: `http://localhost:15672`
 - Redis: `redis://localhost:6379`
 
-## Mobile
+## Mobiel
 
-The mobile app is built with **React Native + Expo 50** and talks to the same NestJS backend. The backend must be running before you launch the app.
+Die mobiele toepassing is gebou met **React Native + Expo 50** en kommunikeer met dieselfde NestJS-backend. Die backend moet aan die gang wees voordat jy die toepassing begin.
 
-### Prerequisites
+### Vereistes
 
-| Tool | Minimum version | Notes |
+| Hulpmiddel | Minimum weergawe | Notas |
 |---|---|---|
 | Node.js | 18+ | |
-| Expo Go app | latest | Install on your phone from the App Store / Play Store |
-| Android Studio | Hedgehog+ | Required only for Android emulator |
-| Xcode | 15+ | Required only for iOS simulator — macOS only |
+| Expo Go-toepassing | nuutste | Installeer op jou foon vanaf die App Store / Play Store |
+| Android Studio | Hedgehog+ | Slegs benodig vir Android-emulator |
+| Xcode | 15+ | Slegs benodig vir iOS-simulator — slegs macOS |
 
-### Install
+### Installasie
 
 ```bash
 cd apps/mobile
 npm install
 ```
 
-### Configure the API URL
+### Stel die API-URL in
 
-The app reads `EXPO_PUBLIC_API_URL` from the root `.env` to reach the backend. The default value works for an Android emulator. Change it if you're using a different target:
+Die toepassing lees `EXPO_PUBLIC_API_URL` vanaf die hoof `.env`-lêer om die backend te bereik. Die verstekwaarde werk vir 'n Android-emulator. Verander dit as jy 'n ander teiken gebruik:
 
-| Target | `EXPO_PUBLIC_API_URL` |
+| Teiken | `EXPO_PUBLIC_API_URL` |
 |---|---|
-| Android emulator | `http://10.0.2.2:3000` ← default |
-| iOS simulator | `http://localhost:3000` |
-| Physical device | `http://<your-machine-LAN-ip>:3000` |
+| Android-emulator | `http://10.0.2.2:3000` ← verstek |
+| iOS-simulator | `http://localhost:3000` |
+| Fisiese toestel | `http://<jou-masjien-LAN-ip>:3000` |
 
-To find your machine's LAN IP on Windows: `ipconfig` → look for IPv4 Address under your active adapter.
+Om jou masjien se LAN-IP op Windows te vind: `ipconfig` → soek vir IPv4-adres onder jou aktiewe adapter.
 
-### Run
+### Uitvoer
 
 ```bash
-# Start the Expo dev server — scan the QR code with Expo Go on your phone
+# Begin die Expo-ontwikkelingsbediener — scan die QR-kode met Expo Go op jou foon
 npm start
 
-# Open directly in a running Android emulator
+# Maak direk oop in 'n lopende Android-emulator
 npm run android
 
-# Open directly in the iOS simulator (macOS only)
+# Maak direk oop in die iOS-simulator (slegs macOS)
 npm run ios
 
-# Open in browser for a quick web preview
-# First time only: npx expo install react-native-web react-dom @expo/metro-runtime
+# Maak oop in blaaier vir 'n vinnige webvoorskou
+# Eerste keer slegs: npx expo install react-native-web react-dom @expo/metro-runtime
 npm run web
 ```
 
-> **Tip:** press `a` in the Expo terminal to open the Android emulator, `i` for iOS simulator, or `w` for web — no need to restart the server.
+> **Wenk:** druk `a` in die Expo-terminaal om die Android-emulator oop te maak, `i` vir iOS-simulator, of `w` vir web — geen herstart van die bediener nodig nie.
