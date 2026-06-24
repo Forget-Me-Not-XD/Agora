@@ -52,3 +52,15 @@ export async function cancelRsvp(rsvpId: string): Promise<void> {
 export async function getRsvpQrDataUri(rsvpId: string): Promise<string> {
     return apiClient.getImageDataUri(`/rsvp/${rsvpId}/qr`);
 }
+
+// POST /rsvp/scan -- personeel skandeer 'n gas se QR-kode om in te check
+// 404 - ongeldige lading, 409 - gas reeds ingecheck, rol-beperk tot ADMIN/DOSENT
+export interface ScanResult {
+    guestName: string;
+    eventTitle: string;
+    eventDate: string;
+}
+
+export async function scanQr(qrPayload: string): Promise<ScanResult> {
+    return apiClient.post<ScanResult, { qrPayload: string }>('/rsvp/scan', { qrPayload });
+}

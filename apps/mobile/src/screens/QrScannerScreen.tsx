@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
+import { CameraView, useCameraPermissions } from 'expo-camera/next';
+import { useResponse } from '../providers/ResponseProvider';
+import { scanQr } from '../api/rsvp';
 import { MOCK_EVENTS, MOCK_CHECK_INS, type MockCheckIn } from '../lib/mock-data';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
@@ -34,26 +37,48 @@ export function QrScannerScreen() {
     MOCK_CHECK_INS[0] ?? null,
   );
   const [walkInName, setWalkInName] = useState('');
-  const [isScanning, setIsScanning] = useState(true);
+
+  const { showLoading, showSuccess, showError, showWarning } = useResponse();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanned, setScanned] = useState(false);
+  const scanLock = useRef(false);
+
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
+  function resetScanner() {
+    scanLock.current = false;
+    setScanned(false);
+  }
+
+  async function handleBarCodeScanned({ data }: { type: string; data: string }) {
+    if (scanLock.current) return;
+    scanLock.current = true;
+    setScanned(true);
+    showLoading(true);
+    try {
+      const res = await scanQr(data);
+      showLoading(false);
+      showSuccess(res, resetScanner);
+    } catch (err) {
+      showLoading(false);
+      const status = (err as any)?.response?.status;
+      if (status === 409) {
+        showWarning('Gas het reeds ingecheck', resetScanner);
+      } else if (status === 404) {
+        showError('Ongeldige QR-kode', resetScanner);
+      } else {
+        showError('Kon nie die QR-kode verwerk nie. Probeer asseblief weer.', resetScanner);
+      }
+    }
+  }
 
   const total = event?.registered ?? 87;
   const checkedInCount = checkIns.length;
   const outstanding = total - checkedInCount;
-
-  function simulateScan() {
-    const names = ['Sipho Ndlovu', 'Lerato Mokoena', 'Ruan Fourie', 'Amahle Dube', 'Christiaan Nel'];
-    const randomName = names[Math.floor(Math.random() * names.length)];
-    const newEntry: MockCheckIn = {
-      id: `ci-${Date.now()}`,
-      name: randomName,
-      eventId: route.params.eventId,
-      status: 'bevestig',
-      dietary: Math.random() > 0.7 ? 'Vegetaries' : null,
-      checkedInAt: new Date().toISOString(),
-    };
-    setLastScanned(newEntry);
-    setCheckIns((prev) => [newEntry, ...prev]);
-  }
 
   function handleAccept() {
     if (!lastScanned) return;
@@ -103,7 +128,16 @@ export function QrScannerScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Camera viewfinder ── */}
         <View style={styles.camera}>
-          <View style={styles.overlay}>
+          {permission?.granted && (
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            />
+          )}
+
+          <View style={styles.overlay} pointerEvents="none">
             {/* Corner brackets */}
             <View style={[styles.corner, styles.cornerTL]} />
             <View style={[styles.corner, styles.cornerTR]} />
@@ -113,17 +147,16 @@ export function QrScannerScreen() {
             {/* Scan line */}
             <View style={styles.scanLine} />
           </View>
-          <Text style={styles.scanHint}>Plaas QR-kode binne die raamwerk</Text>
 
-          {/* Simulate scan button (dev mode) */}
-          <TouchableOpacity
-            style={styles.simulateBtn}
-            onPress={simulateScan}
-            accessibilityLabel="Simuleer QR skandering"
-          >
-            <Feather name="zap" size={12} color="#FFFFFF" />
-            <Text style={styles.simulateBtnText}>Skandeer (Demo)</Text>
-          </TouchableOpacity>
+          {permission?.granted && (
+            <Text style={styles.scanHint}>Plaas QR-kode binne die raamwerk</Text>
+          )}
+          {(!permission || (!permission.granted && permission.canAskAgain)) && (
+            <Text style={styles.scanHint}>Versoek kamera-toegang…</Text>
+          )}
+          {permission && !permission.granted && !permission.canAskAgain && (
+            <Text style={styles.scanHint}>Geen kamera-toegang nie</Text>
+          )}
         </View>
 
         {/* ── Stats row ── */}
@@ -325,21 +358,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       color: 'rgba(255,255,255,0.6)',
       fontWeight: '600',
     },
-    simulateBtn: {
-      position: 'absolute',
-      top: 10,
-      right: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: 'rgba(20,184,199,0.25)',
-      borderWidth: 1,
-      borderColor: colors.primary,
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    simulateBtnText: { fontSize: 10, fontWeight: '700', color: colors.primary },
 
     // Stats
     statsRow: {
