@@ -73,7 +73,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                     onClick={() => setOpen(false)}
                                     className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
                                 >
-                                    Kanseleer
+                                    Kanselleer
                                 </button>
                                 <button
                                     onClick={() => {}}
