@@ -5,6 +5,7 @@ import { ActivityIndicator, View, StyleSheet, Appearance } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import ResponseProvider from './src/providers/ResponseProvider';
 import { useAuthStore } from './src/stores/auth.store';
 import { useThemeStore } from './src/stores/theme.store';
 import { useNavTheme, useStatusBarStyle, useThemeColors } from './src/theme/theme';
@@ -43,10 +44,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer theme={navTheme}>
-        <AppNavigator />
-        <StatusBar style={statusBarStyle} />
-      </NavigationContainer>
+      <ResponseProvider>
+        <NavigationContainer theme={navTheme}>
+          <AppNavigator />
+          <StatusBar style={statusBarStyle} />
+        </NavigationContainer>
+      </ResponseProvider>
     </SafeAreaProvider>
   );
 }

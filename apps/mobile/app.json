@@ -10,6 +10,14 @@
         "backgroundColor": "#1E3A5F"
       },
       "assetBundlePatterns": ["**/*"],
+      "plugins": [
+        [
+          "expo-camera",
+          {
+            "cameraPermission": "Laat Akademia toe om die kamera te gebruik om gaste se QR-kodes te skandeer."
+          }
+        ]
+      ],
       "ios": {
         "supportsTablet": true,
         "bundleIdentifier": "ac.akademia.app"
