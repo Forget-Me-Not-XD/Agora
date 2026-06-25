@@ -12,7 +12,7 @@ import { AnalyticsController } from './analytics.controller';
 // Importing MongooseModule.forFeature here gives the LstmService direct access to the Rsvp model:
 
 @Module ({
-    imports: [
+    imports: [  
         EventsModule,
         MongooseModule.forFeature([
             { name: Event.name, schema: EventSchema },
