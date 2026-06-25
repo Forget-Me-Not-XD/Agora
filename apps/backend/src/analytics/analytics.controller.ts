@@ -5,20 +5,54 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { LstmService, TrainingDataItem } from './lstm.service';
+import { AnalyticsService, EventsPerMonth, RsvpPerEvent } from './analytics.service';
+
+interface EventsSummaryResponse {
+    eventsPerMonth: EventsPerMonth[];
+    top5Events: RsvpPerEvent[];
+}
+
+interface RsvpSummaryResponse {
+    rsvpsPerEvent: RsvpPerEvent[];
+    averageFillRate: number;
+}
 
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
 export class AnalyticsController {
-    constructor(private readonly lstmService: LstmService) {}
+    constructor(
+        private readonly lstmService: LstmService,
+        private readonly analyticsService: AnalyticsService,
+    ) {}
 
-    // Returns the full training dataset ( all past events with features + labels ).
-    // Admin only - This is internal data the ML pipeline consumes, not as user-facing feature
-    @Get ('training-data')
+    @Get('training-data')
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getTrainingData(
-        @Query('eventId') eventId ?: string,
-    ): Promise <TrainingDataItem[]> {
+        @Query('eventId') eventId?: string,
+    ): Promise<TrainingDataItem[]> {
         return this.lstmService.getTrainingData(eventId);
+    }
+
+    @Get('events-summary')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getEventsSummary(): Promise<EventsSummaryResponse> {
+        const [eventsPerMonth, top5Events] = await Promise.all([
+            this.analyticsService.getEventsPerMonth(),
+            this.analyticsService.getTop5Events(),
+        ]);
+        return { eventsPerMonth, top5Events };
+    }
+
+    @Get('rsvp-summary')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRsvpSummary(): Promise<RsvpSummaryResponse> {
+        const [rsvpsPerEvent, averageFillRate] = await Promise.all([
+            this.analyticsService.getRsvpsPerEvent(),
+            this.analyticsService.getAverageFillRate(),
+        ]);
+        return { rsvpsPerEvent, averageFillRate };
     }
 }
