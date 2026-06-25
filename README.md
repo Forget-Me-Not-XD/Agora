@@ -2,93 +2,160 @@
   <img src="404_logo_transparent.png" alt="Akademia Funksiebestuurstelsel Banner" width="100%" />
 </p>
 
-# Span 404
 # Akademia Funksiebestuurstelsel
 
-Die **Akademia Funksiebestuurstelsel** is 'n omvattende platform wat ontwikkel is vir die doeltreffende bestuur van Akademia-spesifieke funksies, insluitend sportbyeenkomste, glasieklink, kultuuraande en meer. Die stelsel bestaan uit:
+Die **Akademia Funksiebestuurstelsel** is 'n omvattende platform vir die bestuur van Akademia-funksies soos gradeplegtigheid, sportbyeenkomste, kultuuraande en meer. Dit stel beplanners in staat om geleenthede te skep, RSVPs te bestuur, bywoning te monitor, en datagedrewe besluite te neem deur middel van 'n ingeboude LSTM-voorspellingsmodel.
 
-- **Webinterface** (Next.js)
-- **Mobiele toepassing** (React Native Expo)
-- **Sentrale backend** (NestJS) met MongoDB as databasis
+Die stelsel bestaan uit drie dele:
 
-'n **LSTM-neurale netwerk** word geïntegreer om voorspellende analise te doen tydens die skep van nuwe funksies, soos vir begrotings, verwagte opkoms en benodigde hulpbronne. Hierdie oplossing stel beplanners in staat om datagedrewe besluite te neem en proaktief te bestuur.
+| Deel | Tegnologie | Beskrywing |
+|---|---|---|
+| Backend API | NestJS + MongoDB | Sentrale API vir alle data en besigheidlogika |
+| Web-dashboard | Next.js 14 | Bestuurskoppelvlak vir admins en dosente |
+| Mobiele toepassing | React Native + Expo | Gebruikerskoppelvlak vir gaste en studente |
 
-# Akademia Funksiebestuurstelsel — Pre-Alpha
+---
 
-## Vinnige Begin
-
-```bash
-# 1. Kopieer die omgewingslêer
-cp .env.example .env
-
-# 2. Genereer 'n sterk JWT-geheim en vervang dit in .env
-openssl rand -hex 32
-
-# 3. Begin alle dienste
-docker compose up --build
-
-# 4. Verifieer dat alle dienste gesond is
-docker compose ps
-
-# 5. Maak die RabbitMQ-bestuurskoppelvlak oop
-open http://localhost:15672  # gebruiker: akademia, wagwoord: sien .env
-```
-
-## Eindpunte
-
-- Backend API: `http://localhost:3000`
-- MongoDB: `mongodb://localhost:27017`
-- RabbitMQ AMQP: `amqp://localhost:5672`
-- RabbitMQ-koppelvlak: `http://localhost:15672`
-- Redis: `redis://localhost:6379`
-
-## Mobiel
-
-Die mobiele toepassing is gebou met **React Native + Expo 50** en kommunikeer met dieselfde NestJS-backend. Die backend moet aan die gang wees voordat jy die toepassing begin.
-
-### Vereistes
+## Vereistes
 
 | Hulpmiddel | Minimum weergawe | Notas |
 |---|---|---|
-| Node.js | 18+ | |
-| Expo Go-toepassing | nuutste | Installeer op jou foon vanaf die App Store / Play Store |
-| Android Studio | Hedgehog+ | Slegs benodig vir Android-emulator |
-| Xcode | 15+ | Slegs benodig vir iOS-simulator — slegs macOS |
+| Node.js | 18+ | Benodig vir backend, web, en mobiel |
+| Docker Desktop | Nuutste | Benodig vir MongoDB, RabbitMQ, en Redis |
+| Expo Go | Nuutste | Installeer op jou foon vir mobiele toetsing |
 
-### Installasie
+---
+
+## Omgewingsveranderlikes
+
+Kopieer die voorbeeldlêer na `.env` in die repo-wortel:
+
+```bash
+cp .env.example .env
+```
+
+| Veranderlike | Beskrywing | Voorbeeldwaarde |
+|---|---|---|
+| `MONGO_INITDB_ROOT_USERNAME` | MongoDB root gebruikersnaam | `akademia` |
+| `MONGO_INITDB_ROOT_PASSWORD` | MongoDB root wagwoord | `changeme_in_production` |
+| `MONGO_DB_NAME` | MongoDB databasisnaam | `akademia` |
+| `MONGO_URI` | Volledige MongoDB verbindingsstring | `mongodb://akademia:changeme_in_production@mongodb:27017/akademia?authSource=admin` |
+| `RABBITMQ_DEFAULT_USER` | RabbitMQ gebruikersnaam | `akademia` |
+| `RABBITMQ_DEFAULT_PASS` | RabbitMQ wagwoord | `changeme_in_production` |
+| `RABBITMQ_URL` | Volledige RabbitMQ verbindingsstring | `amqp://akademia:changeme_in_production@rabbitmq:5672` |
+| `REDIS_URL` | Redis verbindingsstring | `redis://redis:6379` |
+| `JWT_SECRET` | Geheime sleutel vir JWT-tokens | `replace_with_64_random_bytes_in_production` |
+| `JWT_ACCESS_EXPIRY` | Vervaltyd van toegangstoken | `15m` |
+| `JWT_REFRESH_EXPIRY` | Vervaltyd van verfristoken | `7d` |
+| `BACKEND_PORT` | Poort waarop die backend luister | `3000` |
+| `NODE_ENV` | Omgewingsmodus | `development` |
+| `EXPO_PUBLIC_API_URL` | Backend URL vir die mobiele toepassing | `http://10.0.2.2:3000` |
+
+> Genereer 'n veilige `JWT_SECRET` met: `openssl rand -hex 32`
+
+---
+
+## Opstelling
+
+### 1. Docker-dienste (MongoDB, RabbitMQ, Redis)
+
+Die backend is afhanklik van MongoDB, RabbitMQ, en Redis. Begin al drie met Docker:
+
+```bash
+docker compose up
+```
+
+Verifieer dat alle dienste gesond is:
+
+```bash
+docker compose ps
+```
+
+Eindpunte na opstart:
+
+| Diens | URL |
+|---|---|
+| Backend API | `http://localhost:3000` |
+| RabbitMQ-bestuurskoppelvlak | `http://localhost:15672` |
+| MongoDB | `mongodb://localhost:27017` |
+| Redis | `redis://localhost:6379` |
+
+### 2. Web-toepassing
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Die web-dashboard is beskikbaar by `http://localhost:3001`.
+
+### 3. Mobiele toepassing
 
 ```bash
 cd apps/mobile
 npm install
 ```
 
-### Stel die API-URL in
-
-Die toepassing lees `EXPO_PUBLIC_API_URL` vanaf die hoof `.env`-lêer om die backend te bereik. Die verstekwaarde werk vir 'n Android-emulator. Verander dit as jy 'n ander teiken gebruik:
+Stel die korrekte `EXPO_PUBLIC_API_URL` in jou `.env` in volgens jou teiken:
 
 | Teiken | `EXPO_PUBLIC_API_URL` |
 |---|---|
-| Android-emulator | `http://10.0.2.2:3000` ← verstek |
+| Android-emulator | `http://10.0.2.2:3000` |
 | iOS-simulator | `http://localhost:3000` |
-| Fisiese toestel | `http://<jou-masjien-LAN-ip>:3000` |
+| Fisiese toestel | `http://<jou-LAN-IP>:3000` |
 
-Om jou masjien se LAN-IP op Windows te vind: `ipconfig` → soek vir IPv4-adres onder jou aktiewe adapter.
+> Om jou LAN-IP op Windows te vind: `ipconfig` -> soek IPv4-adres onder jou aktiewe adapter.
 
-### Uitvoer
+Begin die Expo-ontwikkelingsbediener:
 
 ```bash
-# Begin die Expo-ontwikkelingsbediener — scan die QR-kode met Expo Go op jou foon
 npm start
-
-# Maak direk oop in 'n lopende Android-emulator
-npm run android
-
-# Maak direk oop in die iOS-simulator (slegs macOS)
-npm run ios
-
-# Maak oop in blaaier vir 'n vinnige webvoorskou
-# Eerste keer slegs: npx expo install react-native-web react-dom @expo/metro-runtime
-npm run web
 ```
 
-> **Wenk:** druk `a` in die Expo-terminaal om die Android-emulator oop te maak, `i` vir iOS-simulator, of `w` vir web — geen herstart van die bediener nodig nie.
+| Opdrag | Aksie |
+|---|---|
+| `a` in terminaal | Maak Android-emulator oop |
+| `i` in terminaal | Maak iOS-simulator oop (slegs macOS) |
+| `w` in terminaal | Maak webblaaier oop |
+
+---
+
+## Kenmerke van Stelsel
+
+### Geleentheidskeping
+Skep en bestuur funksies met besonderhede soos datum, ligging, kapasiteit, en begroting.
+- Web: `http://localhost:3001/events/create`
+
+### RSVP-vloei
+Gebruikers kan registreer vir geleenthede en hul RSVP-status bestuur.
+- Web: `http://localhost:3001/events`
+- API: `POST /api/v1/rsvp`
+
+### Dashboard-statistieke
+Admins en dosente sien 'n oorsig van bywoning, begroting, en bevredigingsgraderings.
+- Web: `http://localhost:3001/dashboard`
+
+### Gebruikersprofiel
+Gebruikers kan hul akademiese titel opstel via die profielblad.
+- Web: `http://localhost:3001/profile`
+
+### Gebruikersbestuur
+Admins kan alle geregistreerde gebruikers sien en bestuur.
+- Web: `http://localhost:3001/users`
+
+---
+
+## Projekstruktuur
+
+```
+span4/
+├── apps/
+│   ├── backend/        # NestJS API
+│   ├── web/            # Next.js 14 web-dashboard
+│   ├── mobile/         # React Native + Expo mobiele toepassing
+│
+├── docker-compose.yaml
+├── .env.example
+└── README.md
+```
