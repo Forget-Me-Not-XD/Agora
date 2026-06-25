@@ -1,3 +1,5 @@
+// ========== Imports: ==========
+
 /**
  * Centralised event registry.
  * Every message published or consumed must use these constants —
@@ -8,30 +10,31 @@
  *   auth.user.login
  *   notification.email.welcome
  *   audit.log.create
+ *   event.photographer.assigned
  */
 
 export const EXCHANGES = {
    AUTH: 'auth.events',
    NOTIFICATION: 'notification.events',
    AUDIT: 'audit.events',
+   EVENT: 'event.events',
    DEAD_LETTER: 'dlx.events',
 } as const;
 
 export const ROUTING_KEYS = {
-   // Auth Domain:
    USER_REGISTERED: 'auth.user.registered',
    USER_LOGIN: 'auth.user.login',
    USER_LOGOUT: 'auth.user.logout',
    USER_FAILED_LOGIN: 'auth.user.failed-login',
 
-   // Notification Domain:
    NOTIFY_EMAIL_WELCOME:  'notification.email.welcome',
    NOTIFY_EMAIL_RSVP:     'notification.email.rsvp',
    NOTIFY_SMS_REMINDER:   'notification.sms.reminder',
    NOTIFY_PUSH_GENERIC:   'notification.push.generic',
 
-   // Audit domain
    AUDIT_LOG_CREATE: 'audit.log.create',
+
+   PHOTOGRAPHER_ASSIGNED: 'event.photographer.assigned',
 } as const;
 
 export const QUEUES = {
@@ -39,6 +42,7 @@ export const QUEUES = {
    NOTIFICATION_SMS: 'queue.notification.sms',
    NOTIFICATION_PUSH: 'queue.notification.push',
    AUDIT_LOG: 'queue.audit.log',
+   PHOTOGRAPHER_ASSIGNED: 'queue.photographer.assigned',
    DEAD_LETTER: 'queue.dead-letter',
 } as const;
 
@@ -76,5 +80,12 @@ export interface AuditLogEvent {
    oldValue?: Record<string, unknown>;
    newValue?: Record<string, unknown>;
    statusCode: number;
+   timestamp: string;
+}
+
+export interface PhotographerAssignedEvent {
+   eventId: string;
+   photographerId: string;
+   brief: string;
    timestamp: string;
 }

@@ -21,6 +21,7 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { EventResponseDto } from './dto/event-response.dto';
 
 @Controller('events')
@@ -74,5 +75,16 @@ export class EventsController {
         @CurrentUser() user: JwtPayload,
     ): Promise<void> {
         await this.eventsService.deleteEvent(id, user.sub, user.role);
+    }
+
+    @Patch(':id/assign-photographer')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async assignPhotographer(
+        @Param('id') id: string,
+        @Body() dto: AssignPhotographerDto,
+    ): Promise<EventResponseDto> {
+        const event = await this.eventsService.assignPhotographer(id, dto);
+        return EventResponseDto.fromDocument(event);
     }
 }
