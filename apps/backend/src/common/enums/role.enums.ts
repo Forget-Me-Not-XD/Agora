@@ -12,4 +12,5 @@ export enum Role {
     DOSENT = 'DOSENT',
     STUDENT = 'STUDENT',
     GAS = 'GAS',
+    PHOTOGRAPHER = 'PHOTOGRAPHER',
 }
