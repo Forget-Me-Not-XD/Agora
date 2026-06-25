@@ -73,4 +73,52 @@ export class AnalyticsService {
             },
         ]).exec();
     }
+
+    async getAverageFillRate(): Promise<number> {
+        const result = await this.eventModel.aggregate<{ avgFillRate: number }>([
+            { $match: { maxCapacity: { $gt: 0 } } },
+            {
+                $project: {
+                    fillRate: { $divide: ['$confirmedAttendees', '$maxCapacity'] },
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    avgFillRate: { $avg: '$fillRate' },
+                },
+            },
+        ]).exec();
+
+        return result.length > 0 ? result[0].avgFillRate : 0;
+    }
+
+    async getTop5Events(): Promise<RsvpPerEvent[]> {
+        return this.rsvpModel.aggregate<RsvpPerEvent>([
+            {
+                $group: {
+                    _id: '$event',
+                    totalRsvps: { $sum: 1 },
+                },
+            },
+            {
+                $lookup: {
+                    from: 'events',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'eventDoc',
+                },
+            },
+            { $unwind: '$eventDoc' },
+            {
+                $project: {
+                    _id: 0,
+                    eventTitle: '$eventDoc.title',
+                    totalRsvps: 1,
+                },
+            },
+            { $sort: { totalRsvps: -1 } },
+            { $limit: 5 },
+        ]).exec();
+    }
 }
