@@ -1,5 +1,6 @@
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import type { MockEvent } from '@/lib/mock-data';
+import RsvpModal from './RsvpModal';
 
 interface EventCardProps {
     event: MockEvent;
@@ -99,6 +100,8 @@ export default function EventCard({ event }: EventCardProps) {
                         {isAlmostFull && <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Byna vol</span>}
                     </div>
                 </div>
+
+                <RsvpModal event={event} />
             </div>
         </div>
     );
