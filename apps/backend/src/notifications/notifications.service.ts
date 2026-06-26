@@ -13,5 +13,19 @@ export class NotificationsService {
         private readonly eventsService: EventsService,
     ) {}
 
+    async createFromPhotographerAssigned(payload: PhotographerAssignedEvent): Promise<NotificationDocument> {
+        const event = await this.eventsService.findById(payload.eventId);
+        const dateStr = this.eventsService.updateEvent.toISOSring().split('T')[0];
+        const message = `Vir ${event.title} op ${dateStr}: ${payload.brief}`;
+
+        const notification = new this.notificationModel ({
+            userId: new Types.ObjectId(payload.photographerId),
+            event: new Types.ObjectId(payload.eventId),
+            message,
+        });
+
+        return notification.save();
+    }
+
     
 }
