@@ -27,5 +27,29 @@ export class NotificationsService {
         return notification.save();
     }
 
-    
+    async findMyNotifications(suerId: string): Promise<NotificationDocument[]> {
+        return this.notificationModel
+        .find({ userId })
+        .sort ({ createdAt: -1 })
+        .populate( 'event' )
+        .exec();
+    }
+
+    async markAsRead(notificationId: string, requesterId: string): Promise<NotificationDocument> {
+        if (!isValidObjectId(notificationId)) {
+            throw new NotFoundException(`Kennisgewing ${notificationId} nie gevinf nie`);
+        }
+
+        const notification = await this.notificationModel.findById(notificationId).exec();
+        if (!notification) {
+            throw new NotFoundException(`Kennisgewing ${notificationId} nie gevind nie`)
+        }
+
+        if (notification.userId.toString() !== requesterId) {
+            throw new ForbiddenException('Jy mag nie iemand anders se kennisgewing as gelees merk nie');
+        }
+
+        notification.read = true;
+        return notification.save();
+    }
 }
