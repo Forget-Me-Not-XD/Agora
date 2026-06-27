@@ -15,7 +15,7 @@ export class NotificationsService {
 
     async createFromPhotographerAssigned(payload: PhotographerAssignedEvent): Promise<NotificationDocument> {
         const event = await this.eventsService.findById(payload.eventId);
-        const dateStr = this.eventsService.updateEvent.toISOSring().split('T')[0];
+        const dateStr = event.date.toISOString().split('T')[0];
         const message = `Vir ${event.title} op ${dateStr}: ${payload.brief}`;
 
         const notification = new this.notificationModel ({
@@ -27,7 +27,7 @@ export class NotificationsService {
         return notification.save();
     }
 
-    async findMyNotifications(suerId: string): Promise<NotificationDocument[]> {
+    async findMyNotifications(userId: string): Promise<NotificationDocument[]> {
         return this.notificationModel
         .find({ userId })
         .sort ({ createdAt: -1 })
@@ -37,7 +37,7 @@ export class NotificationsService {
 
     async markAsRead(notificationId: string, requesterId: string): Promise<NotificationDocument> {
         if (!isValidObjectId(notificationId)) {
-            throw new NotFoundException(`Kennisgewing ${notificationId} nie gevinf nie`);
+            throw new NotFoundException(`Kennisgewing ${notificationId} nie gevind nie`);
         }
 
         const notification = await this.notificationModel.findById(notificationId).exec();

@@ -15,7 +15,7 @@ export class Notification {
     @Prop({ required: true, type: Types.ObjectId, ref: 'Event', index: true })
     event !: Types.ObjectId;
 
-    @Prop({ defualt: false })
+    @Prop({ default: false })
     read !: boolean;
 
     createdAt ?: Date;
