@@ -1,18 +1,20 @@
-import { Calendar, Users, BarChart2, Wallet } from 'lucide-react';
+import { Suspense } from 'react';
+import { Calendar, CalendarClock, Ticket, Gauge } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import EventCard from '@/components/EventCard';
 import IncomeExpenseChart from '@/components/charts/IncomeExpenseChart';
 import AttendanceChart from '@/components/charts/AttendanceChart';
 import SatisfactionChart from '@/components/charts/SatisfactionChart';
-import { MOCK_EVENTS, MOCK_USERS, MOCK_BUDGET_ITEMS, MOCK_INSIGHTS } from '@/lib/mock-data';
+import { MOCK_EVENTS, MOCK_BUDGET_ITEMS, MOCK_INSIGHTS } from '@/lib/mock-data';
 import { filterEventsForUser, canViewBudget, canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { getEvents } from '@/lib/api/events';
+
+export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
     const user = getCurrentUser();
     const visibleEvents = filterEventsForUser(MOCK_EVENTS, user);
-    const upcomingCount = visibleEvents.filter((e) => e.status === 'upcoming').length;
-    const activeUsers = MOCK_USERS.filter((u) => u.isActive).length;
 
     /* ── Chart data (only computed for roles that can see them) ── */
     const showCharts = canViewInsights(user.role) || canViewBudget(user.role);
@@ -55,13 +57,6 @@ export default function DashboardPage() {
             rating: i.averageRating,
         }));
 
-    const totalIncome = budgetData.reduce((s, d) => s + d.income, 0);
-    const totalExpense = budgetData.reduce((s, d) => s + d.expense, 0);
-    const avgAttendance =
-        attendanceData.length > 0
-            ? Math.round(attendanceData.reduce((s, d) => s + d.rate, 0) / attendanceData.length)
-            : 0;
-
     return (
         <div className="space-y-6">
 
@@ -73,43 +68,9 @@ export default function DashboardPage() {
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">{user.studyCenter}</p>
             </div>
 
-            {/* ── KPI stat cards ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard
-                    label="Aanstaande Geleenthede"
-                    value={upcomingCount}
-                    sub="in die volgende 60 dae"
-                    icon={Calendar}
-                    color="blue"
-                />
-                {canViewInsights(user.role) && (
-                    <StatCard
-                        label="Aktiewe Gebruikers"
-                        value={activeUsers}
-                        sub="geregistreerde gebruikers"
-                        icon={Users}
-                        color="green"
-                    />
-                )}
-                {canViewInsights(user.role) && (
-                    <StatCard
-                        label="Gemiddelde Bywoning"
-                        value={avgAttendance > 0 ? `${avgAttendance}%` : 'N/B'}
-                        sub="voltooide geleenthede"
-                        icon={BarChart2}
-                        color="orange"
-                    />
-                )}
-                {canViewBudget(user.role) && (
-                    <StatCard
-                        label="Netto Begroting"
-                        value={`R ${(totalIncome - totalExpense).toLocaleString('af-ZA')}`}
-                        sub="inkomste minus uitgawes"
-                        icon={Wallet}
-                        color="red"
-                    />
-                )}
-            </div>
+            <Suspense fallback={<KpiSkeletons />}>
+                <DashboardKpis />
+            </Suspense>
 
             {/* ── Charts row (Admin + Dosent only) ── */}
             {showCharts && (
@@ -182,6 +143,67 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+// grys blokkies terwyl die data gehaal word
+function KpiSkeletons() {
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                    key={i}
+                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-start gap-4 animate-pulse"
+                >
+                    <div className="w-11 h-11 rounded-xl bg-[var(--color-border)]" />
+                    <div className="flex-1 space-y-2">
+                        <div className="h-3 w-24 rounded bg-[var(--color-border)]" />
+                        <div className="h-6 w-16 rounded bg-[var(--color-border)]" />
+                        <div className="h-3 w-20 rounded bg-[var(--color-border)]" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Haal die KPI-data en wys die 4 kaarte
+async function DashboardKpis() {
+    let events: Awaited<ReturnType<typeof getEvents>> | null = null;
+    try {
+        events = await getEvents();
+    } catch {
+        events = null; // haal misluk → kaarte wys "--"
+    }
+
+    // Elke waarde word onafhanklik bereken
+    // is events null, wys daardie kaart "--"
+    const totalEvents = events ? events.length : '--';
+
+    const upcomingEvents = events
+        ? events.filter((e) => new Date(e.date).getTime() > Date.now()).length
+        : '--';
+
+    const totalRsvps = events
+        ? events.reduce((sum, e) => sum + e.confirmedAttendees, 0)
+        : '--';
+
+    const avgFillRate = events
+        ? `${Math.round(
+            (events.reduce(
+                (sum, e) => sum + (e.maxCapacity > 0 ? e.confirmedAttendees / e.maxCapacity : 0),
+                0,
+            ) / (events.length || 1)) * 100,
+            )}%`
+        : '--';
+
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Totale Geleenthede"     value={totalEvents}    sub="in die stelsel"       icon={Calendar}      color="blue" />
+            <StatCard label="Aankomende Geleenthede" value={upcomingEvents} sub="datum in die toekoms" icon={CalendarClock} color="green" />
+            <StatCard label="Totale RSVPs"           value={totalRsvps}     sub="bevestigde bywoners"  icon={Ticket}        color="orange" />
+            <StatCard label="Gemiddelde Vulkoers"    value={avgFillRate}    sub="kapasiteit gevul"     icon={Gauge}         color="red" />
         </div>
     );
 }
