@@ -11,6 +11,8 @@ import { RsvpService, ScanResponse } from './rsvp.service';
 import { CreateRsvpDto } from './dto/create-rsvp.dto';
 import { RsvpDocument } from './schemas/rsvp.schema';
 import { ScanRsvpDto } from './dto/scan-rsvp.dto';
+import { RsvpResponseDto } from './dto/rsvp-response.dto';
+import { UserDocument } from '../users/schemas/user.schema';
 
 @Controller('rsvp')
 @UseGuards(JwtAuthGuard)
@@ -48,8 +50,9 @@ export class RsvpController {
     @Roles(Role.ADMIN, Role.DOSENT)
     async findRsvpsByEvent(
         @Param('eventId') eventId: string,
-    ): Promise<RsvpDocument[]> {
-        return this.rsvpService.findRsvpsByEvent(eventId);
+    ): Promise<RsvpResponseDto[]> {
+        const rsvps = await this.rsvpService.findRsvpsByEvent(eventId);
+        return rsvps.map(r => RsvpResponseDto.fromDocument(r as RsvpDocument & { user: UserDocument }));
     }
 
     @Get (':id/qr')

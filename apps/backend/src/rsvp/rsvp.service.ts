@@ -62,7 +62,7 @@ export class RsvpService {
         await this.eventsService.findById(eventId);
         return this.rsvpModel
         .find({ event: eventId })
-        .populate('user')
+        .populate('user', '-passwordHash -__v')
         .exec();
     }
 
