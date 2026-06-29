@@ -31,18 +31,20 @@ export class EventsController {
 
     @Get()
     async findAll(
+        @CurrentUser() user: JwtPayload,
         @Query('from') from?: string,
         @Query('to') to?: string,
     ): Promise<EventResponseDto[]> {
-        const events = await this.eventsService.findAll(from, to);
+        const events = await this.eventsService.findAll(user.role, user.sub, from, to);
         return events.map(EventResponseDto.fromDocument);
     }
 
     @Get(':id')
     async findOne(
         @Param('id') id: string,
+        @CurrentUser() user: JwtPayload,
     ): Promise<EventResponseDto> {
-        const event = await this.eventsService.findById(id);
+        const event = await this.eventsService.findById(id, user.role, user.sub);
         return EventResponseDto.fromDocument(event);
     }
 

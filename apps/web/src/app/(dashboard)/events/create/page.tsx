@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useCurrentUser } from '@/components/UserContext';
 import { canCreateEvents } from '@/lib/rbac';
 import { createEventAction } from '@/lib/actions/event.actions';
+import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
 
 const STUDY_CENTERS = [
     'Centurion - Leriba',
@@ -15,6 +17,7 @@ const STUDY_CENTERS = [
 ];
 
 export default function CreateEventPage() {
+    const router = useRouter();
     const user = useCurrentUser();
 
     const [formData, setFormData] = useState({
@@ -24,6 +27,7 @@ export default function CreateEventPage() {
         time: '',
         location: '',
         type: 'public',
+        intendedAttendance: 'GAS',
         capacity: '',
         budget: '',
         studyCenter: user.studyCenter,
@@ -69,13 +73,18 @@ export default function CreateEventPage() {
         setApiError(null);
         startTransition(async () => {
             const err = await createEventAction({
-                title:       formData.title,
-                description: formData.description,
-                date:        `${formData.date}T${formData.time}`,
-                location:    formData.location,
-                maxCapacity: Number(formData.capacity),
+                title:              formData.title,
+                description:        formData.description,
+                date:               `${formData.date}T${formData.time}`,
+                location:           formData.location,
+                maxCapacity:        Number(formData.capacity),
+                intendedAttendance: formData.intendedAttendance as AttendanceRole,
             });
-            if (err) setApiError(err);
+            if (err) {
+                setApiError(err);
+            } else {
+                router.push('/events');
+            }
         });
     }
 
@@ -217,6 +226,21 @@ export default function CreateEventPage() {
                     </div>
                 </div>
 
+                <div>
+                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                        Sigbaarheid (wie kan dit sien)
+                    </label>
+                    <select
+                        value={formData.intendedAttendance}
+                        onChange={(e) => handleChange('intendedAttendance', e.target.value)}
+                        className={inputClass('intendedAttendance')}
+                    >
+                        {ATTENDANCE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                    </select>
+                </div>
+                
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">

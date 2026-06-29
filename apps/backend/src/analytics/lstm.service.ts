@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
 import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
+import { Role } from '../common/enums/role.enums';
 
 // ============================================================
 // This interface is the boundary between the NestJS world and the Python world
@@ -40,6 +41,8 @@ export class LstmService {
 
         // findAll supports an optional 'to' date filter - we use this to exclude future events
         const events = await this.eventsService.findAll(
+            Role.ADMIN,
+            '',
             undefined,
             new Date().toISOString(),
         );

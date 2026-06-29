@@ -9,7 +9,10 @@ import {
     IsMongoId,
     MaxLength,
     Min,
+    IsIn,
 } from 'class-validator';
+import { Role } from '../../common/enums/role.enums';
+import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
 
 export class CreateEventDto {
     @IsString()
@@ -43,4 +46,8 @@ export class CreateEventDto {
     @IsString()
     @MaxLength(2000)
     photographerInstructions?: string;
+
+    @IsOptional()
+    @IsIn(ATTENDANCE_ROLES)
+    intendedAttendance?: Role;
 }
