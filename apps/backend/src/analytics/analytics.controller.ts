@@ -1,11 +1,11 @@
 // ========== Imports: ==========
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { LstmService, TrainingDataItem } from './lstm.service';
-import { AnalyticsService, EventsPerMonth, RsvpPerEvent } from './analytics.service';
+import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent } from './analytics.service';
 
 interface EventsSummaryResponse {
     eventsPerMonth: EventsPerMonth[];
@@ -54,5 +54,14 @@ export class AnalyticsController {
             this.analyticsService.getAverageFillRate(),
         ]);
         return { rsvpsPerEvent, averageFillRate };
+    }
+
+    @Get('predict/:eventId')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async predictAttendance(
+        @Param('eventId') eventId: string,
+    ): Promise<AttendancePrediction> {
+        return this.analyticsService.predictAttendance(eventId);
     }
 }
