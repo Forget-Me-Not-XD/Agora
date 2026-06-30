@@ -1,4 +1,5 @@
 ﻿// ========== Imports: ==========
+import * as path from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -19,6 +20,7 @@ import { PhotographersModule } from '../photographers/photographers.module';
     // ========== Global configuration ==========
     ConfigModule.forRoot({
         isGlobal: true,
+        envFilePath: path.join(__dirname, '../../.env'),
         load: [configuration],
     }),
 
