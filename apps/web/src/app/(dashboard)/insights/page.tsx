@@ -3,6 +3,7 @@ import { MOCK_EVENTS, MOCK_INSIGHTS } from '@/lib/mock-data';
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import InfoModal from '@/components/InfoModal';
+import ExportCsvButton from '@/components/ExportCsvButton';
 
 const TYPE_LABELS: Record<string, string> = {
     public: 'Publiek',
@@ -85,6 +86,9 @@ export default function InsightsPage() {
                             ? 'Prestasie oorsig vir alle geleenthede'
                             : 'Prestasie oorsig vir jou geleenthede'}
                     </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <ExportCsvButton type="events-summary" />
                 </div>
                 <InfoModal title="Oor KI Insigte">
                     <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
