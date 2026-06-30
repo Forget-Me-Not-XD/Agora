@@ -14,6 +14,7 @@ import { EventsModule } from '../events/events.module';
 import { RsvpModule } from '../rsvp/rsvp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
+import { ExportModule } from '../export/export.module'; 
 
 @Module({
     imports: [
@@ -43,6 +44,7 @@ import { PhotographersModule } from '../photographers/photographers.module';
     RsvpModule,
     AnalyticsModule,
     PhotographersModule,
+    ExportModule,
     ],
 })
 export class AppModule {}
