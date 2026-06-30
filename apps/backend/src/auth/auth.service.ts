@@ -9,6 +9,7 @@ import {
   import { JwtService } from '@nestjs/jwt';
   import * as bcrypt from 'bcrypt';
   import { v4 as uuidv4 } from 'uuid';
+  import type { StringValue } from 'ms';
   
   import { UsersService } from '../users/users.service';
   import { UserDocument } from '../users/schemas/user.schema';
@@ -123,8 +124,8 @@ import {
         role: user.role,
       };
   
-      const accessExpiry = this.config.get<string>('jwt.accessExpiry')!;
-      const refreshExpiry = this.config.get<string>('jwt.refreshExpiry')!;
+      const accessExpiry = this.config.get<StringValue>('jwt.accessExpiry')!;
+      const refreshExpiry = this.config.get<StringValue>('jwt.refreshExpiry')!;
   
       const accessToken = await this.jwtService.signAsync(payload, {
         expiresIn: accessExpiry as StringValue,
