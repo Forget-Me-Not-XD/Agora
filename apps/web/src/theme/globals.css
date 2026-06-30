@@ -22,6 +22,8 @@
   --color-red:   #B91C1C;
   --color-green: #15803D;
   --color-blue:  #1D4ED8;
+
+  --color-gold: #B8860B;
 }
 
 /* dark mode */
@@ -42,6 +44,8 @@
   --color-red:   #F87171;
   --color-green: #4ADE80;
   --color-blue:  #60A5FA;
+
+  --color-gold: #0DC9D0;
 }
 
 /* Base */
