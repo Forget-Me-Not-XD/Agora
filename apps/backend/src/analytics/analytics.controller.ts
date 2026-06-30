@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
-import { LstmService, TrainingDataItem } from './lstm.service';
+import { LstmService, TrainingDataItem, PredictionResult } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent } from './analytics.service';
 
 interface EventsSummaryResponse {
@@ -63,5 +63,12 @@ export class AnalyticsController {
         @Param('eventId') eventId: string,
     ): Promise<AttendancePrediction> {
         return this.analyticsService.predictAttendance(eventId);
+    }
+
+    @Get('prediction')
+    async getAttendancePrediction(
+        @Query('eventId') eventId: string,
+    ): Promise<PredictionResult> {
+        return this.lstmService.predictAttendance(eventId);
     }
 }

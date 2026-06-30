@@ -51,3 +51,39 @@ export async function getRsvpSummary(): Promise<RsvpSummary> {
 export async function getEventsSummary(): Promise<EventsSummary> {
     return apiFetch<EventsSummary>('/api/v1/analytics/events-summary');
 }
+
+export interface PredictionResult {
+    predictedFillRate:   number;
+    estimatedRsvps:      number;
+    predictedNoShowRate: number;
+    estimatedAttendees:  number;
+    estimatedBudgetZAR:  number;
+    reasoning:           string[];
+}
+
+// Thrown specifically on a 503, so callers can show a distinct "unavailable" state.
+export class PredictionUnavailableError extends Error {}
+
+export async function getAttendancePrediction(eventId: string): Promise<PredictionResult> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/analytics/prediction?eventId=${encodeURIComponent(eventId)}`, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        cache: 'no-store',
+    });
+
+    if (res.status === 503) {
+        throw new PredictionUnavailableError('Prediction service unavailable');
+    }
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+    }
+
+    return res.json() as Promise<PredictionResult>;
+}

@@ -4,6 +4,7 @@ import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
+import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 
 const TYPE_LABELS: Record<string, string> = {
     public: 'Publiek',
@@ -130,7 +131,8 @@ export default function InsightsPage() {
                     </div>
                 </InfoModal>
             </div>
-
+            {/* ── Predicted Attendance Card ── */}
+            <PredictedAttendanceCard />
             {/* ── Summary KPI cards ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <KpiCard
