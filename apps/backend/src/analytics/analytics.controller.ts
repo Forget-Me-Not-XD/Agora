@@ -1,5 +1,6 @@
 // ========== Imports: ==========
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards, BadRequestException } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
@@ -54,6 +55,20 @@ export class AnalyticsController {
             this.analyticsService.getAverageFillRate(),
         ]);
         return { rsvpsPerEvent, averageFillRate };
+    }
+
+    @Get('export')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async exportCsv(
+        @Query('type') type: string,
+        @Res() res: Response,
+    ): Promise<void> {
+        const date = new Date().toISOString().slice(0, 10);
+        const csv = await this.analyticsService.exportToCsv(type);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="uitvoer-${type}-${date}.csv"`);
+        res.send(csv);
     }
 
     @Get('predict/:eventId')

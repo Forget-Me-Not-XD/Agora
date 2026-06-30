@@ -7,6 +7,7 @@ import { Rsvp, RsvpSchema } from '../rsvp/schemas/rsvp.schema';
 import { LstmService } from './lstm.service';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 
 // Importing MongooseModule.forFeature here gives the LstmService direct access to the Rsvp model:
@@ -16,6 +17,7 @@ import { AnalyticsController } from './analytics.controller';
         EventsModule,
         MongooseModule.forFeature([
             { name: Event.name, schema: EventSchema },
+            { name: User.name, schema: UserSchema },
             { name: Rsvp.name, schema: RsvpSchema}]),
     ],
     providers: [LstmService, AnalyticsService],

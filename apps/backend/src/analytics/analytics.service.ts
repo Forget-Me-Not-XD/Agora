@@ -1,13 +1,15 @@
 // ========== Imports: ==========
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { stringify } from 'csv-stringify/sync';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
 import { LstmService } from './lstm.service';
 
 const execFileAsync = promisify(execFile);
@@ -33,6 +35,7 @@ export class AnalyticsService {
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
         private readonly lstmService: LstmService,
     ) {}
 
@@ -133,6 +136,69 @@ export class AnalyticsService {
             { $sort: { totalRsvps: -1 } },
             { $limit: 5 },
         ]).exec();
+    }
+
+    async exportToCsv(type: string): Promise<string> {
+        let rows: string[][];
+
+        switch (type) {
+            case 'kpis': {
+                const [totalEvents, totalUsers, totalRsvps, checkedIn] = await Promise.all([
+                    this.eventModel.countDocuments().exec(),
+                    this.userModel.countDocuments({ isActive: true }).exec(),
+                    this.rsvpModel.countDocuments().exec(),
+                    this.rsvpModel.countDocuments({ checkedIn: true }).exec(),
+                ]);
+                const attendanceRate = totalRsvps > 0
+                    ? ((checkedIn / totalRsvps) * 100).toFixed(1)
+                    : '0.0';
+                rows = [
+                    ['KPI', 'Waarde'],
+                    ['Totale Geleenthede',  String(totalEvents)],
+                    ['Aktiewe Gebruikers',  String(totalUsers)],
+                    ['Totale RSVPs',        String(totalRsvps)],
+                    ['Ingeboek (Check-in)', String(checkedIn)],
+                    ['Bywoningskoers (%)',  attendanceRate],
+                ];
+                break;
+            }
+            case 'events-summary': {
+                const [eventsPerMonth, top5Events] = await Promise.all([
+                    this.getEventsPerMonth(),
+                    this.getTop5Events(),
+                ]);
+                rows = [
+                    ['Jaar', 'Maand', 'Geleenthede per Maand', 'Top Geleentheid', 'RSVPs'],
+                    ...eventsPerMonth.map((e, i) => [
+                        String(e.year),
+                        String(e.month),
+                        String(e.count),
+                        top5Events[i]?.eventTitle ?? '',
+                        top5Events[i] ? String(top5Events[i].totalRsvps) : '',
+                    ]),
+                ];
+                break;
+            }
+            case 'rsvp-summary': {
+                const [rsvpsPerEvent, averageFillRate] = await Promise.all([
+                    this.getRsvpsPerEvent(),
+                    this.getAverageFillRate(),
+                ]);
+                rows = [
+                    ['Geleentheid', 'Totale RSVPs', 'Gemiddelde Vullingskoers (%)'],
+                    ...rsvpsPerEvent.map((r) => [
+                        r.eventTitle,
+                        String(r.totalRsvps),
+                        (averageFillRate * 100).toFixed(1),
+                    ]),
+                ];
+                break;
+            }
+            default:
+                throw new BadRequestException(`Ongeldige tipe: ${type}`);
+        }
+
+        return '\uFEFF' + 'sep=,\r\n' + stringify(rows);
     }
 
     // Calls predict.py as a child process and returns a typed attendance prediction.
