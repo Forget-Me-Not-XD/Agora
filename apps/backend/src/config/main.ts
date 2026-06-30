@@ -11,9 +11,21 @@ async function bootstrap() {
 
     const config = app.get(ConfigService);
 
-    // ========== CORS — allow mobile + web frontends ==========
+    // ========== CORS - allow mobile + web frontends ==========
+    const rawOrigins = config.get<string>('ALLOWED_ORIGINS') ?? '';
+    const allowedOrigins = rawOrigins
+        .split(',')
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+
     app.enableCors({
-        origin: true,    // In prod environment, replace with explicit origin list
+        origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+            if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`CORS: origin ${requestOrigin} is not allowed `), false);
+            }
+        },
         credentials: true,
         methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     });
