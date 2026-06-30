@@ -5,11 +5,10 @@ import {
     Logger,
   } from '@nestjs/common';
   import { ConfigService } from '@nestjs/config';
-  import { StringValue } from 'ms';
+  import type { StringValue } from 'ms';
   import { JwtService } from '@nestjs/jwt';
   import * as bcrypt from 'bcrypt';
   import { v4 as uuidv4 } from 'uuid';
-  import type { StringValue } from 'ms';
   
   import { UsersService } from '../users/users.service';
   import { UserDocument } from '../users/schemas/user.schema';
