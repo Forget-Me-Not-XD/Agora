@@ -5,6 +5,7 @@ import {
     Logger,
   } from '@nestjs/common';
   import { ConfigService } from '@nestjs/config';
+  import { StringValue } from 'ms';
   import { JwtService } from '@nestjs/jwt';
   import * as bcrypt from 'bcrypt';
   import { v4 as uuidv4 } from 'uuid';
@@ -127,11 +128,11 @@ import {
       const refreshExpiry = this.config.get<StringValue>('jwt.refreshExpiry')!;
   
       const accessToken = await this.jwtService.signAsync(payload, {
-        expiresIn: accessExpiry,
+        expiresIn: accessExpiry as StringValue,
       });
       const refreshToken = await this.jwtService.signAsync(
         { ...payload, jti: uuidv4() },
-        { expiresIn: refreshExpiry },
+        { expiresIn: refreshExpiry as StringValue},
       );
   
       return {
