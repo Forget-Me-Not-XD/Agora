@@ -116,7 +116,7 @@ export interface UserResponse {
     name: string;
     surname: string;
     email: string;
-    role: 'ADMIN' | 'DOSENT' | 'GAS';
+    role: 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS' | 'PHOTOGRAPHER';
     studyCenter: string;
     isActive: boolean;
     createdAt: string;
