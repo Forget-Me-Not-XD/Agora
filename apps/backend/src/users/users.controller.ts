@@ -1,6 +1,8 @@
 // ========== Imports: ==========
-import { Controller, Get, Patch, Param, Body, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -22,6 +24,19 @@ export class UsersController {
   ): Promise <UserResponseDto> {
     const user = await this.usersService.findById(jwtPayload.sub);
     return UserResponseDto.fromDocument(user);
+  }
+
+  // Soek gebruikers per rol
+  @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.DOSENT)
+  async search(
+    @Query('role') role: Role,
+    @Query('q') q?: string,
+    @Query('ids') ids?: string,
+  ) : Promise<UserResponseDto[]> {
+    const idList = ids ? ids.split(',').filter(Boolean) : undefined;
+    return this.usersService.search(role, q, idList);
   }
 
     /** 
