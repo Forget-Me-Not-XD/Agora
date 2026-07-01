@@ -7,6 +7,10 @@ import { EventsScreen } from '../screens/EventsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { RsvpScreen } from '../screens/RsvpScreen';
 import { AiScreen } from '../screens/AiScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { useEffect } from 'react';
+import { canViewNotifications } from '../lib/rbac';
+import { useNotificationsStore } from '../stores/notifications.store';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -14,6 +18,7 @@ export type MainTabParamList = {
   Calendar: undefined;
   Rsvp: undefined;
   Ai: undefined;
+  Notifications: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -22,6 +27,17 @@ export function MainTabs() {
   const colors = useThemeColors();
   const user = useAuthStore((s) => s.user);
   const canViewAi = user?.role === 'ADMIN' || user?.role === 'DOSENT';
+
+  const canSeeNotifications = !!user && canViewNotifications(user.role);
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const loadNotifications = useNotificationsStore((s) => s.load);
+
+  // Laai kennisgewings sodra 'n fotograaf aan meldd, sodat die kenteken reg is
+  useEffect(() => {
+    if (canSeeNotifications) {
+      loadNotifications();
+    }
+  }, [canSeeNotifications,loadNotifications]);
 
   return (
     <Tab.Navigator
@@ -81,6 +97,17 @@ export function MainTabs() {
           options={{
             title: 'KI',
             tabBarIcon: ({ color, size }) => <Feather name="cpu" color={color} size={size ?? 20} />,
+          }}
+        />
+      )}
+      {canSeeNotifications && (
+        <Tab.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
+            title: 'Kennisgewings',
+            tabBarIcon: ({ color, size }) => <Feather name="bell" color={color} size={size ?? 20} />,
+            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           }}
         />
       )}

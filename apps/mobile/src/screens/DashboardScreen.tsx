@@ -20,7 +20,9 @@ export function DashboardScreen() {
   const roleLabel = {
     ADMIN:  'Administrateur',
     DOSENT: 'Dosent',
-    GAS:    'Gas / Student',
+    STUDENT: 'Student',
+    GAS:    'Gas',
+    PHOTOGRAPHER: 'Fotograaf',
   }[user.role];
 
   const handleLogout = () => {
