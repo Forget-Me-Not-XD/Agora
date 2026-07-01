@@ -25,30 +25,24 @@ export class RsvpService {
     ) {}
 
     async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
-        const event = await this.eventsService.findById(dto.eventId);
+        await this.eventsService.findById(dto.eventId);
 
         const existing = await this.rsvpModel
-        .findOne({ event: dto.eventId, user: userId})
+        .findOne({ event: dto.eventId, user: userId })
         .exec();
         if (existing) {
             throw new ConflictException('Jy het alreeds vir hierdie geleentheid ingeskryf');
         }
 
-        if (event.confirmedAttendees >= event.maxCapacity) {
-            throw new ConflictException('Hierdie geleentheid is vol bespreek');
-        }
+        await this.eventsService.incrementConfirmedAttendees(dto.eventId);
 
-        const rsvp = new this.rsvpModel({
+        const rsvp = new this.rsvpModel ({
             event: dto.eventId,
             user: userId,
             qrPayload: uuidv4(),
         });
-        const saved = await rsvp.save();
 
-        event.confirmedAttendees += 1;
-        await event.save();
-
-        return saved;
+        return rsvp.save();
     }
 
     async findMyRsvps(userId: string): Promise<RsvpDocument[]> {
