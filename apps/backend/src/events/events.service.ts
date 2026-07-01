@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model, Types } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';
@@ -45,6 +45,23 @@ export class EventsService {
 
         const event = await this.eventModel.findById(id).exec();
         if (!event) throw new NotFoundException(`Event ${id} not found`);
+        return event;
+    }
+
+    async incrementConfirmedAttendees(id: string): Promise<EventDocument> {
+        const event = await this.eventModel.findOneAndUpdate(
+            {
+                _id: id,
+                $expr: { $lt: [`$confirmedAttendees`, `$maxCapacity`] },
+            },
+            { $inc: { confirmedAttendees: 1 } },
+            { new: true },
+        ).exec();
+
+        if (!event) {
+            throw new ConflictException(`Hierdie geleentheid is vol bespreek`);
+        }
+
         return event;
     }
 
