@@ -59,6 +59,8 @@ export class EventsController {
     }
 
     @Patch(':id')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
     async update(
         @Param('id') id: string,
         @Body() dto: UpdateEventDto,
