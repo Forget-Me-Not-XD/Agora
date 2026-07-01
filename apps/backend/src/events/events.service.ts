@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model, Types } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';

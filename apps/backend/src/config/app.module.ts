@@ -1,4 +1,5 @@
 ﻿// ========== Imports: ==========
+import * as path from 'path';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -13,12 +14,14 @@ import { EventsModule } from '../events/events.module';
 import { RsvpModule } from '../rsvp/rsvp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
+import { ExportModule } from '../export/export.module'; 
 
 @Module({
     imports: [
     // ========== Global configuration ==========
     ConfigModule.forRoot({
         isGlobal: true,
+        envFilePath: path.join(__dirname, '../../.env'),
         load: [configuration],
     }),
 
@@ -41,6 +44,7 @@ import { PhotographersModule } from '../photographers/photographers.module';
     RsvpModule,
     AnalyticsModule,
     PhotographersModule,
+    ExportModule,
     ],
 })
 export class AppModule {}

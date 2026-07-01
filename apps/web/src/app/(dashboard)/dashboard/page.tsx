@@ -9,6 +9,7 @@ import { MOCK_EVENTS, MOCK_BUDGET_ITEMS, MOCK_INSIGHTS } from '@/lib/mock-data';
 import { filterEventsForUser, canViewBudget, canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
+import ExportCsvButton from '@/components/ExportCsvButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,11 +62,14 @@ export default function DashboardPage() {
         <div className="space-y-6">
 
             {/* ── Greeting ── */}
+            <div className="flex items-center justify-between">
             <div>
                 <h1 className="text-2xl font-bold text-[var(--color-text)]">
                     Goeie dag, {user.name}
                 </h1>
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">{user.studyCenter}</p>
+            </div>
+                <ExportCsvButton type="kpis" />
             </div>
 
             <Suspense fallback={<KpiSkeletons canSeeAll={canViewInsights(user.role)}/>}>

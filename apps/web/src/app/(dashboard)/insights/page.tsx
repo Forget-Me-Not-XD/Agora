@@ -3,6 +3,8 @@ import { MOCK_EVENTS, MOCK_INSIGHTS } from '@/lib/mock-data';
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import InfoModal from '@/components/InfoModal';
+import ExportCsvButton from '@/components/ExportCsvButton';
+import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 
 const TYPE_LABELS: Record<string, string> = {
     public: 'Publiek',
@@ -86,6 +88,9 @@ export default function InsightsPage() {
                             : 'Prestasie oorsig vir jou geleenthede'}
                     </p>
                 </div>
+                <div className="flex items-center gap-2">
+                    <ExportCsvButton type="events-summary" />
+                </div>
                 <InfoModal title="Oor KI Insigte">
                     <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
                         Hierdie bladsy wys hoe goed jou geleenthede presteer het op grond van
@@ -126,7 +131,8 @@ export default function InsightsPage() {
                     </div>
                 </InfoModal>
             </div>
-
+            {/* ── Predicted Attendance Card ── */}
+            <PredictedAttendanceCard />
             {/* ── Summary KPI cards ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <KpiCard

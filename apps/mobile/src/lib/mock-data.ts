@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS';
+export type UserRole = 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS' | 'PHOTOGRAPHER';
 export type EventType = 'public' | 'internal_student' | 'private' | 'department';
 export type EventStatus = 'upcoming' | 'ongoing' | 'past' | 'cancelled';
 

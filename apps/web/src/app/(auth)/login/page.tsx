@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { Eye, EyeOff, Loader2, Clock, RefreshCw, Lock, Shield } from 'lucide-react';
+// ========== Imports: ==========
+import { useRef, useState, useTransition } from 'react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { loginAction } from '@/lib/actions/auth.actions';
+import { SnakeFieldBorder, type SnakeFieldBorderHandle } from '@/components/SnakeFieldBorder';
 
 export default function LoginPage() {
   const [email, setEmail]                     = useState('');
@@ -12,6 +14,12 @@ export default function LoginPage() {
   const [error, setError]                     = useState<string | null>(null);
   const [isPending, startTransition]          = useTransition();
   const [forgotInfo, setForgotInfo]           = useState(false);
+
+  const formRef                               = useRef<HTMLFormElement>(null);
+  const emailInputRef                         = useRef<HTMLInputElement>(null);
+  const passwordInputRef                      = useRef<HTMLInputElement>(null);
+  const submitButtonRef                       = useRef<HTMLButtonElement>(null);
+  const snakeRef                              = useRef<SnakeFieldBorderHandle>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +54,7 @@ export default function LoginPage() {
 
       {/* Form card */}
       <div
-        className="rounded-[16px] border p-6"
+        className="rounded-[24px] border p-6"
         style={{
           background: 'var(--color-surface)',
           borderColor: 'var(--color-border)',
@@ -104,7 +112,14 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} noValidate>
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className='relative'>
+          <SnakeFieldBorder
+            ref={snakeRef}
+            containerRef={formRef}
+            emailRef={emailInputRef}
+            passwordRef={passwordInputRef}
+            submitRef={submitButtonRef}
+          />
 
           {/* E-pos */}
           <label className="block mb-1.5">
@@ -113,20 +128,16 @@ export default function LoginPage() {
             </span>
             <input
               type="email"
+              ref={emailInputRef}
               autoComplete="email"
               placeholder="naam@akademia.ac.za"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isPending}
               required
-              className="mt-1.5 w-full rounded-[10px] px-[14px] py-3 text-[15px] focus:outline-none transition disabled:opacity-60"
-              style={{
-                background: 'var(--color-bg)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text)',
-              }}
-              onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)')}
-              onBlur={(e)  => (e.currentTarget.style.boxShadow = '')}
+              className="mt-1.5 w-full bg-transparent border-0 pb-2 text-[15px] focus:outline-none transition disabled:opacity-60"
+              style={{ color: 'var(--color-text)' }}
+              onFocus={() => snakeRef.current?.highlight('email')}
             />
           </label>
 
@@ -138,20 +149,16 @@ export default function LoginPage() {
             <div className="relative mt-1.5">
               <input
                 type={passwordVisible ? 'text' : 'password'}
+                ref={passwordInputRef}
                 autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isPending}
                 required
-                className="w-full rounded-[10px] px-[14px] py-3 pr-11 text-[15px] focus:outline-none transition disabled:opacity-60"
-                style={{
-                  background: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text)',
-                }}
-                onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px var(--color-primary)')}
-                onBlur={(e)  => (e.currentTarget.style.boxShadow = '')}
+                className="w-full bg-transparent border-0 pb-2 pr-11 text-[15px] focus:outline-none transition disabled:opacity-60"
+                style={{ color: 'var(--color-text)' }}
+                onFocus={() => snakeRef.current?.highlight('password')}
               />
               <button
                 type="button"
@@ -193,8 +200,11 @@ export default function LoginPage() {
           {/* Meld Aan */}
           <button
             type="submit"
+            ref={submitButtonRef}
+            onMouseEnter={() => snakeRef.current?.highlight('submit')}
+            onFocus={() => snakeRef.current?.highlight('submit')}
             disabled={isPending || !email || !password}
-            className="mt-5 mb-5 w-full rounded-[12px] py-[14px] text-[15px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="mt-5 mb-5 w-full rounded-[20px] py-[14px] text-[15px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
             style={{
               background: 'var(--color-primary)',
               color: 'var(--color-primary-text)',
@@ -207,35 +217,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* JWT Sessiebeskerming blok */}
-        <div
-          className="rounded-[12px] border px-4 py-3"
-          style={{
-            background: 'var(--color-jwt-bg)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-text)' }}>
-            JWT Sessiebeskerming
-          </p>
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5">
-              <Clock size={11} style={{ color: 'var(--color-text-subtle)', flexShrink: 0 }} />
-              <RefreshCw size={11} style={{ color: 'var(--color-text-subtle)', flexShrink: 0 }} />
-              <Lock size={11} style={{ color: 'var(--color-text-subtle)', flexShrink: 0 }} />
-              <span className="text-[11px]" style={{ color: 'var(--color-text-subtle)' }}>
-                Teken: 15 min • Herlaai: 7 dae • HTTPS versleuteling
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Shield size={11} style={{ color: 'var(--color-text-subtle)', flexShrink: 0 }} />
-              <span className="text-[11px]" style={{ color: 'var(--color-text-subtle)' }}>
-                bcrypt(12) wagwoord-hashing • POPIA-nakoming
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Geen rekening */}

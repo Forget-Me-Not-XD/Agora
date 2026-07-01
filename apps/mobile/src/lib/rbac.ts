@@ -25,6 +25,10 @@ export function canRsvpToEvent(role: UserRole): boolean {
   return role === 'STUDENT' || role === 'GAS';
 }
 
+export function canViewNotifications(role: UserRole): boolean {
+  return role === 'PHOTOGRAPHER';
+}
+
 function isActiveStatus(status: EventStatus): boolean {
   return status === 'upcoming' || status === 'ongoing';
 }
@@ -71,6 +75,7 @@ export function getRoleLabel(role: UserRole): string {
     DOSENT: 'Dosent',
     STUDENT: 'Student',
     GAS: 'GAS Lid',
+    PHOTOGRAPHER: 'Fotograaf'
   };
   return labels[role] ?? role;
 }

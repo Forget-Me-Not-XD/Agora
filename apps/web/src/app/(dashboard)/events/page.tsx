@@ -9,6 +9,8 @@ import { MOCK_EVENTS } from '@/lib/mock-data';
 import { filterEventsForUser, canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import type { EventStatus, EventType } from '@/lib/mock-data';
+import ExportCsvButton from '@/components/ExportCsvButton';
+
 
 const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
     {
@@ -68,6 +70,8 @@ export default function EventsPage() {
                         {filtered.length} geleenthede sigbaar vir jou rol
                     </p>
                 </div>
+                <div className="flex item-center gap-2">
+                    <ExportCsvButton type="rsvp-summary"/>
                 {canCreateEvents(user.role) && (
                     <Link
                         href="/events/create"
@@ -77,6 +81,7 @@ export default function EventsPage() {
                         Skep Geleentheid
                     </Link>
                 )}
+                </div>
             </div>
 
             {/* ── Filters ── */}

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import type { StringValue } from 'ms';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -18,7 +19,7 @@ import { UsersModule } from '../users/users.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('jwt.secret'),
         // Default sign options — overridden per-token in AuthService
-        signOptions: { expiresIn: config.get<string>('jwt.accessExpiry') },
+        signOptions: { expiresIn: config.get<StringValue>('jwt.accessExpiry') },
       }),
     }),
   ],
