@@ -83,6 +83,26 @@ export class EventsService {
         return false;
     }
 
+    async incrementConfirmedAttendees(id: string): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        // Atomiese voorwaardelike inkrement voorkom die TOCTOU-wedloop tussen die
+        // kapasiteitstoets en die skrywe wanneer verskeie RSVP's gelyktydig inkom.
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id, $expr: { $lt: ['$confirmedAttendees', '$maxCapacity'] } },
+            { $inc: { confirmedAttendees: 1 } },
+            { new: true },
+        ).exec();
+
+        if (updated) return updated;
+
+        const event = await this.eventModel.findById(id).exec();
+        if (!event) throw new NotFoundException(`Event ${id} not found`);
+        throw new ConflictException('Hierdie geleentheid is vol bespreek');
+    }
+
     async updateEvent(
         id: string,
         dto: UpdateEventDto,
