@@ -1,5 +1,6 @@
 // ========== Imports: ==========
 import { getToken } from '../session';
+import type { AttendanceRole } from '../attendance';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -14,6 +15,7 @@ export interface Event {
     photographers:            string[];
     photographerInstructions: string;
     confirmedAttendees:       number;
+    intendedAttendance:       AttendanceRole;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -24,6 +26,7 @@ export interface CreateEventPayload {
     date:                      string;
     location:                  string;
     maxCapacity:               number;
+    intendedAttendance?:       AttendanceRole;
     photographers?:            string[];
     photographerInstructions?: string;
 }

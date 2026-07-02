@@ -72,8 +72,8 @@ export default function DashboardPage() {
                 <ExportCsvButton type="kpis" />
             </div>
 
-            <Suspense fallback={<KpiSkeletons />}>
-                <DashboardKpis />
+            <Suspense fallback={<KpiSkeletons canSeeAll={canViewInsights(user.role)}/>}>
+                <DashboardKpis canSeeAll={canViewInsights(user.role)}/>
             </Suspense>
 
             {/* ── Charts row (Admin + Dosent only) ── */}
@@ -152,7 +152,7 @@ export default function DashboardPage() {
 }
 
 // grys blokkies terwyl die data gehaal word
-function KpiSkeletons() {
+function KpiSkeletons({ canSeeAll }: { canSeeAll: boolean}) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -173,32 +173,31 @@ function KpiSkeletons() {
 }
 
 // Haal die KPI-data en wys die 4 kaarte
-async function DashboardKpis() {
-    let events: Awaited<ReturnType<typeof getEvents>> | null = null;
-    try {
-        events = await getEvents();
-    } catch {
-        events = null; // haal misluk → kaarte wys "--"
-    }
+async function DashboardKpis({ canSeeAll }: { canSeeAll: boolean }) {
+    const [allRes, upcomingRes] = await Promise.allSettled([
+        getEvents(),
+        getEvents({ from: new Date().toISOString() }),
+    ]);
+
+    const allEvents = allRes.status === 'fulfilled' ? allRes.value : null;
+    const upcoming  = upcomingRes.status === 'fulfilled' ? upcomingRes.value : null;
 
     // Elke waarde word onafhanklik bereken
     // is events null, wys daardie kaart "--"
-    const totalEvents = events ? events.length : '--';
+    const totalEvents = allEvents ? allEvents.length : '--';
 
-    const upcomingEvents = events
-        ? events.filter((e) => new Date(e.date).getTime() > Date.now()).length
+    const upcomingEvents = upcoming ? upcoming.length : '--';
+
+    const totalRsvps = allEvents
+        ? allEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0)
         : '--';
 
-    const totalRsvps = events
-        ? events.reduce((sum, e) => sum + e.confirmedAttendees, 0)
-        : '--';
-
-    const avgFillRate = events
+    const avgFillRate = allEvents
         ? `${Math.round(
-            (events.reduce(
+            (allEvents.reduce(
                 (sum, e) => sum + (e.maxCapacity > 0 ? e.confirmedAttendees / e.maxCapacity : 0),
                 0,
-            ) / (events.length || 1)) * 100,
+            ) / (allEvents.length || 1)) * 100,
             )}%`
         : '--';
 
@@ -206,8 +205,12 @@ async function DashboardKpis() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Totale Geleenthede"     value={totalEvents}    sub="in die stelsel"       icon={Calendar}      color="blue" />
             <StatCard label="Aankomende Geleenthede" value={upcomingEvents} sub="datum in die toekoms" icon={CalendarClock} color="green" />
-            <StatCard label="Totale RSVPs"           value={totalRsvps}     sub="bevestigde bywoners"  icon={Ticket}        color="orange" />
-            <StatCard label="Gemiddelde Vulkoers"    value={avgFillRate}    sub="kapasiteit gevul"     icon={Gauge}         color="red" />
+            {canSeeAll && (
+                <>
+                    <StatCard label="Totale RSVPs"        value={totalRsvps}  sub="bevestigde bywoners" icon={Ticket} color="orange" />
+                    <StatCard label="Gemiddelde Vulkoers" value={avgFillRate} sub="kapasiteit gevul"    icon={Gauge}  color="red" />
+                </>
+            )}
         </div>
     );
 }

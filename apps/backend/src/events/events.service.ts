@@ -7,6 +7,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { Role } from '../common/enums/role.enums';
+import { visibleAttendanceRoles } from '../common/rbac/event-visibility';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging/events.constants';
 
@@ -26,7 +27,12 @@ export class EventsService {
         return created.save();
     }
 
-    async findAll(from?: string, to?: string): Promise<EventDocument[]> {
+    async findAll(
+        viewerRole: Role,
+        viewerId: string,
+        from?: string,
+        to?: string,
+    ): Promise<EventDocument[]> {
         const filter: FilterQuery<EventDocument> = {};
 
         if (from || to) {
@@ -35,34 +41,66 @@ export class EventsService {
             if (to)   filter.date.$lte = new Date(to);
         }
 
+        // Rol-gebaseerde sigbaarheid: 'n gebruiker sien geleenthede op sy vlak en laer.
+        // ADMIN sien alles, PHOTOGRAPHER(vlak 2) sien ook waar hy toegewys is.
+        if (viewerRole !== Role.ADMIN) {
+            const allowed = visibleAttendanceRoles(viewerRole);
+            if (viewerRole === Role.PHOTOGRAPHER) {
+                filter.$or = [
+                    { intendedAttendance: { $in: allowed } },
+                    { photographers: new Types.ObjectId(viewerId) },
+                ];
+            } else {
+                filter.intendedAttendance = { $in: allowed };
+            }
+        }
+
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
     }
 
-    async findById(id: string): Promise<EventDocument> {
+    async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {
         if (!isValidObjectId(id)) {
             throw new NotFoundException(`Event ${id} not found`);
         }
 
         const event = await this.eventModel.findById(id).exec();
         if (!event) throw new NotFoundException(`Event ${id} not found`);
+
+        // dwing rol-sigbaarheid, geen lek van versteekte geleenthede nie. Gee 404
+        if (viewerRole && !this.canView(event, viewerRole, viewerId)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
         return event;
     }
 
+    private canView(event: EventDocument, viewerRole: Role, viewerId?: string): boolean {
+        if (viewerRole === Role.ADMIN) return true;
+        if (visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance)) return true;
+        if (viewerRole === Role.PHOTOGRAPHER && viewerId) {
+            return event.photographers.some((p) => p.toString() === viewerId);
+        }
+        return false;
+    }
+
     async incrementConfirmedAttendees(id: string): Promise<EventDocument> {
-        const event = await this.eventModel.findOneAndUpdate(
-            {
-                _id: id,
-                $expr: { $lt: [`$confirmedAttendees`, `$maxCapacity`] },
-            },
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        // Atomiese voorwaardelike inkrement voorkom die TOCTOU-wedloop tussen die
+        // kapasiteitstoets en die skrywe wanneer verskeie RSVP's gelyktydig inkom.
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id, $expr: { $lt: ['$confirmedAttendees', '$maxCapacity'] } },
             { $inc: { confirmedAttendees: 1 } },
             { new: true },
         ).exec();
 
-        if (!event) {
-            throw new ConflictException(`Hierdie geleentheid is vol bespreek`);
-        }
+        if (updated) return updated;
 
-        return event;
+        const event = await this.eventModel.findById(id).exec();
+        if (!event) throw new NotFoundException(`Event ${id} not found`);
+        throw new ConflictException('Hierdie geleentheid is vol bespreek');
     }
 
     async updateEvent(
