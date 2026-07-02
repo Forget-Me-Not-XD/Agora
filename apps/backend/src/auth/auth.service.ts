@@ -18,6 +18,7 @@ import {
   import { TokenPairDto } from './dto/token-pair.dto';
   import { JwtPayload } from './strategies/jwt.strategy';
   import { RabbitMQService } from '../messaging/rabbitmq.service';
+  import { Role } from '../common/enums/role.enums';
   import {
     EXCHANGES,
     ROUTING_KEYS,
@@ -43,6 +44,10 @@ import {
      * Publishes auth.user.registered → triggers welcome email + audit log.
      */
     async register(dto: RegisterDto): Promise<TokenPairDto> {
+      if (dto.role !== Role.GAS || Role.STUDENT) {
+        throw new ForbiddenException('Self-registration is only permitted for the GAS / STUDENT role');
+      }
+
       const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS)
       const passwordHash = await bcrypt.hash(dto.password, salt)
   

@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, MaxLength, Matches, ValidateIf, IsOptional } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsString, MinLength, MaxLength, Matches, ValidateIf, IsOptional } from 'class-validator';
 import { Role } from '../../common/enums/role.enums';
 
 export class RegisterDto {
@@ -33,7 +33,7 @@ export class RegisterDto {
     })
     password!: string;
 
-    @IsEnum(Role)
+    @IsIn([Role.GAS, Role.STUDENT])
     role!: Role;
 
     // Required for all roles except GAS (guests have no study center)
