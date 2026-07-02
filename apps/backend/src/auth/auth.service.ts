@@ -14,6 +14,7 @@ import {
   import { UserDocument } from '../users/schemas/user.schema';
   import { UserResponseDto } from '../users/dto/user-response.dto';
   import { RegisterDto } from './dto/register.dto';
+  import { CreateUserDto } from './dto/create-user.dto';
   import { LoginDto } from './dto/login.dto';
   import { TokenPairDto } from './dto/token-pair.dto';
   import { JwtPayload } from './strategies/jwt.strategy';
@@ -31,6 +32,7 @@ import {
   export class AuthService {
     private readonly logger = new Logger(AuthService.name);
     private readonly BCRYPT_ROUNDS = 12;
+    private readonly SELF_REGISTERABLE_ROLES = [Role.GAS, Role.STUDENT];
   
     constructor(
       private readonly usersService: UsersService,
@@ -44,8 +46,8 @@ import {
      * Publishes auth.user.registered → triggers welcome email + audit log.
      */
     async register(dto: RegisterDto): Promise<TokenPairDto> {
-      if (dto.role !== Role.GAS || Role.STUDENT) {
-        throw new ForbiddenException('Self-registration is only permitted for the GAS / STUDENT role');
+      if (!this.SELF_REGISTERABLE_ROLES.includes(dto.role)) {
+        throw new ForbiddenException('Self-registration is only permitted for the GAS or STUDENT role');
       }
 
       const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS)
@@ -72,6 +74,36 @@ import {
   
       this.logger.log(`-- User registered: ${user.email}`);
       return this.issueTokenPair(user);
+    }
+  
+    /**
+     * Create a user of any role. Admin-only — enforced by RolesGuard on the route.
+     * Does not log the caller in as the new user; no tokens are issued.
+     */
+    async adminCreateUser(dto: CreateUserDto): Promise<UserResponseDto> {
+      const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS)
+      const passwordHash = await bcrypt.hash(dto.password, salt)
+  
+      const user = await this.usersService.create({
+        name: dto.name,
+        surname: dto.surname,
+        email: dto.email.toLowerCase(),
+        passwordHash,
+        role: dto.role,
+        studyCenter: dto.studyCenter ?? '',
+      });
+  
+      const event: UserRegisteredEvent = {
+        userId: user._id.toString(),
+        email: user.email,
+        name: `${user.name} ${user.surname}`,
+        role: user.role,
+        timestamp: new Date().toISOString(),
+      };
+      await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED, event);
+  
+      this.logger.log(`-- User created by admin: ${user.email} (${user.role})`);
+      return UserResponseDto.fromDocument(user);
     }
   
     /**
