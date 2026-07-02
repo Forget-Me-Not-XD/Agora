@@ -1,7 +1,7 @@
 // ========== Imports: ==========
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, FilterQuery } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -67,5 +67,20 @@ export class UsersService {
     if (!updated) throw new NotFoundException(`User ${id} not found`);
 
     return UserResponseDto.fromDocument(updated);
-}
+  }
+
+  async search(role: Role, q?: string, ids?: string[]): Promise<UserResponseDto[]> {
+    const filter: FilterQuery<UserDocument> = { role };
+
+    if ( ids && ids.length) {
+      filter._id = { $in: ids };
+    } else if (q && q.trim()) {
+      const safe = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(safe, 'i');
+      filter.$or = [{ name: rx }, { surname: rx }];
+    }
+
+    const users = await this.userModel.find(filter).sort({ name: 1 }).exec();
+    return users.map(UserResponseDto.fromDocument);
+  }
 }
