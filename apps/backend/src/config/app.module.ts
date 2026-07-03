@@ -15,6 +15,8 @@ import { RsvpModule } from '../rsvp/rsvp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
 import { ExportModule } from '../export/export.module'; 
+import { ThrottlerModule } from '@nestjs/throttler';
+
 
 @Module({
     imports: [
@@ -32,6 +34,16 @@ import { ExportModule } from '../export/export.module';
         useFactory: (config: ConfigService) => ({
         uri: config.get<string>('mongoUri'),
         }),
+    }),
+
+    // ========== Throttler Module for Requests ==========
+    ThrottlerModule.forRoot({
+        throttlers: [
+            {
+                ttl: 60000,
+                limit: 10,
+            },
+        ],
     }),
 
     // ========== Domain modules ==========
