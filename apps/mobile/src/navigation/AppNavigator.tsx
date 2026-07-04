@@ -5,6 +5,7 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
+import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { MainTabs } from './MainTabs';
 
 export type RootStackParamList = {
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   Settings: undefined;
   EventDetail: { eventId: string };
   QrScanner: { eventId: string };
+  AdminCreateUser: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -29,6 +31,7 @@ export function AppNavigator() {
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="QrScanner" component={QrScannerScreen} />
+          <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
         </>
       ) : (
         <>

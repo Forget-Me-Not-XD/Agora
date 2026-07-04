@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeStore, ThemeMode } from '../stores/theme.store';
+import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
@@ -17,6 +18,7 @@ export function SettingsScreen({ navigation }: Props) {
   const colors = useThemeColors();
   const mode = useThemeStore((s) => s.mode);
   const setMode = useThemeStore((s) => s.setMode);
+  const user = useAuthStore((s) => s.user);
 
   const styles = makeStyles(colors);
 
@@ -51,6 +53,21 @@ export function SettingsScreen({ navigation }: Props) {
           );
         })}
       </View>
+
+      {user?.role === 'ADMIN' && (
+        <View style={[styles.card, styles.adminCard]}>
+          <Text style={styles.cardTitle}>Administrasie</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('AdminCreateUser')}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Skep gebruiker</Text>
+              <Text style={styles.rowSubtitle}>DOSENT, ADMIN of FOTOGRAAF rekening skep</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -85,6 +102,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderColor: colors.border,
       overflow: 'hidden',
     },
+    adminCard: { marginTop: 16 },
     cardTitle: {
       color: colors.text,
       fontSize: 16,
@@ -122,4 +140,3 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     radioDotActive: { backgroundColor: colors.primary },
   });
 }
-
