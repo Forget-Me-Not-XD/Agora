@@ -1,15 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import InfoModal from '@/components/InfoModal';
-import { MOCK_EVENTS } from '@/lib/mock-data';
-import { filterEventsForUser, canCreateEvents } from '@/lib/rbac';
-import { useCurrentUser } from '@/components/UserContext';
-import type { EventStatus, EventType } from '@/lib/mock-data';
 import ExportCsvButton from '@/components/ExportCsvButton';
+import { canCreateEvents } from '@/lib/rbac';
+import { useCurrentUser } from '@/components/UserContext';
+import { listEventsAction } from '@/lib/actions/event.actions';
+import type { Event, EventType } from '@/lib/api/events';
+import { deriveStatus } from '@/lib/event-view';
+import type { EventStatus } from '@/lib/event-view';
 
 
 const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
@@ -41,17 +43,34 @@ const EVENT_TYPE_INFO: { type: string; label: string; color: string; description
 
 export default function EventsPage() {
     const user = useCurrentUser();
-    const allVisible = filterEventsForUser(MOCK_EVENTS, user);
+
+    const [events, setEvents]       = useState<Event[]>([]);
+    const [loading, setLoading]     = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
 
-    const filtered = allVisible.filter((event) => {
+    // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
+    // backend-kant afgedwing, so wys net wat teruggekom het.
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            const result = await listEventsAction();
+            if (!active) return;
+            if (result.error) setLoadError(result.error);
+            else setEvents(result.events ?? []);
+            setLoading(false);
+        })();
+        return () => { active = false; };
+    }, []);
+
+    const filtered = events.filter((event) => {
         const matchesSearch =
             event.title.toLowerCase().includes(search.toLowerCase()) ||
             event.description.toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || event.status === statusFilter;
+        const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
         const matchesType = typeFilter === 'all' || event.type === typeFilter;
         return matchesSearch && matchesStatus && matchesType;
     });
@@ -67,7 +86,7 @@ export default function EventsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--color-text)]">Geleenthede</h1>
                     <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                        {filtered.length} geleenthede sigbaar vir jou rol
+                        {loading ? 'Laai geleenthede…' : `${filtered.length} geleenthede sigbaar vir jou rol`}
                     </p>
                 </div>
                 <div className="flex item-center gap-2">
@@ -157,8 +176,20 @@ export default function EventsPage() {
                 </div>
             </div>
 
-            {/* ── Event grid ── */}
-            {filtered.length === 0 ? (
+            {/* ── Body ── */}
+            {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <EventCardSkeleton key={i} />
+                    ))}
+                </div>
+            ) : loadError ? (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-12 text-center">
+                    <p className="text-red-600 dark:text-red-400 text-sm">
+                        Kon nie geleenthede laai nie: {loadError.replace(/^\[\d+\]\s*/, '')}
+                    </p>
+                </div>
+            ) : filtered.length === 0 ? (
                 <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-12 text-center">
                     <p className="text-[var(--color-text-subtle)] text-sm">
                         Geen geleenthede gevind nie.
@@ -171,6 +202,22 @@ export default function EventsPage() {
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+// Grys geraamte-kaart terwyl die geleenthede laai
+function EventCardSkeleton() {
+    return (
+        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden animate-pulse">
+            <div className="h-1 w-full bg-[var(--color-border)]" />
+            <div className="p-5 space-y-3">
+                <div className="h-4 w-2/3 rounded bg-[var(--color-border)]" />
+                <div className="h-3 w-full rounded bg-[var(--color-border)]" />
+                <div className="h-3 w-1/2 rounded bg-[var(--color-border)]" />
+                <div className="h-1.5 w-full rounded bg-[var(--color-border)] mt-4" />
+                <div className="h-9 w-full rounded-xl bg-[var(--color-border)] mt-3" />
+            </div>
         </div>
     );
 }

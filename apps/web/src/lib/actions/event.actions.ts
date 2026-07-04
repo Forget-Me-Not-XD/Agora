@@ -1,8 +1,8 @@
 'use server';
 
 // ========== Imports: ==========
-import { createEvent } from '@/lib/api/events';
-import type { CreateEventPayload } from '@/lib/api/events';
+import { createEvent, getEvents } from '@/lib/api/events';
+import type { CreateEventPayload, Event } from '@/lib/api/events';
 
 export async function createEventAction(
     payload: CreateEventPayload,
@@ -13,4 +13,18 @@ export async function createEventAction(
         return err instanceof Error ? err.message : 'Geleentheid skep het misluk.';
     }
     return null;
+}
+
+export interface ListEventsResult {
+    events?: Event[];
+    error?:  string;
+}
+
+export async function listEventsAction(): Promise<ListEventsResult> {
+    try {
+        const events = await getEvents();
+        return { events };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie geleenthede laai nie.' };
+    }
 }

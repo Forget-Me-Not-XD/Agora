@@ -6,7 +6,7 @@ import IncomeExpenseChart from '@/components/charts/IncomeExpenseChart';
 import AttendanceChart from '@/components/charts/AttendanceChart';
 import SatisfactionChart from '@/components/charts/SatisfactionChart';
 import { MOCK_EVENTS, MOCK_BUDGET_ITEMS, MOCK_INSIGHTS } from '@/lib/mock-data';
-import { filterEventsForUser, canViewBudget, canViewInsights } from '@/lib/rbac';
+import { canViewBudget, canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
 import ExportCsvButton from '@/components/ExportCsvButton';
@@ -15,7 +15,6 @@ export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
     const user = getCurrentUser();
-    const visibleEvents = filterEventsForUser(MOCK_EVENTS, user);
 
     /* ── Chart data (only computed for roles that can see them) ── */
     const showCharts = canViewInsights(user.role) || canViewBudget(user.role);
@@ -133,19 +132,9 @@ export default function DashboardPage() {
                         Sien almal
                     </a>
                 </div>
-                {visibleEvents.length === 0 ? (
-                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 text-center">
-                        <p className="text-[var(--color-text-subtle)] text-sm">
-                            Geen geleenthede beskikbaar nie.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {visibleEvents.slice(0, 6).map((event) => (
-                            <EventCard key={event.id} event={event} />
-                        ))}
-                    </div>
-                )}
+                <Suspense fallback={<EventsPreviewSkeleton />}>
+                    <EventsPreview />
+                </Suspense>
             </div>
         </div>
     );
@@ -211,6 +200,51 @@ async function DashboardKpis({ canSeeAll }: { canSeeAll: boolean }) {
                     <StatCard label="Gemiddelde Vulkoers" value={avgFillRate} sub="kapasiteit gevul"    icon={Gauge}  color="red" />
                 </>
             )}
+        </div>
+    );
+}
+
+// Grys geraamte terwyl die voorskou laai
+function EventsPreviewSkeleton() {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                    key={i}
+                    className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden animate-pulse"
+                >
+                    <div className="h-1 w-full bg-[var(--color-border)]" />
+                    <div className="p-5 space-y-3">
+                        <div className="h-4 w-2/3 rounded bg-[var(--color-border)]" />
+                        <div className="h-3 w-full rounded bg-[var(--color-border)]" />
+                        <div className="h-3 w-1/2 rounded bg-[var(--color-border)]" />
+                        <div className="h-9 w-full rounded-xl bg-[var(--color-border)] mt-4" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Haal die rol-sigbare geleenthede en wys die eerste 6
+async function EventsPreview() {
+    const events = await getEvents().catch(() => null);
+
+    if (!events || events.length === 0) {
+        return (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 text-center">
+                <p className="text-[var(--color-text-subtle)] text-sm">
+                    Geen geleenthede beskikbaar nie.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {events.slice(0, 6).map((event) => (
+                <EventCard key={event.id} event={event} />
+            ))}
         </div>
     );
 }

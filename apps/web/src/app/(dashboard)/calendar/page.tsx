@@ -1,12 +1,19 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, X, Calendar, MapPin, Users, Clock } from 'lucide-react';
-import { MOCK_EVENTS } from '@/lib/mock-data';
-import type { MockEvent } from '@/lib/mock-data';
-import { filterEventsForUser } from '@/lib/rbac';
-import { useCurrentUser } from '@/components/UserContext';
-import { TYPE_COLORS, TYPE_LABELS, STATUS_COLORS, STATUS_LABELS } from '@/components/EventCard';
+import { listEventsAction } from '@/lib/actions/event.actions';
+import type { Event } from '@/lib/api/events';
+import {
+    TYPE_COLORS,
+    TYPE_LABELS,
+    STATUS_COLORS,
+    STATUS_LABELS,
+    deriveStatus,
+    eventDateKey,
+    eventTime,
+    fillPercentage,
+} from '@/lib/event-view';
 
 const MONTHS = [
     'Januarie', 'Februarie', 'Maart', 'April', 'Mei', 'Junie',
@@ -16,22 +23,37 @@ const MONTHS = [
 const DAYS = ['So', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Sa'];
 
 export default function CalendarPage() {
-    const user = useCurrentUser();
-    const visibleEvents = filterEventsForUser(MOCK_EVENTS, user);
+    const [events, setEvents]       = useState<Event[]>([]);
+    const [loading, setLoading]     = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const today = new Date();
     const [viewYear, setViewYear] = useState(today.getFullYear());
     const [viewMonth, setViewMonth] = useState(today.getMonth());
-    const [selectedEvent, setSelectedEvent] = useState<MockEvent | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
+    // Haal die geleenthede
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            const result = await listEventsAction();
+            if (!active) return;
+            if (result.error) setLoadError(result.error);
+            else setEvents(result.events ?? []);
+            setLoading(false);
+        })();
+        return () => { active = false; };
+    }, []);
 
     const eventsByDate = useMemo(() => {
-        const map: Record<string, MockEvent[]> = {};
-        for (const event of visibleEvents) {
-            if (!map[event.date]) map[event.date] = [];
-            map[event.date].push(event);
+        const map: Record<string, Event[]> = {};
+        for (const event of events) {
+            const key = eventDateKey(event);
+            if (!map[key]) map[key] = [];
+            map[key].push(event);
         }
         return map;
-    }, [visibleEvents]);
+    }, [events]);
 
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -53,16 +75,29 @@ export default function CalendarPage() {
 
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    const fillPct = (e: MockEvent) => Math.round((e.registered / e.capacity) * 100);
-
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-[var(--color-text)]">Kalender</h1>
-                <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                    Maandelikse oorsig van geleenthede
-                </p>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <h1 className="text-2xl font-bold text-[var(--color-text)]">Kalender</h1>
+                    <p className="text-sm text-[var(--color-text-subtle)] mt-1">
+                        Maandelikse oorsig van geleenthede
+                    </p>
+                </div>
+                {loading && (
+                    <span className="text-xs text-[var(--color-text-subtle)] animate-pulse">
+                        Laai geleenthede…
+                    </span>
+                )}
             </div>
+
+            {loadError && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 text-center">
+                    <p className="text-red-600 dark:text-red-400 text-sm">
+                        Kon nie geleenthede laai nie: {loadError.replace(/^\[\d+\]\s*/, '')}
+                    </p>
+                </div>
+            )}
 
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
                 {/* Month navigation */}
@@ -184,7 +219,7 @@ export default function CalendarPage() {
                         className="bg-[var(--color-surface)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className={`h-2 w-full ${STATUS_COLORS[selectedEvent.status]}`} />
+                        <div className={`h-2 w-full ${STATUS_COLORS[deriveStatus(selectedEvent)]}`} />
 
                         <div className="p-6">
                             {/* Title + close */}
@@ -202,8 +237,8 @@ export default function CalendarPage() {
 
                             {/* Status + type badges */}
                             <div className="flex gap-2 mb-4">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[selectedEvent.status]}`}>
-                                    {STATUS_LABELS[selectedEvent.status]}
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[deriveStatus(selectedEvent)]}`}>
+                                    {STATUS_LABELS[deriveStatus(selectedEvent)]}
                                 </span>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[selectedEvent.type]}`}>
                                     {TYPE_LABELS[selectedEvent.type]}
@@ -219,9 +254,9 @@ export default function CalendarPage() {
                             <div className="space-y-3 mb-5">
                                 <div className="flex items-center gap-3 text-sm text-[var(--color-text-subtle)]">
                                     <Calendar size={15} className="shrink-0 text-[var(--color-primary)]" />
-                                    <span>{selectedEvent.date}</span>
+                                    <span>{eventDateKey(selectedEvent)}</span>
                                     <Clock size={15} className="shrink-0 text-[var(--color-primary)] ml-2" />
-                                    <span>{selectedEvent.time}</span>
+                                    <span>{eventTime(selectedEvent)}</span>
                                 </div>
                                 <div className="flex items-center gap-3 text-sm text-[var(--color-text-subtle)]">
                                     <MapPin size={15} className="shrink-0 text-[var(--color-primary)]" />
@@ -230,7 +265,7 @@ export default function CalendarPage() {
                                 <div className="flex items-center gap-3 text-sm text-[var(--color-text-subtle)]">
                                     <Users size={15} className="shrink-0 text-[var(--color-primary)]" />
                                     <span>
-                                        {selectedEvent.registered} / {selectedEvent.capacity} geregistreer
+                                        {selectedEvent.confirmedAttendees} / {selectedEvent.maxCapacity} geregistreer
                                     </span>
                                 </div>
                             </div>
@@ -241,17 +276,17 @@ export default function CalendarPage() {
                                     <div
                                         className={[
                                             'h-full rounded-full transition-all',
-                                            fillPct(selectedEvent) >= 100
+                                            fillPercentage(selectedEvent) >= 100
                                                 ? 'bg-red-500'
-                                                : fillPct(selectedEvent) >= 80
+                                                : fillPercentage(selectedEvent) >= 80
                                                 ? 'bg-amber-500'
                                                 : 'bg-[var(--color-primary)]',
                                         ].join(' ')}
-                                        style={{ width: `${Math.min(fillPct(selectedEvent), 100)}%` }}
+                                        style={{ width: `${Math.min(fillPercentage(selectedEvent), 100)}%` }}
                                     />
                                 </div>
                                 <p className="text-xs text-[var(--color-text-subtle)] mt-1">
-                                    {fillPct(selectedEvent)}% vol
+                                    {fillPercentage(selectedEvent)}% vol
                                 </p>
                             </div>
                         </div>

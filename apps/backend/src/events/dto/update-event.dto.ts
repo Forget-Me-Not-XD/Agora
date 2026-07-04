@@ -10,8 +10,10 @@ import {
     MaxLength,
     Min,
     IsIn,
+    IsEnum,
 } from 'class-validator';
 import { Role } from '../../common/enums/role.enums';
+import { EventType } from '../../common/enums/event-type.enum';
 import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
 
 export class UpdateEventDto {
@@ -30,6 +32,10 @@ export class UpdateEventDto {
     @IsOptional()
     @IsDateString()
     date?: string;
+
+    @IsOptional()
+    @IsDateString()
+    endDate?: string;
 
     @IsOptional()
     @IsString()
@@ -55,4 +61,8 @@ export class UpdateEventDto {
     @IsOptional()
     @IsIn(ATTENDANCE_ROLES)
     intendedAttendance?: Role;
+
+    @IsOptional()
+    @IsEnum(EventType)
+    type?: EventType;
 }
