@@ -2,6 +2,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
+import { EventType } from '../../common/enums/event-type.enum';
 import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
 
 export type EventDocument = HydratedDocument<Event>;
@@ -16,6 +17,9 @@ export class Event {
 
     @Prop ({ required: true, type: Date })
     date!: Date;
+
+    @Prop ({ required: false, type: Date })
+    endDate?: Date;
 
     @Prop ({ required: true, trim: true})
     location!: string;
@@ -37,6 +41,9 @@ export class Event {
 
     @Prop ({ type: String, enum: ATTENDANCE_ROLES, default: Role.GAS, index: true })
     intendedAttendance!: Role;
+
+    @Prop ({ type: String, enum: Object.values(EventType), default: EventType.PUBLIC })
+    type!: EventType;
 
     createdAt?: Date;
     updatedAt?: Date;

@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { ForbiddenException, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model, Types } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';
@@ -19,9 +19,14 @@ export class EventsService {
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
+        const start = new Date(dto.date);
+        const end   = dto.endDate ? new Date(dto.endDate) : undefined;
+        this.assertEndAfterStart(start, end);
+
         const created = new this.eventModel({
             ...dto,
-            date:      new Date(dto.date),
+            date:      start,
+            endDate:   end,
             createdBy: creatorId,
         });
         return created.save();
@@ -114,9 +119,12 @@ export class EventsService {
 
         this.assertOwnership(event, requesterId, requesterRole);
 
-        const { date, ...rest } = dto;
+        const { date, endDate, ...rest } = dto;
         Object.assign(event, rest);
-        if (date) event.date = new Date(date);
+        if (date)    event.date    = new Date(date);
+        if (endDate) event.endDate = new Date(endDate);
+
+        this.assertEndAfterStart(event.date, event.endDate);
 
         return event.save();
     }
@@ -176,6 +184,12 @@ export class EventsService {
             throw new ForbiddenException(
                 `You do not have permission to modify this event`,
             );
+        }
+    }
+
+    private assertEndAfterStart(start: Date, end?: Date): void {
+        if (end && end.getTime() <= start.getTime()) {
+            throw new BadRequestException('Die eind-datum moet ná die begin-datum wees');
         }
     }
 }

@@ -2,6 +2,7 @@
 import { Types } from 'mongoose';
 import { EventDocument } from '../schemas/event.schema';
 import { Role } from '../../common/enums/role.enums';
+import { EventType } from '../../common/enums/event-type.enum';
 
 /**
  * Public facing Event Shape
@@ -13,6 +14,7 @@ export class EventResponseDto {
     title!: string;
     description!: string;
     date!: Date;
+    endDate?: Date;
     location!: string;
     maxCapacity!: number;
     createdBy!: string;
@@ -20,6 +22,7 @@ export class EventResponseDto {
     photographerInstructions!: string;
     confirmedAttendees!: number;
     intendedAttendance!: Role;
+    type!: EventType;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -29,13 +32,15 @@ export class EventResponseDto {
             title:                      event.title,
             description:                event.description,
             date:                       event.date,
+            endDate:                    event.endDate,
             location:                   event.location,
             maxCapacity:                event.maxCapacity,
             createdBy:                  event.createdBy.toString(),
             photographers:              event.photographers.map((id: Types.ObjectId) => id.toString()),
             photographerInstructions:   event.photographerInstructions,
             confirmedAttendees:         event.confirmedAttendees,
-            intendedAttendance:        event.intendedAttendance,
+            intendedAttendance:         event.intendedAttendance,
+            type:                       event.type,
             createdAt:                  event.createdAt!,
             updatedAt:                  event.updatedAt!,
         };
