@@ -78,12 +78,6 @@ export function RegisterScreen({ navigation }: Props) {
     }).start();
   }, [showValidation]);
 
-  // --- Role mapping ---
-  const payloadRole: RegisterPayload['role'] = useMemo(() => {
-    if (uiRole === 'STUDENT') return 'GAS';
-    return uiRole;
-  }, [uiRole]);
-
   // Only GAS hides study center; STUDENT shares GAS privileges but still provides a study center.
   const showStudyCenter = uiRole !== 'GAS';
 

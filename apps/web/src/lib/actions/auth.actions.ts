@@ -99,7 +99,7 @@ export async function registerAction(payload: {
   surname:     string;
   email:       string;
   password:    string;
-  role:        'ADMIN' | 'DOSENT' | 'GAS';
+  role:        'GAS' | 'STUDENT';
   studyCenter: string;
 }): Promise<string | null> {
   try {
