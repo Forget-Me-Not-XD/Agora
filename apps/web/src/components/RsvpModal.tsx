@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Ticket, X, Calendar, Clock, Users } from 'lucide-react';
-import type { MockEvent } from '@/lib/mock-data';
+import type { Event } from '@/lib/api/events';
+import { eventDateKey, eventTime } from '@/lib/event-view';
 import { rsvpToEventAction } from '@/lib/actions/rsvp.actions';
 import successAnim from '@/assets/Success.json';
 import warningAnim from '@/assets/Warning_Status.json';
@@ -13,7 +14,7 @@ import loadingAnim from '@/assets/loading.json'
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 interface RsvpModalProps {
-    event: MockEvent;
+    event: Event;
 }
 
 export default function RsvpModal({ event }: RsvpModalProps) {
@@ -22,8 +23,8 @@ export default function RsvpModal({ event }: RsvpModalProps) {
     const [qrDataUri, setQrDataUri] = useState<string | null>(null);
     const [error, setError]         = useState<string | null>(null);
 
-    const isFull = event.registered >= event.capacity;
-    const availableSpots = Math.max(event.capacity - event.registered, 0);
+    const isFull = event.confirmedAttendees >= event.maxCapacity;
+    const availableSpots = Math.max(event.maxCapacity - event.confirmedAttendees, 0);
 
     // Maak toe en herstel toestand
     function close() {
@@ -124,9 +125,9 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2 text-xs text-[var(--color-text-subtle)]">
                                             <Calendar size={13} className="shrink-0" />
-                                            <span>{event.date}</span>
+                                            <span>{eventDateKey(event)}</span>
                                             <Clock size={13} className="ml-1 shrink-0" />
-                                            <span>{event.time}</span>
+                                            <span>{eventTime(event)}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-[var(--color-text-subtle)]">
                                             <Users size={13} className="shrink-0" />
