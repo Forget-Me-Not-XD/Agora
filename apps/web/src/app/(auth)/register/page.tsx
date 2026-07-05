@@ -6,13 +6,11 @@ import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Circle, ChevronDown, X 
 import { registerAction } from '@/lib/actions/auth.actions';
 import type { RegisterPayload } from '@/lib/types';
 
-type UiRole = 'GAS' | 'STUDENT' | 'DOSENT' | 'ADMIN';
+type UiRole = 'GAS' | 'STUDENT';
 
 const ROLE_OPTIONS: Array<{ value: UiRole; label: string; subtitle: string }> = [
   { value: 'GAS',     label: 'GAS',     subtitle: 'Gas'            },
   { value: 'STUDENT', label: 'STUDENT', subtitle: 'Student'        },
-  { value: 'DOSENT',  label: 'DOSENT',  subtitle: 'Dosent'         },
-  { value: 'ADMIN',   label: 'ADMIN',   subtitle: 'Administrateur'  },
 ];
 
 const STUDY_CENTERS = [
@@ -93,7 +91,7 @@ export default function RegisterPage() {
       const err = await registerAction({
         ...form,
         email:       form.email.trim(),
-        role:        (uiRole === 'STUDENT' ? 'GAS' : uiRole) as RegisterPayload['role'],
+        role:        uiRole as RegisterPayload['role'], 
         studyCenter: showStudyCenter ? form.studyCenter : '',
       });
       if (err) setError(err);

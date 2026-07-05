@@ -24,7 +24,7 @@ name: string;
 surname: string;
 email: string;
 password: string;
-role: 'ADMIN' | 'DOSENT' | 'GAS';
+role: 'GAS' | 'STUDENT';
 studyCenter: string;
 }
 

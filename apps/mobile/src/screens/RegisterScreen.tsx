@@ -13,13 +13,11 @@ import { useThemeColors } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-type UiRole = 'GAS' | 'STUDENT' | 'DOSENT' | 'ADMIN';
+type UiRole = 'GAS' | 'STUDENT';
 
 const ROLE_OPTIONS: Array<{ value: UiRole; label: string; subtitle?: string }> = [
   { value: 'GAS', label: 'GAS', subtitle: 'Gas' },
   { value: 'STUDENT', label: 'STUDENT', subtitle: 'Student' },
-  { value: 'DOSENT', label: 'DOSENT', subtitle: 'Dosent' },
-  { value: 'ADMIN', label: 'ADMIN', subtitle: 'Administrateur' },
 ];
 
 const STUDY_CENTERS = [
@@ -80,12 +78,6 @@ export function RegisterScreen({ navigation }: Props) {
     }).start();
   }, [showValidation]);
 
-  // --- Role mapping ---
-  const payloadRole: RegisterPayload['role'] = useMemo(() => {
-    if (uiRole === 'STUDENT') return 'GAS';
-    return uiRole;
-  }, [uiRole]);
-
   // Only GAS hides study center; STUDENT shares GAS privileges but still provides a study center.
   const showStudyCenter = uiRole !== 'GAS';
 
@@ -95,13 +87,14 @@ export function RegisterScreen({ navigation }: Props) {
     try {
       await register({
         ...form,
-        role: payloadRole,
+        role: uiRole,
         studyCenter: showStudyCenter ? form.studyCenter : '',
       });
     } catch {
       // Error is stored in the Zustand store and displayed below
     }
   };
+
 
   return (
     <SafeAreaView style={styles.safe}>

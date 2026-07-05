@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { createUser, type CreateUserPayload } from '@/lib/api/auth';
 import type { TokenPair, LoginPayload } from '@/lib/types';
 
 const COOKIE_NAME         = 'akademia_token';
@@ -99,7 +100,7 @@ export async function registerAction(payload: {
   surname:     string;
   email:       string;
   password:    string;
-  role:        'ADMIN' | 'DOSENT' | 'GAS';
+  role:        'GAS' | 'STUDENT';
   studyCenter: string;
 }): Promise<string | null> {
   try {
@@ -123,6 +124,23 @@ export async function registerAction(payload: {
   }
 
   redirect('/dashboard');
+}
+
+/**
+ * Admin create-user server action.
+ * Roep NestJS POST /api/v1/auth/admin/register met die ingetekende admin se token.
+ * Stel GEEN cookies nie - die admin bly ingeteken as homself, die nuwe gebruiker word nie outomaties aangemeld nie. 
+ */
+export async function adminCreateUserAction(
+  payload: CreateUserPayload,
+): Promise <{ error?: string }> {
+  try {
+    const token = cookies().get(COOKIE_NAME)?.value;
+    await createUser(payload, token);
+    return {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Registrasie het misluk.' };
+  }
 }
 
 /**
