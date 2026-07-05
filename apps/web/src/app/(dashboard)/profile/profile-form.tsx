@@ -99,7 +99,7 @@ export default function ProfileForm({ user }: Props) {
             <button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium py-2 px-4 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="w-full rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-medium py-2 px-4 hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
                 {saving ? 'Besig om te stoor…' : 'Stoor'}
             </button>

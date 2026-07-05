@@ -17,6 +17,7 @@ export class EventResponseDto {
     endDate?: Date;
     location!: string;
     maxCapacity!: number;
+    budget!: number;
     createdBy!: string;
     photographers!: string[];
     photographerInstructions!: string;
@@ -35,6 +36,7 @@ export class EventResponseDto {
             endDate:                    event.endDate,
             location:                   event.location,
             maxCapacity:                event.maxCapacity,
+            budget:                     event.budget ?? 0,
             createdBy:                  event.createdBy.toString(),
             photographers:              event.photographers.map((id: Types.ObjectId) => id.toString()),
             photographerInstructions:   event.photographerInstructions,

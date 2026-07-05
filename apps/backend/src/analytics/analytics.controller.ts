@@ -6,7 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { LstmService, TrainingDataItem, PredictionResult } from './lstm.service';
-import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent } from './analytics.service';
+import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth } from './analytics.service';
 
 interface EventsSummaryResponse {
     eventsPerMonth: EventsPerMonth[];
@@ -55,6 +55,41 @@ export class AnalyticsController {
             this.analyticsService.getAverageFillRate(),
         ]);
         return { rsvpsPerEvent, averageFillRate };
+    }
+
+    @Get('admin-kpis')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getAdminKpis(): Promise <AdminKpis> {
+        return this.analyticsService.getAdminKpis();
+    }
+
+    @Get('rsvps-per-month')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRsvpsPerMonth(): Promise <EventsPerMonth[]> {
+        return this.analyticsService.getRsvpsPerMonth();
+    }
+
+    @Get('recent-rsvps')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRecentRsvps(@Query('limit') limit?: string): Promise <RecentRsvp[]> {
+        return this.analyticsService.getRecentRsvps(limit ? parseInt(limit, 10) : 10);
+    }
+
+    @Get('rsvp-status-breakdown')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
+        return this.analyticsService.getRsvpStatusBreakdown();
+    }
+
+    @Get('budget-per-month')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
+        return this.analyticsService.getBudgetPerMonth();
     }
 
     @Get('export')

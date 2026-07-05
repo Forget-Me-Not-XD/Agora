@@ -4,16 +4,10 @@ import { Calendar, MapPin, Users, ChevronLeft } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { formatDateLong as formatDate } from '@/lib/format-date';
 import PhotographerSection from '@/components/PhotographerSection';
 
 export const dynamic = 'force-dynamic';
-
-const AF_MONTHS = ['Januarie','Februarie','Maart','April','Mei','Junie','Julie','Augustus','September','Oktober','November','Desember'];
-
-function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return `${d.getDate()} ${AF_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${d.toTimeString().slice(0, 5)}`;
-}
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
     const user = getCurrentUser();

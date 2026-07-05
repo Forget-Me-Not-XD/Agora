@@ -56,7 +56,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
             <button
                 onClick={() => setOpen(true)}
                 disabled={isFull}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <Ticket size={15} />
                 Skryf In
@@ -74,7 +74,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--color-border)]">
                             <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-[var(--color-primary)] flex items-center justify-center shrink-0">
-                                    <Ticket size={13} className="text-white" />
+                                    <Ticket size={13} className="text-[var(--color-primary-text)]" />
                                 </div>
                                 <h3 className="text-sm font-bold text-[var(--color-text)]">Skryf In vir Geleentheid</h3>
                             </div>
@@ -145,7 +145,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                         <button
                                             onClick={handleConfirm}
                                             disabled={loading}
-                                            className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl text-sm font-medium bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                                            className="flex-1 flex items-center justify-center px-4 py-2 rounded-xl text-sm font-medium bg-[var(--color-primary)] text-[var(--color-primary-text)] hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
                                         >
                                             {loading ? <Lottie animationData={loadingAnim} loop style={{ width: 22, height: 22 }} /> : 'Bevestig'}
                                         </button>

@@ -78,6 +78,7 @@ export default function CreateEventPage() {
                 date:               `${formData.date}T${formData.time}`,
                 location:           formData.location,
                 maxCapacity:        Number(formData.capacity),
+                budget:             Number(formData.budget),
                 intendedAttendance: formData.intendedAttendance as AttendanceRole,
             });
             if (err) {
@@ -292,7 +293,7 @@ export default function CreateEventPage() {
                 <button
                     type="submit"
                     disabled={isPending}
-                    className="w-full py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                     {isPending ? (
                         <><Loader2 size={16} className="animate-spin" /> Besig om te skep...</>

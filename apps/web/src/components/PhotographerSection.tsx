@@ -138,7 +138,7 @@ export default function PhotographerSection({ eventId, initialAssigned, initialI
                             <button
                                 onClick={handleSave}
                                 disabled={saving || !brief.trim()}
-                                className="w-full px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                                className="w-full px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
                             >
                                 {saving ? 'Besig om te stoor...' : 'Stoor toewysing'}
                             </button>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -10,6 +11,7 @@ import {
     BarChart2,
     Wallet,
     Users,
+    ChevronDown,
     X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -38,11 +40,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     const pathname = usePathname();
     const user = useCurrentUser();
     const role = user.role;
+    const [dashboardOpen, setDashboardOpen] = useState(true);
 
-    const navItems: NavItem[] = [
+    const dashboardGroup: NavItem[] = [
         { href: '/dashboard', label: 'Oorsig', icon: LayoutDashboard },
-        { href: '/events', label: 'Geleenthede', icon: Calendar },
         { href: '/calendar', label: 'Kalender', icon: CalendarDays },
+    ];
+
+    const flatItems: NavItem[] = [
+        { href: '/events', label: 'Geleenthede', icon: Calendar },
         ...(canCreateEvents(role)
             ? [{ href: '/events/create', label: 'Skep Geleentheid', icon: PlusCircle }]
             : []),
@@ -56,6 +62,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             ? [{ href: '/users', label: 'Gebruikers', icon: Users }]
             : []),
     ];
+
+    const isGroupActive = dashboardGroup.some((i) => i.href === pathname);
 
     return (
         <>
@@ -89,7 +97,49 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => {
+                    <button
+                        onClick={() => setDashboardOpen((v) => !v)}
+                        className={[
+                            'w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                            isGroupActive
+                                ? 'text-[var(--color-primary)]'
+                                : 'text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]',
+                        ].join(' ')}
+                    >
+                        <span className="flex items-center gap-3">
+                            <LayoutDashboard size={18} />
+                            Dashboard
+                        </span>
+                        <ChevronDown size={16} className={`transition-transform ${dashboardOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {dashboardOpen && (
+                        <div className="pl-8 space-y-1">
+                            {dashboardGroup.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = pathname === item.href;
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={[
+                                            'flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors',
+                                            isActive
+                                                ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]'
+                                                : 'text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]',
+                                        ].join(' ')}
+                                    >
+                                        <Icon size={16} />
+                                        {item.label}
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <div className="h-px bg-[var(--color-border)] my-2" />
+
+                    {flatItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname === item.href;
                         return (
@@ -99,7 +149,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                                 className={[
                                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                                     isActive
-                                        ? 'bg-[var(--color-primary)] text-white'
+                                        ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]'
                                         : 'text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]',
                                 ].join(' ')}
                             >
@@ -109,6 +159,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         );
                     })}
                 </nav>
+
+                {canCreateEvents(role) && (
+                    <div className="px-4">
+                        <Link
+                            href="/events/create"
+                            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-semibold hover:opacity-90 transition-opacity"
+                        >
+                            <PlusCircle size={16} />
+                            Skep Geleentheid
+                        </Link>
+                    </div>
+                )}
 
                 <div className="p-4 border-t border-[var(--color-border)]">
                     <div className="px-3 py-2.5">

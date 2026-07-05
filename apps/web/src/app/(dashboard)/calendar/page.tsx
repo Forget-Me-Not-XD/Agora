@@ -160,7 +160,7 @@ export default function CalendarPage() {
                                             className={[
                                                 'text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full mb-1 leading-none',
                                                 isToday
-                                                    ? 'bg-[var(--color-primary)] text-white'
+                                                    ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]'
                                                     : 'text-[var(--color-text-subtle)]',
                                             ].join(' ')}
                                         >
