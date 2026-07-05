@@ -25,6 +25,12 @@ export interface EventsPerMonth {
     count: number;
 }
 
+export interface BudgetPerMonth {
+    year: number;
+    month: number;
+    total: number;
+}
+
 export interface AdminKpi {
     value: number;
     deltaPct: number | null    //<-- Null - zero comparison possible yet
@@ -41,9 +47,14 @@ export interface RecentRsvp {
     id: string;
     eventTitle: string;
     userName: string;
-    staus: string;
+    status: string;
     checkedIn: boolean;
     createdAt: Date;
+}
+
+export interface RsvpStatusCount {
+    status: string;
+    count: number;
 }
 
 export interface AttendancePrediction {
@@ -106,6 +117,29 @@ export class AnalyticsService {
                     year: '$_id.year',
                     month: '$_id.month',
                     count: 1,
+                },
+            },
+        ]).exec();
+    }
+
+    async getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
+        return this.eventModel.aggregate<BudgetPerMonth>([
+            {
+                $group: {
+                    _id: {
+                        year: { $year: '$date' },
+                        month: { $month: '$date' },
+                    },
+                    total: { $sum: '$budget' },
+                },
+            },
+            { $sort: { '_id.year': 1, '_id.month': 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    year: '$_id.year',
+                    month: '$_id.month',
+                    total: 1,
                 },
             },
         ]).exec();
@@ -210,6 +244,14 @@ export class AnalyticsService {
         },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
         { $project: { _id: 0, year: '$_id.year', month: '$_id.month', count: 1 } },
+    ]).exec();
+}
+
+async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
+    return this.rsvpModel.aggregate<RsvpStatusCount>([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+        { $project: { _id: 0, status: '$_id', count: 1 } },
+        { $sort: { count: -1 } },
     ]).exec();
 }
 

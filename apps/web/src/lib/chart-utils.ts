@@ -1,7 +1,6 @@
 // ========== Imports: ==========
-import type { EventsPerMonth } from './api/analytics';
-
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+import type { EventsPerMonth, BudgetPerMonth } from './api/analytics';
+import { AF_MONTHS_SHORT } from './format-date';
 
 export interface MonthlyPoint {
     label: string;
@@ -25,7 +24,32 @@ export function mergeMonthlySeries(
         const a = seriesA.find((s) => s.year === year && s.month === month)?.count ?? 0;
         const b = seriesB.find((s) => s.year === year && s.month === month)?.count ?? 0;
 
-        points.push({ label: MONTH_LABELS[month - 1], a, b});
+        points.push({ label: AF_MONTHS_SHORT[month - 1], a, b });
+    }
+
+    return points;
+}
+
+export interface SingleMonthlyPoint {
+    label: string;
+    value: number;
+}
+
+export function mergeSingleMonthlySeries(
+    series: BudgetPerMonth[],
+    monthsBack = 12,
+): SingleMonthlyPoint[] {
+    const now = new Date();
+    const points: SingleMonthlyPoint[] = [];
+
+    for (let i = monthsBack - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const year = d.getFullYear();
+        const month = d.getMonth() + 1;
+
+        const value = series.find((s) => s.year === year && s.month === month)?.total ?? 0;
+
+        points.push({ label: AF_MONTHS_SHORT[month - 1], value });
     }
 
     return points;

@@ -58,7 +58,7 @@ export default function ExportCsvButton({ type, label }: Props) {
             <button
                 onClick={handleExport}
                 disabled={loading}
-                className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium px-4 py-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="flex items-center gap-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-medium px-4 py-2 hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
                 {loading
                     ? <Loader2 size={16} className="animate-spin" />

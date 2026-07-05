@@ -4,6 +4,7 @@ import {
     IsNotEmpty,
     IsDateString,
     IsInt,
+    IsNumber,
     IsOptional,
     IsArray,
     IsMongoId,
@@ -47,6 +48,11 @@ export class UpdateEventDto {
     @IsInt()
     @Min(1)
     maxCapacity?: number;
+
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    budget?: number;
 
     @IsOptional()
     @IsArray()

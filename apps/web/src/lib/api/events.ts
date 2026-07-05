@@ -14,6 +14,7 @@ export interface Event {
     endDate?:                 string;
     location:                 string;
     maxCapacity:              number;
+    budget:                   number;
     createdBy:                string;
     photographers:            string[];
     photographerInstructions: string;
@@ -31,6 +32,7 @@ export interface CreateEventPayload {
     endDate?:                  string;
     location:                  string;
     maxCapacity:               number;
+    budget?:                   number;
     intendedAttendance?:       AttendanceRole;
     photographers?:            string[];
     photographerInstructions?: string;
