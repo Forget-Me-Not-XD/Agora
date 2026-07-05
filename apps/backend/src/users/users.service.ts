@@ -83,4 +83,9 @@ export class UsersService {
     const users = await this.userModel.find(filter).sort({ name: 1 }).exec();
     return users.map(UserResponseDto.fromDocument);
   }
+
+    async findAll(): Promise<UserResponseDto[]> {
+    const users = await this.userModel.find().sort({ name: 1 }).exec();
+    return users.map(UserResponseDto.fromDocument);
+  }
 }

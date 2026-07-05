@@ -49,3 +49,21 @@ export async function updateUser(id: string, payload: UpdateUserDto, token?: str
 
     return res.json() as Promise<UserResponseDto>;
 }
+
+export async function getUsers(token?: string): Promise<UserResponseDto[]> {
+    const res = await fetch(`${BASE_URL}/api/v1/users/all`, {
+        method: 'GET',
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        cache: 'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
+
+    return res.json() as Promise<UserResponseDto[]>;
+}

@@ -1,7 +1,10 @@
+import { Suspense } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { MOCK_USERS } from '@/lib/mock-data';
 import { canManageUsers, getRoleLabel, getRoleBadgeColor } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { getToken } from '@/lib/session';
+import { getUsers } from '@/lib/api/users';
+import type { UserRole } from '@/lib/mock-data';
 import CreateUserForm from './create-user-form';
 
 export default function UsersPage() {
@@ -24,11 +27,42 @@ export default function UsersPage() {
             <div>
                 <h1 className="text-2xl font-bold text-[var(--color-text)]">Gebruikersbestuur</h1>
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                    {MOCK_USERS.length} geregistreerde gebruikers
+                    Bestuur alle geregistreerde gebruikers in die stelsel
                 </p>
             </div>
 
             <CreateUserForm />
+
+            <Suspense fallback={<UsersTableSkeleton />}>
+                <UsersTable />
+            </Suspense>
+        </div>
+    );
+}
+
+// Haal en wys alle gebruikers (slegs bereikbaar vir admins via die bladsy-hek)
+async function UsersTable() {
+    const token = getToken();
+
+    let users;
+    try {
+        users = await getUsers(token);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Onbekende fout';
+        return (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-12 text-center">
+                <p className="text-red-600 dark:text-red-400 text-sm">
+                    Kon nie gebruikers laai nie: {msg.replace(/^\[\d+\]\s*/, '')}
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <p className="text-sm text-[var(--color-text-subtle)]">
+                {users.length} geregistreerde gebruikers
+            </p>
 
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
                 <div className="hidden md:grid md:grid-cols-5 gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
@@ -42,39 +76,74 @@ export default function UsersPage() {
                     ))}
                 </div>
 
+                {users.length === 0 ? (
+                    <div className="px-5 py-12 text-center">
+                        <p className="text-[var(--color-text-subtle)] text-sm">Geen gebruikers gevind nie.</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-[var(--color-border)]">
+                        {users.map((u) => (
+                            <div
+                                key={u.id}
+                                className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center hover:bg-[var(--color-bg)] transition-colors"
+                            >
+                                <p className="text-sm font-medium text-[var(--color-text)]">
+                                    {u.name} {u.surname}
+                                </p>
+                                <p className="text-sm text-[var(--color-text-subtle)] truncate">
+                                    {u.email}
+                                </p>
+                                <div>
+                                    <span
+                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(u.role as UserRole)}`}
+                                    >
+                                        {getRoleLabel(u.role as UserRole)}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-[var(--color-text-subtle)]">
+                                    {u.studyCenter}
+                                </p>
+                                <div>
+                                    <span
+                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                            u.isActive
+                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {u.isActive ? 'Aktief' : 'Onaktief'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Grys geraamte terwyl die gebruikers laai
+function UsersTableSkeleton() {
+    return (
+        <div className="space-y-3">
+            <div className="h-4 w-40 rounded bg-[var(--color-border)] animate-pulse" />
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
+                <div className="hidden md:grid md:grid-cols-5 gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+                    {['Naam', 'E-pos', 'Rol', 'Studiesentrum', 'Status'].map((h) => (
+                        <p key={h} className="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wide">
+                            {h}
+                        </p>
+                    ))}
+                </div>
                 <div className="divide-y divide-[var(--color-border)]">
-                    {MOCK_USERS.map((u) => (
-                        <div
-                            key={u.id}
-                            className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center hover:bg-[var(--color-bg)] transition-colors"
-                        >
-                            <p className="text-sm font-medium text-[var(--color-text)]">
-                                {u.name} {u.surname}
-                            </p>
-                            <p className="text-sm text-[var(--color-text-subtle)] truncate">
-                                {u.email}
-                            </p>
-                            <div>
-                                <span
-                                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(u.role)}`}
-                                >
-                                    {getRoleLabel(u.role)}
-                                </span>
-                            </div>
-                            <p className="text-sm text-[var(--color-text-subtle)]">
-                                {u.studyCenter}
-                            </p>
-                            <div>
-                                <span
-                                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                        u.isActive
-                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                                    }`}
-                                >
-                                    {u.isActive ? 'Aktief' : 'Onaktief'}
-                                </span>
-                            </div>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center animate-pulse">
+                            <div className="h-4 w-32 rounded bg-[var(--color-border)]" />
+                            <div className="h-4 w-40 rounded bg-[var(--color-border)]" />
+                            <div className="h-5 w-20 rounded-full bg-[var(--color-border)]" />
+                            <div className="h-4 w-28 rounded bg-[var(--color-border)]" />
+                            <div className="h-5 w-16 rounded-full bg-[var(--color-border)]" />
                         </div>
                     ))}
                 </div>
