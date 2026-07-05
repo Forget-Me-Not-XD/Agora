@@ -21,6 +21,7 @@ export interface CreateEventPayload {
   date: string;
   location: string;
   maxCapacity: number;
+  budget?: number;
 }
 
 /**

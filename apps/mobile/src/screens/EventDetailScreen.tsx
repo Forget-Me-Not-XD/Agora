@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -19,6 +19,8 @@ import { canViewBudget, canManageCheckIns } from '../lib/rbac';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createEvent } from '../api/events';
 import { createRsvp } from '../api/rsvp';
+import { getDraftPrediction } from '../api/analytics';
+import type { PredictionResult } from '../api/analytics';
 
 const STATUS_PILL: Record<EventStatus, { bg: string; text: string }> = {
   upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
@@ -280,8 +282,69 @@ function CreateEventForm({
   const [endMinute, setEndMinute] = useState('');
   const [location, setLocation] = useState('');
   const [maxCapacity, setMaxCapacity] = useState('');
+  const [budget, setBudget] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
+  const [predictionUnavailable, setPredictionUnavailable] = useState(false);
+  const [predictionErrorDetail, setPredictionErrorDetail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cap = parseInt(maxCapacity, 10);
+    if (isNaN(cap) || cap <= 0) {
+      setPrediction(null);
+      setPredictionUnavailable(false);
+      setPredictionErrorDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setPredictionLoading(true);
+      setPredictionUnavailable(false);
+      setPredictionErrorDetail(null);
+
+      getDraftPrediction({ date: date.toISOString(), maxCapacity: cap })
+        .then((result) => {
+          if (!cancelled) setPrediction(result);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setPrediction(null);
+          setPredictionUnavailable(true);
+
+          const axiosErr = err as {
+            message?: string;
+            code?: string;
+            config?: { baseURL?: string; url?: string };
+            response?: { status?: number; data?: { message?: string | string[] } };
+          };
+          const backendMsg = axiosErr?.response?.data?.message;
+          const detail = backendMsg
+            ? (Array.isArray(backendMsg) ? backendMsg.join(', ') : backendMsg)
+            : axiosErr?.message ?? 'Onbekende fout';
+          const status = axiosErr?.response?.status;
+          const requestedUrl = `${axiosErr?.config?.baseURL ?? ''}${axiosErr?.config?.url ?? ''}`;
+          setPredictionErrorDetail(
+            `${status ? `[${status}] ` : ''}${detail}\n${requestedUrl}`,
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setPredictionLoading(false);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [date, maxCapacity]);
+
+  function handleApplyBudget() {
+    if (prediction) setBudget(String(prediction.estimatedBudgetZAR));
+  }
 
   async function handleSubmit() {
     if (!title.trim() || !location.trim() || !maxCapacity.trim()) {
@@ -307,6 +370,15 @@ function CreateEventForm({
       return;
     }
 
+    let budgetNum: number | undefined;
+    if (budget.trim()) {
+      budgetNum = Number(budget);
+      if (isNaN(budgetNum) || budgetNum < 0) {
+        setError('Begroting moet \'n geldige positiewe getal wees.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -321,6 +393,7 @@ function CreateEventForm({
         })(),
         location: location.trim(),
         maxCapacity: cap,
+        budget: budgetNum,
       });
       navigation.goBack();
     } catch (err: unknown) {
@@ -356,6 +429,7 @@ function CreateEventForm({
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        overScrollMode="never"
       >
         {error && (
           <View style={styles.errorBox}>
@@ -483,9 +557,88 @@ function CreateEventForm({
             onChangeText={setMaxCapacity}
             editable={!isSubmitting}
             keyboardType="number-pad"
+            returnKeyType="next"
+          />
+
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Begroting (R, opsioneel)</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="bv. 15000"
+            placeholderTextColor={colors.textSubtle}
+            value={budget}
+            onChangeText={setBudget}
+            editable={!isSubmitting}
+            keyboardType="number-pad"
             returnKeyType="done"
           />
         </View>
+
+        {(predictionLoading || predictionUnavailable || prediction) && (
+          <View style={styles.predictionCard}>
+            <View style={styles.predictionTop}>
+              <Feather name="cpu" size={14} color={colors.primary} />
+              <Text style={styles.predictionTitle}>KI-Voorspelling</Text>
+            </View>
+
+            {predictionLoading && (
+              <View style={styles.predictionLoadingRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.predictionLoadingText}>Besig om te voorspel...</Text>
+              </View>
+            )}
+
+            {!predictionLoading && predictionUnavailable && (
+              <>
+                <Text style={styles.predictionUnavailableText}>
+                  Voorspellingsdiens is tans nie beskikbaar nie.
+                </Text>
+                {predictionErrorDetail && (
+                  <Text style={styles.predictionErrorDetailText}>
+                    {predictionErrorDetail}
+                  </Text>
+                )}
+              </>
+            )}
+
+            {!predictionLoading && prediction && (
+              <>
+                <View style={styles.predictionStatsRow}>
+                  <PredictionStat
+                    label="Verwag"
+                    value={`${prediction.estimatedAttendees}`}
+                    colors={colors}
+                  />
+                  <PredictionStat
+                    label="Vulkoers"
+                    value={`${Math.round(prediction.predictedFillRate * 100)}%`}
+                    colors={colors}
+                  />
+                  <PredictionStat
+                    label="Begroting"
+                    value={`R ${prediction.estimatedBudgetZAR.toLocaleString('af-ZA')}`}
+                    colors={colors}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={styles.applyBudgetBtn}
+                  onPress={handleApplyBudget}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.applyBudgetText}>Gebruik Voorgestelde Begroting</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.reasoningHeading}>Waarom hierdie voorspelling?</Text>
+                {prediction.reasoning.map((reason, i) => (
+                  <View key={i} style={styles.reasoningRow}>
+                    <Text style={styles.reasoningBullet}>•</Text>
+                    <Text style={styles.reasoningText}>{reason}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.primaryBtn, isSubmitting && styles.btnDisabled]}
@@ -510,6 +663,23 @@ function CreateEventForm({
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PredictionStat({
+  label,
+  value,
+  colors,
+}: {
+  label: string;
+  value: string;
+  colors: ReturnType<typeof useThemeColors>;
+}) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>{value}</Text>
+      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSubtle, marginTop: 2 }}>{label}</Text>
+    </View>
   );
 }
 
@@ -757,5 +927,59 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontWeight: '900',
       color: colors.text,
     },
+
+    predictionCard: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      padding: 16,
+    },
+    predictionTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+    predictionTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
+    predictionLoadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    predictionLoadingText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
+    predictionUnavailableText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
+    predictionErrorDetailText: { fontSize: 11, fontWeight: '500', color: colors.red, marginTop: 4 },
+    predictionStatsRow: {
+      flexDirection: 'row',
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingVertical: 12,
+      marginBottom: 12,
+    },
+    applyBudgetBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginBottom: 14,
+    },
+    applyBudgetText: { fontSize: 13, fontWeight: '800', color: colors.surface },
+    reasoningHeading: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: colors.textSubtle,
+      marginBottom: 8,
+      letterSpacing: 0.3,
+    },
+    reasoningRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: 4,
+    },
+    reasoningBullet: { fontSize: 12, color: colors.primary, fontWeight: '900' },
+    reasoningText: { flex: 1, fontSize: 12, color: colors.text, fontWeight: '600', lineHeight: 17 },
   });
 }

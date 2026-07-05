@@ -1,5 +1,6 @@
 'use client';
 
+// ========== Imports: ==========
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -7,6 +8,7 @@ import { useCurrentUser } from '@/components/UserContext';
 import { canCreateEvents } from '@/lib/rbac';
 import { createEventAction } from '@/lib/actions/event.actions';
 import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
+import EventPredictionPanel from '@/components/EventPredictionPanel';
 
 const STUDY_CENTERS = [
     'Centurion - Leriba',
@@ -94,6 +96,11 @@ export default function CreateEventPage() {
         if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
     }
 
+    function handleApplyBudget(budget: number) {
+        setFormData((prev) => ({ ...prev, budget: String(budget) }));
+        if (errors.budget) setErrors((prev) => ({ ...prev, budget: '' }));
+    }
+
     const inputClass = (field: string) =>
         [
             'w-full bg-[var(--color-bg)] border rounded-xl px-4 py-2.5 text-sm text-[var(--color-text)]',
@@ -104,7 +111,7 @@ export default function CreateEventPage() {
         ].join(' ');
 
     return (
-        <div className="max-w-2xl space-y-6">
+        <div className="max-w-5xl space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-[var(--color-text)]">Skep Geleentheid</h1>
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">
@@ -112,196 +119,206 @@ export default function CreateEventPage() {
                 </p>
             </div>
 
-            <form
-                onSubmit={handleSubmit}
-                className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-5"
-            >
-                <div>
-                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                        Titel
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Geleentheid naam..."
-                        value={formData.title}
-                        onChange={(e) => handleChange('title', e.target.value)}
-                        className={inputClass('title')}
-                    />
-                    {errors.title && (
-                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.title}</p>
-                    )}
-                </div>
-
-                <div>
-                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                        Beskrywing
-                    </label>
-                    <textarea
-                        placeholder="Beskryf die geleentheid..."
-                        value={formData.description}
-                        onChange={(e) => handleChange('description', e.target.value)}
-                        rows={3}
-                        className={`${inputClass('description')} resize-none`}
-                    />
-                    {errors.description && (
-                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.description}</p>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <form
+                    onSubmit={handleSubmit}
+                    className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-5"
+                >
                     <div>
                         <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Datum
+                            Titel
                         </label>
                         <input
-                            type="date"
-                            value={formData.date}
-                            onChange={(e) => handleChange('date', e.target.value)}
-                            className={inputClass('date')}
+                            type="text"
+                            placeholder="Geleentheid naam..."
+                            value={formData.title}
+                            onChange={(e) => handleChange('title', e.target.value)}
+                            className={inputClass('title')}
                         />
-                        {errors.date && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.date}</p>
+                        {errors.title && (
+                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.title}</p>
                         )}
                     </div>
+
                     <div>
                         <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Tyd
+                            Beskrywing
+                        </label>
+                        <textarea
+                            placeholder="Beskryf die geleentheid..."
+                            value={formData.description}
+                            onChange={(e) => handleChange('description', e.target.value)}
+                            rows={3}
+                            className={`${inputClass('description')} resize-none`}
+                        />
+                        {errors.description && (
+                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.description}</p>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Datum
+                            </label>
+                            <input
+                                type="date"
+                                value={formData.date}
+                                onChange={(e) => handleChange('date', e.target.value)}
+                                className={inputClass('date')}
+                            />
+                            {errors.date && (
+                                <p className="text-xs text-[var(--color-red)] mt-1">{errors.date}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Tyd
+                            </label>
+                            <input
+                                type="time"
+                                value={formData.time}
+                                onChange={(e) => handleChange('time', e.target.value)}
+                                className={inputClass('time')}
+                            />
+                            {errors.time && (
+                                <p className="text-xs text-[var(--color-red)] mt-1">{errors.time}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                            Ligging
                         </label>
                         <input
-                            type="time"
-                            value={formData.time}
-                            onChange={(e) => handleChange('time', e.target.value)}
-                            className={inputClass('time')}
+                            type="text"
+                            placeholder="Saal, gebou of adres..."
+                            value={formData.location}
+                            onChange={(e) => handleChange('location', e.target.value)}
+                            className={inputClass('location')}
                         />
-                        {errors.time && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.time}</p>
+                        {errors.location && (
+                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.location}</p>
                         )}
                     </div>
-                </div>
 
-                <div>
-                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                        Ligging
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Saal, gebou of adres..."
-                        value={formData.location}
-                        onChange={(e) => handleChange('location', e.target.value)}
-                        className={inputClass('location')}
-                    />
-                    {errors.location && (
-                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.location}</p>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Tipe
-                        </label>
-                        <select
-                            value={formData.type}
-                            onChange={(e) => handleChange('type', e.target.value)}
-                            className={inputClass('type')}
-                        >
-                            <option value="public">Publiek</option>
-                            <option value="internal_student">Intern - Student</option>
-                            <option value="private">Privaat</option>
-                            <option value="department">Departement</option>
-                        </select>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Tipe
+                            </label>
+                            <select
+                                value={formData.type}
+                                onChange={(e) => handleChange('type', e.target.value)}
+                                className={inputClass('type')}
+                            >
+                                <option value="public">Publiek</option>
+                                <option value="internal_student">Intern - Student</option>
+                                <option value="private">Privaat</option>
+                                <option value="department">Departement</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Studiesentrum
+                            </label>
+                            <select
+                                value={formData.studyCenter}
+                                onChange={(e) => handleChange('studyCenter', e.target.value)}
+                                className={inputClass('studyCenter')}
+                            >
+                                {STUDY_CENTERS.map((c) => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
+
                     <div>
                         <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Studiesentrum
+                            Sigbaarheid (wie kan dit sien)
                         </label>
                         <select
-                            value={formData.studyCenter}
-                            onChange={(e) => handleChange('studyCenter', e.target.value)}
-                            className={inputClass('studyCenter')}
+                            value={formData.intendedAttendance}
+                            onChange={(e) => handleChange('intendedAttendance', e.target.value)}
+                            className={inputClass('intendedAttendance')}
                         >
-                            {STUDY_CENTERS.map((c) => (
-                                <option key={c} value={c}>{c}</option>
+                            {ATTENDANCE_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
                         </select>
                     </div>
-                </div>
 
-                <div>
-                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                        Sigbaarheid (wie kan dit sien)
-                    </label>
-                    <select
-                        value={formData.intendedAttendance}
-                        onChange={(e) => handleChange('intendedAttendance', e.target.value)}
-                        className={inputClass('intendedAttendance')}
-                    >
-                        {ATTENDANCE_OPTIONS.map((o) => (
-                            <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                    </select>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Kapasiteit
-                        </label>
-                        <input
-                            type="number"
-                            placeholder="Maks. deelnemers"
-                            value={formData.capacity}
-                            onChange={(e) => handleChange('capacity', e.target.value)}
-                            min="1"
-                            className={inputClass('capacity')}
-                        />
-                        {errors.capacity && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.capacity}</p>
-                        )}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Kapasiteit
+                            </label>
+                            <input
+                                type="number"
+                                placeholder="Maks. deelnemers"
+                                value={formData.capacity}
+                                onChange={(e) => handleChange('capacity', e.target.value)}
+                                min="1"
+                                className={inputClass('capacity')}
+                            />
+                            {errors.capacity && (
+                                <p className="text-xs text-[var(--color-red)] mt-1">{errors.capacity}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                Begroting (R)
+                            </label>
+                            <input
+                                type="number"
+                                placeholder="Totale begroting"
+                                value={formData.budget}
+                                onChange={(e) => handleChange('budget', e.target.value)}
+                                min="0"
+                                className={inputClass('budget')}
+                            />
+                            {errors.budget && (
+                                <p className="text-xs text-[var(--color-red)] mt-1">{errors.budget}</p>
+                            )}
+                        </div>
                     </div>
-                    <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Begroting (R)
-                        </label>
-                        <input
-                            type="number"
-                            placeholder="Totale begroting"
-                            value={formData.budget}
-                            onChange={(e) => handleChange('budget', e.target.value)}
-                            min="0"
-                            className={inputClass('budget')}
-                        />
-                        {errors.budget && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.budget}</p>
-                        )}
-                    </div>
-                </div>
 
-                {apiError && (
-                    <div
-                        className="px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
-                        style={{
-                            background:  'var(--color-bg)',
-                            borderColor: 'var(--color-red)',
-                            color:       'var(--color-red)',
-                        }}
-                    >
-                        {apiError}
-                    </div>
-                )}
-
-                <button
-                    type="submit"
-                    disabled={isPending}
-                    className="w-full py-3 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                    {isPending ? (
-                        <><Loader2 size={16} className="animate-spin" /> Besig om te skep...</>
-                    ) : (
-                        'Skep Geleentheid'
+                    {apiError && (
+                        <div
+                            className="px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+                            style={{
+                                background:  'var(--color-bg)',
+                                borderColor: 'var(--color-red)',
+                                color:       'var(--color-red)',
+                            }}
+                        >
+                            {apiError}
+                        </div>
                     )}
-                </button>
-            </form>
+
+                    <button
+                        type="submit"
+                        disabled={isPending}
+                        className="w-full py-3 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                        {isPending ? (
+                            <><Loader2 size={16} className="animate-spin" /> Besig om te skep...</>
+                        ) : (
+                            'Skep Geleentheid'
+                        )}
+                    </button>
+                </form>
+
+                <div className="lg:col-span-1">
+                    <EventPredictionPanel
+                        date={formData.date}
+                        capacity={formData.capacity}
+                        onApplyBudget={handleApplyBudget}
+                    />
+                </div>
+            </div>
         </div>
     );
 }

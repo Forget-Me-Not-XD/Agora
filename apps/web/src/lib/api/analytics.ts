@@ -139,3 +139,34 @@ export async function getAttendancePrediction(eventId: string): Promise<Predicti
 
     return res.json() as Promise<PredictionResult>;
 }
+
+export interface PredictDraftPayload {
+    date:        string;
+    maxCapacity: number;
+}
+
+export async function getDraftAttendancePrediction(payload: PredictDraftPayload): Promise<PredictionResult> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/analytics/predict-draft`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+    });
+
+    if (res.status === 503) {
+        throw new PredictionUnavailableError('Prediction service unavailable');
+    }
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+    }
+
+    return res.json() as Promise<PredictionResult>;
+}
