@@ -67,38 +67,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ────────────────────────────────────────
-  # NestJS Backend API
-  # ────────────────────────────────────────
-  backend:
-    build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
-    container_name: akademia-backend
-    restart: unless-stopped
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${BACKEND_PORT}
-      MONGO_URI: ${MONGO_URI}
-      RABBITMQ_URL: ${RABBITMQ_URL}
-      REDIS_URL: ${REDIS_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY}
-      JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY}
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./apps/backend/src:/app/src   # hot-reload in dev
-    networks:
-      - akademia-net
-
 volumes:
   mongo_data:
   rabbitmq_data:

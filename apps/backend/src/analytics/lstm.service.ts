@@ -8,6 +8,7 @@ import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
 import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
 import { Role } from '../common/enums/role.enums';
+import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 // ============================================================
 // This interface is the boundary between the NestJS world and the Python world
@@ -107,11 +108,41 @@ export class LstmService {
         ];
     }
 
+    private computeDraftFeatures(dto: PredictDraftEventDto): [number, number, number, number] {
+        const eventDate = new Date(dto.date);
+        const now = new Date();
+        const daysInAdvance = Math.max(
+            0,
+            Math.round((eventDate.getTime() - now.getTime()) / 86_400_000),
+        );
+
+        return [
+            dto.maxCapacity,
+            eventDate.getDay(),
+            eventDate.getMonth() + 1,
+            daysInAdvance,
+        ];
+    }
+
     // Loads the event, runs predict.py, and returns the model's live prediction.
     // Throws ServiceUnavailableException (-> HTTP 503) if the python process fails.
     async predictAttendance(eventId: string): Promise<PredictionResult> {
         const event = await this.eventsService.findById(eventId);
         const [capacity, dayOfWeek, month, daysInAdvance] = this.computeFeatures(event);
+
+        try {
+            return await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
+        } catch (err) {
+            throw new ServiceUnavailableException(
+                `Attendance prediction is currently unavailable: ${(err as Error).message}`,
+            );
+        }
+    }
+
+    // Same as predictAttendance, but for an event that doesn't exist yet -
+    // used by the "create event" form to preview a prediction before submitting.
+    async predictDraft(dto: PredictDraftEventDto): Promise<PredictionResult> {
+        const [capacity, dayOfWeek, month, daysInAdvance] = this.computeDraftFeatures(dto);
 
         try {
             return await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
@@ -130,11 +161,17 @@ export class LstmService {
     ): Promise<PredictionResult> {
         // apps/ml is a sibling of apps/backend; dist/ mirrors src/ (see tsconfig rootDir/outDir),
         // so this relative depth holds for both ts-node dev and the compiled build.
-        const scriptPath = path.resolve(__dirname, '../../../ml/predict.py');
+        const mlDir = path.resolve(__dirname, '../../../ml');
+        const scriptPath = path.join(mlDir, 'predict.py');
+        // Always use the ml venv's own interpreter - the system 'python' on PATH
+        // may point at an unrelated install with no TensorFlow/numpy installed.
+        const pythonPath = process.platform === 'win32'
+            ? path.join(mlDir, 'venv', 'Scripts', 'python.exe')
+            : path.join(mlDir, 'venv', 'bin', 'python');
         const args = [scriptPath, String(capacity), String(dayOfWeek), String(month), String(daysInAdvance)];
 
         return new Promise((resolve, reject) => {
-            const child = spawn('python', args);
+            const child = spawn(pythonPath, args);
 
             let stdout = '';
             let stderr = '';

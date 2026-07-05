@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Controller, Get, Param, Query, Res, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards, BadRequestException } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -7,6 +7,7 @@ import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { LstmService, TrainingDataItem, PredictionResult } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth } from './analytics.service';
+import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 interface EventsSummaryResponse {
     eventsPerMonth: EventsPerMonth[];
@@ -120,5 +121,14 @@ export class AnalyticsController {
         @Query('eventId') eventId: string,
     ): Promise<PredictionResult> {
         return this.lstmService.predictAttendance(eventId);
+    }
+
+    @Post('predict-draft')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async predictDraftAttendance(
+        @Body() dto: PredictDraftEventDto,
+    ): Promise<PredictionResult> {
+        return this.lstmService.predictDraft(dto);
     }
 }

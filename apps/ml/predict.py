@@ -46,7 +46,7 @@ except ImportError:
     
 
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape
-SEQUENCE_LENGTH = 5    # timesteps the LSTM expects per sample
+SEQUENCE_LENGTH = 10    # timesteps the LSTM expects per sample
 NUM_FEATURES = 4    # [maxCapacity, dayOfWeek, month, daysInAdvance]
 
 
