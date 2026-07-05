@@ -23,6 +23,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { EventResponseDto } from './dto/event-response.dto';
+import { FindEventsQueryDto } from './dto/find-events-query.dto';
 
 @Controller('events')
 @UseGuards(JwtAuthGuard)
@@ -32,10 +33,14 @@ export class EventsController {
     @Get()
     async findAll(
         @CurrentUser() user: JwtPayload,
-        @Query('from') from?: string,
-        @Query('to') to?: string,
+        @Query() query: FindEventsQueryDto,
     ): Promise<EventResponseDto[]> {
-        const events = await this.eventsService.findAll(user.role, user.sub, from, to);
+        const events = await this.eventsService.findAll(
+            user.role,
+            user.sub,
+            query.from,
+            query.to,
+        );
         return events.map(EventResponseDto.fromDocument);
     }
 
