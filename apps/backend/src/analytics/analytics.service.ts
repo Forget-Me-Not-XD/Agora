@@ -25,6 +25,27 @@ export interface EventsPerMonth {
     count: number;
 }
 
+export interface AdminKpi {
+    value: number;
+    deltaPct: number | null    //<-- Null - zero comparison possible yet
+}
+
+export interface AdminKpis {
+    totalEvents: AdminKpi;
+    activeUsers: AdminKpi;
+    newSignups: AdminKpi;
+    totalRsvps: AdminKpi;
+}
+
+export interface RecentRsvp {
+    id: string;
+    eventTitle: string;
+    userName: string;
+    staus: string;
+    checkedIn: boolean;
+    createdAt: Date;
+}
+
 export interface AttendancePrediction {
     predictedFillRate: number;
     predictedAttendance: number;
@@ -137,6 +158,83 @@ export class AnalyticsService {
             { $limit: 5 },
         ]).exec();
     }
+
+    private monthRange(offsetMonths: number): { start: Date; end: Date } {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + offsetMonths + 1, 1);
+        return { start, end };
+    }
+
+    private delta(current: number, previous: number): number | null {
+        if (previous === 0) return current === 0 ? null : 100;
+        return Math.round(((current - previous) / previous) * 1000) / 10;
+    }
+
+    async getAdminKpis(): Promise <AdminKpis> {
+        const thisMonth = this.monthRange(0);
+        const lastMonth = this.monthRange(-1);
+
+        const [
+            totalEvents, totalUsers, totalRsvps,
+            eventsThisMonth, eventsLastMonth, 
+            usersThisMonth,usersLastMonth,
+            rsvpsThisMonth, rsvpsLastMonth, 
+        ] = await Promise.all([
+            this.eventModel.countDocuments().exec(),
+            this.userModel.countDocuments({ isActive: true }).exec(),
+            this.rsvpModel.countDocuments().exec(),
+            this.eventModel.countDocuments({ date: { $gte: thisMonth.start, $lt: thisMonth.end } }).exec(),
+            this.eventModel.countDocuments({ date: { $gte: lastMonth.start, $lt: lastMonth.end } }).exec(),
+            this.userModel.countDocuments({ createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } }).exec(),
+            this.userModel.countDocuments({ createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } }).exec(),
+            this.rsvpModel.countDocuments({ createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } }).exec(),
+            this.rsvpModel.countDocuments({ createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } }).exec(),
+        ]);
+
+        return {
+        totalEvents: { value: totalEvents, deltaPct: this.delta(eventsThisMonth, eventsLastMonth) },
+        activeUsers: { value: totalUsers, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
+        newSignups:  { value: usersThisMonth, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
+        totalRsvps:  { value: totalRsvps, deltaPct: this.delta(rsvpsThisMonth, rsvpsLastMonth) },
+        };
+    }
+
+    async getRsvpsPerMonth(): Promise<EventsPerMonth[]> {
+    return this.rsvpModel.aggregate<EventsPerMonth>([
+        {
+            $group: {
+                _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+                count: { $sum: 1 },
+            },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+        { $project: { _id: 0, year: '$_id.year', month: '$_id.month', count: 1 } },
+    ]).exec();
+}
+
+async getRecentRsvps(limit: number): Promise<RecentRsvp[]> {
+    const rsvps = await this.rsvpModel
+        .find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate<{ event: EventDocument }>('event')
+        .populate<{ user: UserDocument }>('user')
+        .exec();
+
+    return rsvps.map((r) => {
+        const event = r.event as unknown as EventDocument;
+        const user = r.user as unknown as UserDocument;
+        return {
+            id: r._id.toString(),
+            eventTitle: event?.title ?? 'Onbekend',
+            userName: user ? `${user.name} ${user.surname}` : 'Onbekend',
+            status: r.status,
+            checkedIn: r.checkedIn,
+            createdAt: r.createdAt!,
+        };
+    });
+}
 
     async exportToCsv(type: string): Promise<string> {
         let rows: string[][];
