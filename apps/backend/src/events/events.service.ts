@@ -10,12 +10,14 @@ import { Role } from '../common/enums/role.enums';
 import { visibleAttendanceRoles } from '../common/rbac/event-visibility';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging/events.constants';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class EventsService {
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         private readonly rabbitMQService: RabbitMQService,
+        private readonly usersService: UsersService,
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
@@ -119,6 +121,10 @@ export class EventsService {
 
         this.assertOwnership(event, requesterId, requesterRole);
 
+        if (dto.photographers) {
+            await this.assertValidPhotographers(dto.photographers);
+        }
+
         const { date, endDate, ...rest } = dto;
         Object.assign(event, rest);
         if (date)    event.date    = new Date(date);
@@ -171,6 +177,19 @@ export class EventsService {
         );
 
         return saved;
+    }
+
+    private async assertValidPhotographers(photographerIds: string[]): Promise<void> {
+        const uniqueIds = Array.from(new Set(photographerIds));
+        const found = await this.usersService.search(Role.PHOTOGRAPHER, undefined, uniqueIds);
+        const foundIds = new Set(found.map((user) => user.id));
+
+        const invalidIds = uniqueIds.filter((photographerId) => !foundIds.has(photographerId));
+        if (invalidIds.length > 0) {
+            throw new BadRequestException(
+                `Ongeldige fotograaf-ID('s): ${invalidIds.join(', ')}`,
+            );
+        }
     }
 
     private assertOwnership(
