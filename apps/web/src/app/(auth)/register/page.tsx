@@ -323,10 +323,10 @@ export default function RegisterPage() {
             )}
           </label>
 
-          {/* Rol Toeken dropdown */}
+          {/* Ek is 'n: dropdown */}
           <label className="block mb-3">
             <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
-              Rol Toeken <span style={{ color: 'var(--color-primary)' }}>*</span>
+              Ek is 'n: <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <div className="relative mt-1" ref={roleRef}>
               <button
@@ -341,7 +341,7 @@ export default function RegisterPage() {
                 }}
               >
                 <span style={{ fontWeight: selectedRole ? 600 : 400 }}>
-                  {selectedRole ? selectedRole.subtitle : 'Rol Toeken'}
+                  {selectedRole ? selectedRole.subtitle : "Ek is 'n:"}
                 </span>
                 <ChevronDown
                   size={16}

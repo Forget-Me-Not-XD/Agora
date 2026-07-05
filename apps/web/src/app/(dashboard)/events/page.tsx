@@ -94,7 +94,7 @@ export default function EventsPage() {
                 {canCreateEvents(user.role) && (
                     <Link
                         href="/events/create"
-                        className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
                     >
                         <PlusCircle size={16} />
                         Skep Geleentheid

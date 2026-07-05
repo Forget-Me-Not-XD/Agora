@@ -1,133 +1,53 @@
 import { Suspense } from 'react';
-import { Calendar, CalendarClock, Ticket, Gauge } from 'lucide-react';
+import { Calendar, Ticket, Users, UserPlus } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import EventCard from '@/components/EventCard';
-import IncomeExpenseChart from '@/components/charts/IncomeExpenseChart';
-import AttendanceChart from '@/components/charts/AttendanceChart';
-import SatisfactionChart from '@/components/charts/SatisfactionChart';
-import { MOCK_EVENTS, MOCK_BUDGET_ITEMS, MOCK_INSIGHTS } from '@/lib/mock-data';
-import { canViewBudget, canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
+import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getRecentRsvps, getBudgetPerMonth } from '@/lib/api/analytics';
+import { mergeMonthlySeries, mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import ExportCsvButton from '@/components/ExportCsvButton';
+import EventsRsvpsAreaChart from '@/components/charts/EventsRsvpsAreaChart';
+import TopEventsBarChart from '@/components/charts/TopEventsBarChart';
+import RsvpTrendLineChart from '@/components/charts/RsvpTrendLineChart';
+import FillRateDonut from '@/components/charts/FillRateDonut';
+import BudgetTrendChart from '@/components/charts/BudgetTrendChart';
+import RecentBookingsTable from '@/components/charts/RecentBookingTable';
+import DosentDashboard from '@/components/dashboard/DosentDashboard';
+import AttendeeDashboard from '@/components/dashboard/AttendeeDashboard';
 
 export const dynamic = 'force-dynamic';
 
 export default function DashboardPage() {
     const user = getCurrentUser();
-
-    /* ── Chart data (only computed for roles that can see them) ── */
-    const showCharts = canViewInsights(user.role) || canViewBudget(user.role);
-
-    const relevantEvents =
-        user.role === 'ADMIN'
-            ? MOCK_EVENTS
-            : MOCK_EVENTS.filter((e) => e.createdBy === user.id);
-
-    const budgetData = relevantEvents
-        .map((event) => {
-            const items = MOCK_BUDGET_ITEMS.filter((b) => b.eventId === event.id);
-            const income = items.filter((b) => b.type === 'income').reduce((s, b) => s + b.amount, 0);
-            const expense = items.filter((b) => b.type === 'expense').reduce((s, b) => s + b.amount, 0);
-            return { label: event.title, income, expense };
-        })
-        .filter((d) => d.income > 0 || d.expense > 0);
-
-    const relevantInsights =
-        user.role === 'ADMIN'
-            ? MOCK_INSIGHTS
-            : MOCK_INSIGHTS.filter((i) => {
-                  const ev = MOCK_EVENTS.find((e) => e.id === i.eventId);
-                  return ev?.createdBy === user.id;
-              });
-
-    const attendanceData = relevantInsights
-        .filter((i) => i.totalRegistered > 0 && i.totalAttended > 0)
-        .map((i) => ({
-            label: MOCK_EVENTS.find((e) => e.id === i.eventId)?.title ?? 'Onbekend',
-            rate: i.attendanceRate,
-            attended: i.totalAttended,
-            registered: i.totalRegistered,
-        }));
-
-    const satisfactionData = relevantInsights
-        .filter((i) => i.averageRating > 0)
-        .map((i) => ({
-            label: MOCK_EVENTS.find((e) => e.id === i.eventId)?.title ?? 'Onbekend',
-            rating: i.averageRating,
-        }));
+    const isAdmin = user.role === 'ADMIN';
+    const isDosent = user.role === 'DOSENT';
 
     return (
         <div className="space-y-6">
 
             {/* ── Greeting ── */}
             <div className="flex items-center justify-between">
-            <div>
-                <h1 className="text-2xl font-bold text-[var(--color-text)]">
-                    Goeie dag, {user.name}
-                </h1>
-                <p className="text-sm text-[var(--color-text-subtle)] mt-1">{user.studyCenter}</p>
-            </div>
+                <div>
+                    <h1 className="text-2xl font-bold text-[var(--color-text)]">
+                        Goeie dag, {user.name}
+                    </h1>
+                    <p className="text-sm text-[var(--color-text-subtle)] mt-1">{user.studyCenter}</p>
+                </div>
                 <ExportCsvButton type="kpis" />
             </div>
 
-            <Suspense fallback={<KpiSkeletons canSeeAll={canViewInsights(user.role)}/>}>
-                <DashboardKpis canSeeAll={canViewInsights(user.role)}/>
+            {/* ── Role-specific dashboard ── */}
+            <Suspense fallback={<StatCardSkeletons />}>
+                {isAdmin ? <AdminDashboard /> : isDosent ? <DosentDashboard userId={user.id} /> : <AttendeeDashboard />}
             </Suspense>
 
-            {/* ── Charts row (Admin + Dosent only) ── */}
-            {showCharts && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-                    {/* Income vs Expense */}
-                    {canViewBudget(user.role) && (
-                        <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                            <div className="mb-4">
-                                <h2 className="text-sm font-semibold text-[var(--color-text)]">
-                                    Inkomste vs Uitgawes
-                                </h2>
-                                <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                                    Per geleentheid
-                                </p>
-                            </div>
-                            <IncomeExpenseChart data={budgetData} />
-                        </div>
-                    )}
-
-                    {/* Satisfaction */}
-                    {canViewInsights(user.role) && (
-                        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                            <div className="mb-4">
-                                <h2 className="text-sm font-semibold text-[var(--color-text)]">
-                                    Bevredigingsgradering
-                                </h2>
-                                <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                                    Deelnemer terugvoer
-                                </p>
-                            </div>
-                            <SatisfactionChart data={satisfactionData} />
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ── Attendance chart (Admin + Dosent) ── */}
-            {showCharts && canViewInsights(user.role) && (
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                    <div className="mb-4">
-                        <h2 className="text-sm font-semibold text-[var(--color-text)]">Bywoning per Geleentheid</h2>
-                        <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                            Geregistreerdes wat werklik opgedaag het
-                        </p>
-                    </div>
-                    <AttendanceChart data={attendanceData} />
-                </div>
-            )}
-
-            {/* ── Upcoming events preview ── */}
+            {/* ── Upcoming / browsable events ── */}
             <div>
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-base font-semibold text-[var(--color-text)]">Jou Geleenthede</h2>
+                    <h2 className="text-base font-semibold text-[var(--color-text)]">
+                        {isAdmin || isDosent ? 'Opkomende Geleenthede' : 'Beskikbare Geleenthede'}
+                    </h2>
                     <a href="/events" className="text-xs text-[var(--color-primary)] font-medium hover:underline">
                         Sien almal
                     </a>
@@ -140,8 +60,8 @@ export default function DashboardPage() {
     );
 }
 
-// grys blokkies terwyl die data gehaal word
-function KpiSkeletons({ canSeeAll }: { canSeeAll: boolean}) {
+// grys blokkies terwyl die data gehaal word — gedeel deur al drie rol-dashboards (elk wys 4 statistiekkaarte)
+function StatCardSkeletons() {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -161,45 +81,88 @@ function KpiSkeletons({ canSeeAll }: { canSeeAll: boolean}) {
     );
 }
 
-// Haal die KPI-data en wys die 4 kaarte
-async function DashboardKpis({ canSeeAll }: { canSeeAll: boolean }) {
-    const [allRes, upcomingRes] = await Promise.allSettled([
-        getEvents(),
-        getEvents({ from: new Date().toISOString() }),
-    ]);
+// Haal die admin-KPI's, grafiekdata en onlangse besprekings, en wys die volledige admin-uitleg
+async function AdminDashboard() {
+    const [kpisRes, eventsSummaryRes, rsvpSummaryRes, rsvpsPerMonthRes, recentRsvpsRes, budgetPerMonthRes] =
+        await Promise.allSettled([
+            getAdminKpis(),
+            getEventsSummary(),
+            getRsvpSummary(),
+            getRsvpsPerMonth(),
+            getRecentRsvps(8),
+            getBudgetPerMonth(),
+        ]);
 
-    const allEvents = allRes.status === 'fulfilled' ? allRes.value : null;
-    const upcoming  = upcomingRes.status === 'fulfilled' ? upcomingRes.value : null;
+    const kpis = kpisRes.status === 'fulfilled' ? kpisRes.value : null;
+    const eventsSummary = eventsSummaryRes.status === 'fulfilled' ? eventsSummaryRes.value : null;
+    const rsvpSummary = rsvpSummaryRes.status === 'fulfilled' ? rsvpSummaryRes.value : null;
+    const rsvpsPerMonth = rsvpsPerMonthRes.status === 'fulfilled' ? rsvpsPerMonthRes.value : [];
+    const recentRsvps = recentRsvpsRes.status === 'fulfilled' ? recentRsvpsRes.value : [];
+    const budgetPerMonth = budgetPerMonthRes.status === 'fulfilled' ? budgetPerMonthRes.value : [];
 
-    // Elke waarde word onafhanklik bereken
-    // is events null, wys daardie kaart "--"
-    const totalEvents = allEvents ? allEvents.length : '--';
-
-    const upcomingEvents = upcoming ? upcoming.length : '--';
-
-    const totalRsvps = allEvents
-        ? allEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0)
-        : '--';
-
-    const avgFillRate = allEvents
-        ? `${Math.round(
-            (allEvents.reduce(
-                (sum, e) => sum + (e.maxCapacity > 0 ? e.confirmedAttendees / e.maxCapacity : 0),
-                0,
-            ) / (allEvents.length || 1)) * 100,
-            )}%`
-        : '--';
+    const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
+    const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Totale Geleenthede"     value={totalEvents}    sub="in die stelsel"       icon={Calendar}      color="blue" />
-            <StatCard label="Aankomende Geleenthede" value={upcomingEvents} sub="datum in die toekoms" icon={CalendarClock} color="green" />
-            {canSeeAll && (
-                <>
-                    <StatCard label="Totale RSVPs"        value={totalRsvps}  sub="bevestigde bywoners" icon={Ticket} color="orange" />
-                    <StatCard label="Gemiddelde Vulkoers" value={avgFillRate} sub="kapasiteit gevul"    icon={Gauge}  color="red" />
-                </>
-            )}
+        <div className="space-y-6">
+            {/* Stat cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard label="Totale Geleenthede" value={kpis?.totalEvents.value ?? '--'} sub="in totaal" deltaPct={kpis?.totalEvents.deltaPct} icon={Calendar} color="blue" />
+                <StatCard label="Aktiewe Gebruikers" value={kpis?.activeUsers.value ?? '--'} sub="tans aktief" deltaPct={kpis?.activeUsers.deltaPct} icon={Users} color="green" />
+                <StatCard label="Nuwe Registrasies" value={kpis?.newSignups.value ?? '--'} sub="hierdie maand" deltaPct={kpis?.newSignups.deltaPct} icon={UserPlus} color="orange" />
+                <StatCard label="Totale RSVPs" value={kpis?.totalRsvps.value ?? '--'} sub="oor alle geleenthede" deltaPct={kpis?.totalRsvps.deltaPct} icon={Ticket} color="red" />
+            </div>
+
+            {/* Main chart row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                    <div className="mb-2">
+                        <h2 className="text-sm font-semibold text-[var(--color-text)]">Geleenthede vs RSVPs</h2>
+                        <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">Afgelope 12 maande</p>
+                    </div>
+                    <EventsRsvpsAreaChart data={monthly} />
+                </div>
+
+                <div className="flex flex-col gap-4">
+                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                        <div className="mb-2">
+                            <h2 className="text-sm font-semibold text-[var(--color-text)]">Top Geleenthede</h2>
+                            <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">Top 5 volgens totale RSVPs</p>
+                        </div>
+                        <TopEventsBarChart data={eventsSummary?.top5Events ?? []} />
+                    </div>
+                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                        <h2 className="text-sm font-semibold text-[var(--color-text)] mb-2">RSVP-tendens</h2>
+                        <RsvpTrendLineChart data={monthly} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Reports overview */}
+            <div>
+                <h2 className="text-base font-semibold text-[var(--color-text)] mb-3">Verslae oorsig</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                        <h3 className="text-sm font-semibold text-[var(--color-text)] mb-1">Vulkoers-gesondheid</h3>
+                        <FillRateDonut percent={(rsvpSummary?.averageFillRate ?? 0) * 100} />
+                    </div>
+                    <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                        <div className="mb-2">
+                            <h3 className="text-sm font-semibold text-[var(--color-text)]">Begroting-tendens</h3>
+                            <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+                                Toegekende begroting per geleentheid · afgelope 12 maande
+                            </p>
+                        </div>
+                        <BudgetTrendChart data={monthlyBudget} />
+                    </div>
+                </div>
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                    <h2 className="text-sm font-semibold text-[var(--color-text)] mb-3">
+                        Onlangse Besprekings <span className="text-[var(--color-text-subtle)] font-normal">({kpis?.totalRsvps.value ?? recentRsvps.length} in totaal)</span>
+                    </h2>
+                    <RecentBookingsTable data={recentRsvps} />
+                </div>
+            </div>
         </div>
     );
 }

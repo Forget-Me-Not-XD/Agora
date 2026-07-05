@@ -51,7 +51,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 </button>
 
                 <Link href="/profile" 
-                className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-white text-sm font-semibold ml-1 hover:opacity-80 transition-opacity"
+                className="w-8 h-8 rounded-full bg-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary-text)] text-sm font-semibold ml-1 hover:opacity-80 transition-opacity"
                 title="My Profiel">
                     {user.name.charAt(0)}{user.surname.charAt(0)}
                 </Link>

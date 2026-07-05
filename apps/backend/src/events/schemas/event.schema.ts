@@ -39,6 +39,9 @@ export class Event {
     @Prop ({ default: 0 })
     confirmedAttendees!: number;
 
+    @Prop ({ default: 0, min: 0 })
+    budget!: number;
+
     @Prop ({ type: String, enum: ATTENDANCE_ROLES, default: Role.GAS, index: true })
     intendedAttendance!: Role;
 

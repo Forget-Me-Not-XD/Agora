@@ -17,6 +17,32 @@ export interface RsvpResponse {
     updatedAt:   string;
 }
 
+// Soos GET /api/v1/rsvp/my dit terugstuur: 'n rou, gepopuleerde Mongoose-dokument (nie 'n DTO nie)
+export interface MyRsvpEvent {
+    _id:                 string;
+    title:               string;
+    description:         string;
+    date:                string;
+    endDate?:             string;
+    location:            string;
+    maxCapacity:         number;
+    confirmedAttendees:  number;
+    type:                string;
+    intendedAttendance:  string;
+}
+
+export interface MyRsvp {
+    _id:         string;
+    event:       MyRsvpEvent | null;
+    user:        string;
+    status:      RsvpStatus;
+    qrPayload:   string;
+    checkedIn:   boolean;
+    checkedInAt: string | null;
+    createdAt:   string;
+    updatedAt:   string;
+}
+
 async function throwHttpError(res: Response): Promise<never> {
     const body = await res.json().catch(() => ({})) as { message?: string | string[] };
     const msg  = body.message ?? res.statusText;
@@ -39,6 +65,19 @@ export async function createRsvp(eventId: string): Promise<RsvpResponse> {
 
     if (!res.ok) await throwHttpError(res);
     return res.json() as Promise<RsvpResponse>;
+}
+
+// GET /api/v1/rsvp/my — die ingelogde gebruiker se eie RSVPs, met die geleentheid gepopuleer
+export async function getMyRsvps(): Promise<MyRsvp[]> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/rsvp/my`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<MyRsvp[]>;
 }
 
 // GET /api/v1/rsvp/:id/qr — PNG-beeld, word server-kant na 'n base64 data-URI omgeskakel

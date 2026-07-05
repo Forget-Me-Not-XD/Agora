@@ -52,6 +52,58 @@ export async function getEventsSummary(): Promise<EventsSummary> {
     return apiFetch<EventsSummary>('/api/v1/analytics/events-summary');
 }
 
+export interface AdminKpi {
+    value: number;
+    deltaPct: number | null;
+}
+
+export interface AdminKpis {
+    totalEvents: AdminKpi;
+    activeUsers: AdminKpi;
+    newSignups: AdminKpi;
+    totalRsvps: AdminKpi;
+}
+
+export interface RecentRsvp {
+    id: string;
+    eventTitle: string;
+    userName: string;
+    status: string;
+    checkedIn: boolean;
+    createdAt: string;
+}
+
+export async function getAdminKpis(): Promise <AdminKpis> {
+    return apiFetch<AdminKpis>('/api/v1/analytics/admin-kpis');
+}
+
+export async function getRsvpsPerMonth(): Promise <EventsPerMonth[]> {
+    return apiFetch<EventsPerMonth[]>('/api/v1/analytics/rsvps-per-month');
+}
+
+export async function getRecentRsvps(limit = 8): Promise<RecentRsvp[]> {
+    return apiFetch<RecentRsvp[]>(`/api/v1/analytics/recent-rsvps?limit=${limit}`);
+}
+
+export interface RsvpStatusCount {
+    status: string;
+    count: number;
+}
+
+export async function getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
+    return apiFetch<RsvpStatusCount[]>('/api/v1/analytics/rsvp-status-breakdown');
+}
+
+export interface BudgetPerMonth {
+    year:  number;
+    month: number;
+    total: number;
+}
+
+export async function getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
+    return apiFetch<BudgetPerMonth[]>('/api/v1/analytics/budget-per-month');
+}
+
 export interface PredictionResult {
     predictedFillRate:   number;
     estimatedRsvps:      number;
