@@ -26,6 +26,14 @@ export class UsersController {
     return UserResponseDto.fromDocument(user);
   }
 
+  // Lys alle gebruikers
+  @Get('all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async findAll(): Promise<UserResponseDto[]> {
+    return this.usersService.findAll();
+  }
+
   // Soek gebruikers per rol
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
