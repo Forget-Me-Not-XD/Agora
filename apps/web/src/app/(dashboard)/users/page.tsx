@@ -2,6 +2,7 @@ import { AlertCircle } from 'lucide-react';
 import { MOCK_USERS } from '@/lib/mock-data';
 import { canManageUsers, getRoleLabel, getRoleBadgeColor } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
+import CreateUserForm from './create-user-form';
 
 export default function UsersPage() {
     const user = getCurrentUser();
@@ -26,6 +27,8 @@ export default function UsersPage() {
                     {MOCK_USERS.length} geregistreerde gebruikers
                 </p>
             </div>
+
+            <CreateUserForm />
 
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
                 <div className="hidden md:grid md:grid-cols-5 gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">

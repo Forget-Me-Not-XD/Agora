@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getEvents, type Event } from '@/lib/api/events';
-import {
-    getAttendancePrediction,
-    PredictionUnavailableError,
-    type PredictionResult,
-} from '@/lib/api/analytics';
+import type { Event } from '@/lib/api/events';
+import type { PredictionResult } from '@/lib/api/analytics';
+import { listEventsAction } from '@/lib/actions/event.actions';
+import { getAttendancePredictionAction } from '@/lib/actions/analytics.actions';
 
 export default function PredictedAttendanceCard() {
     const [events, setEvents] = useState<Event[]>([]);
@@ -16,7 +14,7 @@ export default function PredictedAttendanceCard() {
     const [unavailable, setUnavailable] = useState(false);
 
     useEffect(() => {
-        getEvents().then(setEvents).catch(() => setEvents([]));
+        listEventsAction().then((result) => setEvents(result.events ?? []));
     }, []);
 
     useEffect(() => {
@@ -30,17 +28,17 @@ export default function PredictedAttendanceCard() {
         setLoading(true);
         setUnavailable(false);
 
-        getAttendancePrediction(selectedEventId)
+        getAttendancePredictionAction(selectedEventId)
             .then((result) => {
                 if (cancelled) return;
-                setPrediction(result);
-            })
-            .catch((err) => {
-                if (cancelled) return;
-                setUnavailable(true);
-                setPrediction(null);
-                if (!(err instanceof PredictionUnavailableError)) {
-                    console.error('Failed to load attendance prediction:', err);
+                if (result.prediction) {
+                    setPrediction(result.prediction);
+                } else {
+                    setPrediction(null);
+                    setUnavailable(true);
+                    if (result.error) {
+                        console.error('Failed to load attendance prediction:', result.error);
+                    }
                 }
             })
             .finally(() => {
