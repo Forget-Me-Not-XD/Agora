@@ -1,8 +1,7 @@
 // ========== Imports: ==========
 import { Types } from 'mongoose';
 import { EventDocument } from '../schemas/event.schema';
-import { Role } from '../../common/enums/role.enums';
-import { EventType } from '../../common/enums/event-type.enum';
+import { IntendedAttendance } from '../../common/rbac/event-visibility';
 
 /**
  * Public facing Event Shape
@@ -22,8 +21,7 @@ export class EventResponseDto {
     photographers!: string[];
     photographerInstructions!: string;
     confirmedAttendees!: number;
-    intendedAttendance!: Role;
-    type!: EventType;
+    intendedAttendance!: IntendedAttendance;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -42,7 +40,6 @@ export class EventResponseDto {
             photographerInstructions:   event.photographerInstructions,
             confirmedAttendees:         event.confirmedAttendees,
             intendedAttendance:         event.intendedAttendance,
-            type:                       event.type,
             createdAt:                  event.createdAt!,
             updatedAt:                  event.updatedAt!,
         };

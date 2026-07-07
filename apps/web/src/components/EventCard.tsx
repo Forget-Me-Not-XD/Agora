@@ -1,8 +1,8 @@
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import {
-    TYPE_LABELS,
-    TYPE_COLORS,
+    ATTENDANCE_LABELS,
+    ATTENDANCE_COLORS,
     STATUS_LABELS,
     STATUS_COLORS,
     deriveStatus,
@@ -38,8 +38,8 @@ export default function EventCard({ event }: EventCardProps) {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[status]}`}>
                             {STATUS_LABELS[status]}
                         </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[event.type]}`}>
-                            {TYPE_LABELS[event.type]}
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ATTENDANCE_COLORS[event.intendedAttendance]}`}>
+                            {ATTENDANCE_LABELS[event.intendedAttendance]}
                         </span>
                     </div>
                 </div>

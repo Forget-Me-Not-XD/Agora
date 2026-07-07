@@ -7,7 +7,6 @@ import * as path from 'path';
 import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
 import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
-import { Role } from '../common/enums/role.enums';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 // ============================================================
@@ -53,9 +52,7 @@ export class LstmService {
         }
 
         // findAll supports an optional 'to' date filter - we use this to exclude future events
-        const events = await this.eventsService.findAll(
-            Role.ADMIN,
-            '',
+        const events = await this.eventsService.findAllUnfiltered(
             undefined,
             new Date().toISOString(),
         );

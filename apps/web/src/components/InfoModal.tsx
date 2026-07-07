@@ -14,6 +14,7 @@ export default function InfoModal({ title, children }: InfoModalProps) {
     return (
         <>
             <button
+                type="button"
                 onClick={() => setOpen(true)}
                 className="inline-flex items-center justify-center w-7 h-7 rounded-full text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-primary)] transition-colors shrink-0"
                 aria-label="Meer inligting"
@@ -38,6 +39,7 @@ export default function InfoModal({ title, children }: InfoModalProps) {
                                 <h3 className="text-sm font-bold text-[var(--color-text)]">{title}</h3>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => setOpen(false)}
                                 className="p-1.5 rounded-lg text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] transition-colors"
                             >

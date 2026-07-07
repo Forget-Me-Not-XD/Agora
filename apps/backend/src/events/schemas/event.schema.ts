@@ -2,8 +2,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
-import { EventType } from '../../common/enums/event-type.enum';
-import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
+import { INTENDED_ATTENDANCE_VALUES, IntendedAttendance } from '../../common/rbac/event-visibility';
 
 export type EventDocument = HydratedDocument<Event>;
 
@@ -42,11 +41,8 @@ export class Event {
     @Prop ({ default: 0, min: 0 })
     budget!: number;
 
-    @Prop ({ type: String, enum: ATTENDANCE_ROLES, default: Role.GAS, index: true })
-    intendedAttendance!: Role;
-
-    @Prop ({ type: String, enum: Object.values(EventType), default: EventType.PUBLIC })
-    type!: EventType;
+@Prop ({ type: String, enum: INTENDED_ATTENDANCE_VALUES, default: Role.GAS, index: true })
+    intendedAttendance!: IntendedAttendance;
 
     createdAt?: Date;
     updatedAt?: Date;

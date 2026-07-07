@@ -9,37 +9,10 @@ import ExportCsvButton from '@/components/ExportCsvButton';
 import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
-import type { Event, EventType } from '@/lib/api/events';
-import { deriveStatus } from '@/lib/event-view';
+import type { Event } from '@/lib/api/events';
+import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
+import { deriveStatus, ATTENDANCE_COLORS } from '@/lib/event-view';
 import type { EventStatus } from '@/lib/event-view';
-
-
-const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
-    {
-        type: 'public',
-        label: 'Publiek',
-        color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-        description: 'Oop vir alle gebruikers ongeag hul rol. Geen uitnodiging nodig nie. Sigbaar vir GAS, studente, dosente en admins.',
-    },
-    {
-        type: 'internal_student',
-        label: 'Intern - Student',
-        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-        description: 'Slegs vir geregistreerde studente. Dosente en admins kan ook sien. GAS-lede moet spesifiek uitgenooi word.',
-    },
-    {
-        type: 'private',
-        label: 'Privaat',
-        color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-        description: 'Slegs vir spesifiek uitgenodigde gebruikers. Jy moet \'n direkte uitnodiging van die organiseerder ontvang het om dit te sien.',
-    },
-    {
-        type: 'department',
-        label: 'Departement',
-        color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-        description: 'Slegs vir dosente en administrateurs. Nie sigbaar vir studente of GAS-lede nie.',
-    },
-];
 
 export default function EventsPage() {
     const user = useCurrentUser();
@@ -50,7 +23,7 @@ export default function EventsPage() {
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
-    const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
+    const [visibilityFilter, setVisibilityFilter] = useState<AttendanceRole | 'all'>('all');
 
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
@@ -71,8 +44,8 @@ export default function EventsPage() {
             event.title.toLowerCase().includes(search.toLowerCase()) ||
             event.description.toLowerCase().includes(search.toLowerCase());
         const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
-        const matchesType = typeFilter === 'all' || event.type === typeFilter;
-        return matchesSearch && matchesStatus && matchesType;
+        const matchesVisibility = visibilityFilter === 'all' || event.intendedAttendance === visibilityFilter;
+        return matchesSearch && matchesStatus && matchesVisibility;
     });
 
     const selectClass =
@@ -130,35 +103,34 @@ export default function EventsPage() {
 
                 <div className="flex items-center gap-1.5">
                     <select
-                        value={typeFilter}
-                        onChange={(e) => setTypeFilter(e.target.value as EventType | 'all')}
+                        value={visibilityFilter}
+                        onChange={(e) => setVisibilityFilter(e.target.value as AttendanceRole | 'all')}
                         className={selectClass}
                     >
-                        <option value="all">Alle Tipes</option>
-                        <option value="public">Publiek</option>
-                        <option value="internal_student">Intern - Student</option>
-                        <option value="private">Privaat</option>
-                        <option value="department">Departement</option>
+                        <option value="all">Alle Sigbaarheid</option>
+                        {ATTENDANCE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
                     </select>
 
-                    <InfoModal title="Geleentheid Tipes">
+                    <InfoModal title="Sigbaarheid">
                         <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
-                            Elke geleentheid het 'n tipe wat bepaal wie dit kan sien.
-                            Jou rol bepaal watter tipes vir jou sigbaar is.
+                            Elke geleentheid het 'n sigbaarheid wat bepaal wie dit kan sien.
+                            Jou rol bepaal watter geleenthede vir jou sigbaar is.
                         </p>
                         <div className="space-y-2">
-                            {EVENT_TYPE_INFO.map((item) => (
+                            {ATTENDANCE_OPTIONS.map((o) => (
                                 <div
-                                    key={item.type}
+                                    key={o.value}
                                     className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
                                 >
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${item.color}`}>
-                                            {item.label}
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ATTENDANCE_COLORS[o.value]}`}>
+                                            {o.label}
                                         </span>
                                     </div>
                                     <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                        {item.description}
+                                        {o.desc}
                                     </p>
                                 </div>
                             ))}
@@ -166,10 +138,11 @@ export default function EventsPage() {
                         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
                             <p className="text-xs font-semibold text-[var(--color-text)] mb-1">Jou rol: {user.role}</p>
                             <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                {user.role === 'ADMIN' && 'Jy kan alle geleenthede sien, ongeag tipe.'}
-                                {user.role === 'DOSENT' && 'Jy kan alle aanstaande geleenthede sien, plus geleenthede wat jy geskep het.'}
-                                {user.role === 'STUDENT' && 'Jy kan publieke, intern-student geleenthede, en geleenthede waarvoor jy uitgenooi is sien.'}
-                                {user.role === 'GAS' && 'Jy kan publieke geleenthede en geleenthede waarvoor jy spesifiek uitgenooi is sien.'}
+                                {user.role === 'ADMIN' && 'Jy sien alle geleenthede behalwe ander gebruikers se privaat geleenthede.'}
+                                {user.role === 'DOSENT' && 'Jy sien publieke, student- en dosente-geleenthede, plus jou eie privaat geleenthede.'}
+                                {user.role === 'STUDENT' && 'Jy sien publieke en student-geleenthede.'}
+                                {user.role === 'GAS' && 'Jy sien publieke geleenthede.'}
+                                {user.role === 'PHOTOGRAPHER' && 'Jy sien publieke en student-geleenthede, plus geleenthede waaraan jy toegewys is.'}
                             </p>
                         </div>
                     </InfoModal>

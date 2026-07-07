@@ -7,7 +7,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { Role } from '../common/enums/role.enums';
-import { visibleAttendanceRoles } from '../common/rbac/event-visibility';
+import { visibleAttendanceRoles, PRIVATE_ATTENDANCE } from '../common/rbac/event-visibility';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging/events.constants';
 import { UsersService } from '../users/users.service';
@@ -40,29 +40,34 @@ export class EventsService {
         from?: string,
         to?: string,
     ): Promise<EventDocument[]> {
-        const filter: FilterQuery<EventDocument> = {};
+        const filter: FilterQuery<EventDocument> = this.dateRangeFilter(from, to);
 
-        if (from || to) {
-            filter.date = {};
-            if (from) filter.date.$gte = new Date(from);
-            if (to)   filter.date.$lte = new Date(to);
+        // Sigbaarheid: rol-hierargie vir gewone waardes, PRIVATE net vir die skepper
+        // (en 'n toegewysde fotograaf). ADMIN sien nie ander se privaat geleenthede nie.
+        const allowed = visibleAttendanceRoles(viewerRole);
+        const visibility: FilterQuery<EventDocument>[] = [
+            { intendedAttendance: { $in: allowed } },
+            { intendedAttendance: PRIVATE_ATTENDANCE, createdBy: new Types.ObjectId(viewerId) },
+        ];
+        if (viewerRole === Role.PHOTOGRAPHER) {
+            visibility.push({ photographers: new Types.ObjectId(viewerId) });
         }
-
-        // Rol-gebaseerde sigbaarheid: 'n gebruiker sien geleenthede op sy vlak en laer.
-        // ADMIN sien alles, PHOTOGRAPHER(vlak 2) sien ook waar hy toegewys is.
-        if (viewerRole !== Role.ADMIN) {
-            const allowed = visibleAttendanceRoles(viewerRole);
-            if (viewerRole === Role.PHOTOGRAPHER) {
-                filter.$or = [
-                    { intendedAttendance: { $in: allowed } },
-                    { photographers: new Types.ObjectId(viewerId) },
-                ];
-            } else {
-                filter.intendedAttendance = { $in: allowed };
-            }
-        }
+        filter.$or = visibility;
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
+    }
+
+    // Interne aanroep (bv. analytics/LSTM) — geen sig-filter, sien alle geleenthede
+    async findAllUnfiltered(from?: string, to?: string): Promise<EventDocument[]> {
+        return this.eventModel.find(this.dateRangeFilter(from, to)).sort({ date: 1 }).exec();
+    }
+
+    private dateRangeFilter(from?: string, to?: string): FilterQuery<EventDocument> {
+        if (!from && !to) return {};
+        const date: { $gte?: Date; $lte?: Date } = {};
+        if (from) date.$gte = new Date(from);
+        if (to)   date.$lte = new Date(to);
+        return { date };
     }
 
     async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {
@@ -82,8 +87,17 @@ export class EventsService {
     }
 
     private canView(event: EventDocument, viewerRole: Role, viewerId?: string): boolean {
+        // Privaat: net die skepper (en 'n toegewysde fotograaf)
+        if (event.intendedAttendance === PRIVATE_ATTENDANCE) {
+            if (viewerId && event.createdBy.toString() === viewerId) return true;
+            if (viewerRole === Role.PHOTOGRAPHER && viewerId) {
+                return event.photographers.some((p) => p.toString() === viewerId);
+            }
+            return false;
+        }
+        // Nie-privaat: rol-hierargie
         if (viewerRole === Role.ADMIN) return true;
-        if (visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance)) return true;
+        if (visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance as Role)) return true;
         if (viewerRole === Role.PHOTOGRAPHER && viewerId) {
             return event.photographers.some((p) => p.toString() === viewerId);
         }

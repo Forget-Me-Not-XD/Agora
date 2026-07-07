@@ -8,6 +8,8 @@ import { useCurrentUser } from '@/components/UserContext';
 import { canCreateEvents } from '@/lib/rbac';
 import { createEventAction } from '@/lib/actions/event.actions';
 import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
+import { ATTENDANCE_COLORS } from '@/lib/event-view';
+import InfoModal from '@/components/InfoModal';
 import EventPredictionPanel from '@/components/EventPredictionPanel';
 
 const STUDY_CENTERS = [
@@ -28,7 +30,6 @@ export default function CreateEventPage() {
         date: '',
         time: '',
         location: '',
-        type: 'public',
         intendedAttendance: 'GAS',
         capacity: '',
         budget: '',
@@ -203,42 +204,49 @@ export default function CreateEventPage() {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                                Tipe
-                            </label>
-                            <select
-                                value={formData.type}
-                                onChange={(e) => handleChange('type', e.target.value)}
-                                className={inputClass('type')}
-                            >
-                                <option value="public">Publiek</option>
-                                <option value="internal_student">Intern - Student</option>
-                                <option value="private">Privaat</option>
-                                <option value="department">Departement</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                                Studiesentrum
-                            </label>
-                            <select
-                                value={formData.studyCenter}
-                                onChange={(e) => handleChange('studyCenter', e.target.value)}
-                                className={inputClass('studyCenter')}
-                            >
-                                {STUDY_CENTERS.map((c) => (
-                                    <option key={c} value={c}>{c}</option>
-                                ))}
-                            </select>
-                        </div>
+                    <div>
+                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                            Studiesentrum
+                        </label>
+                        <select
+                            value={formData.studyCenter}
+                            onChange={(e) => handleChange('studyCenter', e.target.value)}
+                            className={inputClass('studyCenter')}
+                        >
+                            {STUDY_CENTERS.map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Sigbaarheid (wie kan dit sien)
-                        </label>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                            <label className="text-xs font-medium text-[var(--color-text-subtle)]">
+                                Sigbaarheid (wie kan dit sien)
+                            </label>
+                            <InfoModal title="Sigbaarheid">
+                                <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+                                    Die sigbaarheid bepaal wie die geleentheid kan sien en bywoon.
+                                </p>
+                                <div className="space-y-2">
+                                    {ATTENDANCE_OPTIONS.map((o) => (
+                                        <div
+                                            key={o.value}
+                                            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
+                                        >
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ATTENDANCE_COLORS[o.value]}`}>
+                                                    {o.label}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
+                                                {o.desc}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </InfoModal>
+                        </div>
                         <select
                             value={formData.intendedAttendance}
                             onChange={(e) => handleChange('intendedAttendance', e.target.value)}

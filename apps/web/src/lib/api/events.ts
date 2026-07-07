@@ -4,8 +4,6 @@ import type { AttendanceRole } from '../attendance';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-export type EventType = 'public' | 'internal_student' | 'private' | 'department';
-
 export interface Event {
     id:                       string;
     title:                    string;
@@ -20,7 +18,6 @@ export interface Event {
     photographerInstructions: string;
     confirmedAttendees:       number;
     intendedAttendance:       AttendanceRole;
-    type:                     EventType;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -36,7 +33,6 @@ export interface CreateEventPayload {
     intendedAttendance?:       AttendanceRole;
     photographers?:            string[];
     photographerInstructions?: string;
-    type?:                     EventType;
 }
 
 export interface EventFilters {

@@ -1,17 +1,17 @@
-import type { Event, EventType } from '@/lib/api/events';
+import type { Event } from '@/lib/api/events';
+import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
 
-export const TYPE_LABELS: Record<EventType, string> = {
-    public:           'Publiek',
-    internal_student: 'Intern - Student',
-    private:          'Privaat',
-    department:       'Departement',
-};
+// Kort etikette
+export const ATTENDANCE_LABELS = Object.fromEntries(
+    ATTENDANCE_OPTIONS.map((o) => [o.value, o.label]),
+) as Record<AttendanceRole, string>;
 
-export const TYPE_COLORS: Record<EventType, string> = {
-    public:           'bg-cyan-600 text-white dark:bg-cyan-500',
-    internal_student: 'bg-violet-600 text-white dark:bg-violet-500',
-    private:          'bg-amber-500 text-white dark:bg-amber-500',
-    department:       'bg-indigo-600 text-white dark:bg-indigo-500',
+export const ATTENDANCE_COLORS: Record<AttendanceRole, string> = {
+    GAS:     'bg-cyan-600 text-white dark:bg-cyan-500',      // Publiek
+    STUDENT: 'bg-violet-600 text-white dark:bg-violet-500',
+    PRIVATE: 'bg-amber-500 text-white dark:bg-amber-500',
+    DOSENT:  'bg-indigo-600 text-white dark:bg-indigo-500',
+    ADMIN:   'bg-rose-600 text-white dark:bg-rose-500',
 };
 
 export type EventStatus = 'upcoming' | 'ongoing' | 'past' | 'cancelled';

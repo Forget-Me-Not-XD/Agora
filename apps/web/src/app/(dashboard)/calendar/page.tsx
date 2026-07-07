@@ -5,8 +5,8 @@ import { ChevronLeft, ChevronRight, X, Calendar, MapPin, Users, Clock } from 'lu
 import { listEventsAction } from '@/lib/actions/event.actions';
 import type { Event } from '@/lib/api/events';
 import {
-    TYPE_COLORS,
-    TYPE_LABELS,
+    ATTENDANCE_COLORS,
+    ATTENDANCE_LABELS,
     STATUS_COLORS,
     STATUS_LABELS,
     deriveStatus,
@@ -173,7 +173,7 @@ export default function CalendarPage() {
                                                     onClick={() => setSelectedEvent(event)}
                                                     className={[
                                                         'w-full text-left text-[10px] font-semibold px-1.5 py-0.5 rounded truncate block',
-                                                        TYPE_COLORS[event.type],
+                                                        ATTENDANCE_COLORS[event.intendedAttendance],
                                                         'hover:opacity-80 transition-opacity',
                                                     ].join(' ')}
                                                 >
@@ -197,10 +197,11 @@ export default function CalendarPage() {
             {/* Legend */}
             <div className="flex flex-wrap gap-4">
                 {[
-                    { color: 'bg-cyan-600', label: TYPE_LABELS.public },
-                    { color: 'bg-violet-600', label: TYPE_LABELS.internal_student },
-                    { color: 'bg-amber-500', label: TYPE_LABELS.private },
-                    { color: 'bg-indigo-600', label: TYPE_LABELS.department },
+                    { color: ATTENDANCE_COLORS.GAS,     label: ATTENDANCE_LABELS.GAS },
+                    { color: ATTENDANCE_COLORS.STUDENT, label: ATTENDANCE_LABELS.STUDENT },
+                    { color: ATTENDANCE_COLORS.PRIVATE, label: ATTENDANCE_LABELS.PRIVATE },
+                    { color: ATTENDANCE_COLORS.DOSENT,  label: ATTENDANCE_LABELS.DOSENT },
+                    { color: ATTENDANCE_COLORS.ADMIN,   label: ATTENDANCE_LABELS.ADMIN },
                 ].map((item) => (
                     <span key={item.label} className="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
                         <span className={`w-2.5 h-2.5 rounded-sm ${item.color} shrink-0`} />
@@ -240,8 +241,8 @@ export default function CalendarPage() {
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[deriveStatus(selectedEvent)]}`}>
                                     {STATUS_LABELS[deriveStatus(selectedEvent)]}
                                 </span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[selectedEvent.type]}`}>
-                                    {TYPE_LABELS[selectedEvent.type]}
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ATTENDANCE_COLORS[selectedEvent.intendedAttendance]}`}>
+                                    {ATTENDANCE_LABELS[selectedEvent.intendedAttendance]}
                                 </span>
                             </div>
 
