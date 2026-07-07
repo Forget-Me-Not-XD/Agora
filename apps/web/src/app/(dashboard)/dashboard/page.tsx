@@ -191,7 +191,7 @@ function EventsPreviewSkeleton() {
 
 // Haal die rol-sigbare geleenthede en wys die eerste 6
 async function EventsPreview() {
-    const events = await getEvents().catch(() => null);
+    const events = await getEvents({ from: new Date().toISOString() }).catch(() => null);
 
     if (!events || events.length === 0) {
         return (

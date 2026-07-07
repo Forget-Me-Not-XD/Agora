@@ -44,6 +44,13 @@ export interface MockCheckIn {
   checkedInAt: string;
 }
 
+// Genereer 'n datumstring relatief tot vandag, sodat mock geleentheid altyd "opkomend" bly wanneer die app loop
+function daysFromNow(offset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);    //'YYYY'-'MM'-'DD'
+}
+
 export const MOCK_EVENTS: MockEvent[] = [
   {
     id: 'event-1',
