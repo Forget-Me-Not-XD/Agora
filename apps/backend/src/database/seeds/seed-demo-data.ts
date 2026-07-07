@@ -226,6 +226,7 @@ function makeUser(opts: {
     role: string;
     title?: string;
     createdDaysAgo?: number;
+    isActive?: boolean;          // add this line
 }): SeedUser {
     const createdAt = new Date(Date.now() - (opts.createdDaysAgo ?? randInt(30, 900)) * 86_400_000);
     return {
@@ -236,7 +237,7 @@ function makeUser(opts: {
         passwordHash: opts.passwordHash,
         role: opts.role,
         studyCenter: pick(STUDY_CENTERS),
-        isActive: Math.random() > 0.05, // ~95% active, a few inactive for realism
+        isActive: opts.isActive ?? Math.random() > 0.05,   
         failedLoginAttempts: Math.random() > 0.85 ? randInt(1, 3) : 0,
         lockedUntil: null,
         title: opts.title ?? '',
@@ -244,6 +245,7 @@ function makeUser(opts: {
         updatedAt: createdAt,
     };
 }
+
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
