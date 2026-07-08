@@ -1,13 +1,5 @@
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -15,9 +7,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { MOCK_EVENTS } from '../lib/mock-data';
+import { listEvents, type EventResponse } from '../api/events';
+import { getPrediction, type PredictionResult } from '../api/analytics';
+import { formatEventTime } from '../lib/event-status';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+// Hoeveel aankomende funksies se voorspellings ons op skerm-oop haal --
+// elkeen is 'n aparte model-inferensie, so ons beperk dit tot 'n redelike getal.
+const MAX_FORECASTS = 10;
 
 interface MetricInfo {
   key: string;
@@ -65,6 +63,11 @@ const LSTM_METRICS: MetricInfo[] = [
   },
 ];
 
+interface Forecast {
+  event: EventResponse;
+  prediction: PredictionResult | null;
+}
+
 export function AiScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
@@ -72,9 +75,33 @@ export function AiScreen() {
   const styles = makeStyles(colors);
 
   const [selectedMetric, setSelectedMetric] = useState<MetricInfo | null>(null);
+  const [forecasts, setForecasts] = useState<Forecast[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const role = user?.role ?? 'STUDENT';
   const canViewAi = role === 'ADMIN' || role === 'DOSENT';
+
+  useEffect(() => {
+    if (!canViewAi) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const upcoming = (await listEvents(new Date().toISOString())).slice(0, MAX_FORECASTS);
+        const results = await Promise.allSettled(upcoming.map((e) => getPrediction(e.id)));
+        if (!active) return;
+        setForecasts(
+          upcoming.map((event, i) => ({
+            event,
+            prediction: results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<PredictionResult>).value : null,
+          })),
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [canViewAi]);
 
   if (!canViewAi) {
     return (
@@ -93,10 +120,6 @@ export function AiScreen() {
       </SafeAreaView>
     );
   }
-
-  const upcomingWithForecast = MOCK_EVENTS.filter(
-    (e) => e.status === 'upcoming' || e.status === 'ongoing',
-  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -153,19 +176,20 @@ export function AiScreen() {
 
         {/* ── Forecast per event ── */}
         <Text style={styles.sectionTitle}>VOORSPELLINGS PER FUNKSIE</Text>
-        {upcomingWithForecast.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyCard}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : forecasts.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>Geen aankomende funksies met voorspellings nie.</Text>
           </View>
         ) : (
-          upcomingWithForecast.map((event) => {
-            const fillPct = Math.min(
-              Math.round((event.forecast / event.capacity) * 100),
-              100,
-            );
-            const confidence = event.forecastConfidence;
-            const confidenceColor =
-              confidence >= 85 ? '#10B981' : confidence >= 70 ? '#F59E0B' : '#EF4444';
+          forecasts.map(({ event, prediction }) => {
+            const fillPct = event.maxCapacity > 0
+              ? Math.min(Math.round((event.confirmedAttendees / event.maxCapacity) * 100), 100)
+              : 0;
+            const predictedPct = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
 
             return (
               <TouchableOpacity
@@ -173,52 +197,48 @@ export function AiScreen() {
                 style={styles.forecastCard}
                 onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
                 activeOpacity={0.75}
-                accessibilityLabel={`${event.title} voorspelling: ${event.forecast} gaste`}
+                accessibilityLabel={`${event.title} voorspelling`}
               >
                 <View style={styles.forecastTop}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.forecastTitle} numberOfLines={1}>{event.title}</Text>
-                    <Text style={styles.forecastMeta}>{event.location} · {event.time}</Text>
-                  </View>
-                  <View style={[styles.confidencePill, { backgroundColor: `${confidenceColor}22` }]}>
-                    <Text style={[styles.confidenceText, { color: confidenceColor }]}>
-                      {confidence}% vertroue
-                    </Text>
+                    <Text style={styles.forecastMeta}>{event.location} · {formatEventTime(event.date)}</Text>
                   </View>
                 </View>
 
-                <View style={styles.forecastNumbers}>
-                  <View style={styles.forecastNum}>
-                    <Text style={[styles.forecastNumVal, { color: colors.primary }]}>{event.forecast}</Text>
-                    <Text style={styles.forecastNumLbl}>Verwag</Text>
-                  </View>
-                  <View style={styles.forecastRange}>
-                    <Text style={styles.forecastRangeVal}>
-                      {event.forecastLow} – {event.forecastHigh}
-                    </Text>
-                    <Text style={styles.forecastRangeLbl}>Reeks (95% CI)</Text>
-                  </View>
-                  <View style={styles.forecastNum}>
-                    <Text style={[styles.forecastNumVal, { color: colors.textSubtle }]}>
-                      {event.registered}
-                    </Text>
-                    <Text style={styles.forecastNumLbl}>RSVPs</Text>
-                  </View>
-                </View>
+                {prediction ? (
+                  <>
+                    <View style={styles.forecastNumbers}>
+                      <View style={styles.forecastNum}>
+                        <Text style={[styles.forecastNumVal, { color: colors.primary }]}>
+                          {prediction.estimatedAttendees}
+                        </Text>
+                        <Text style={styles.forecastNumLbl}>Verwag</Text>
+                      </View>
+                      <View style={styles.forecastNum}>
+                        <Text style={styles.forecastNumVal}>{predictedPct}%</Text>
+                        <Text style={styles.forecastNumLbl}>Vulkoers</Text>
+                      </View>
+                      <View style={styles.forecastNum}>
+                        <Text style={[styles.forecastNumVal, { color: colors.textSubtle }]}>
+                          {Math.round(prediction.predictedNoShowRate * 100)}%
+                        </Text>
+                        <Text style={styles.forecastNumLbl}>No-show</Text>
+                      </View>
+                    </View>
 
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${fillPct}%` as any }]} />
-                  {/* Registered marker */}
-                  <View style={[
-                    styles.registeredMarker,
-                    {
-                      left: `${Math.min(Math.round((event.registered / event.capacity) * 100), 100)}%` as any,
-                    },
-                  ]} />
-                </View>
-                <Text style={styles.progressCaption}>
-                  {event.forecastLow}–{event.forecastHigh} verwag van {event.capacity} kapasiteit
-                </Text>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${predictedPct}%` as any }]} />
+                      {/* Werklike bygewoon-merker */}
+                      <View style={[styles.registeredMarker, { left: `${fillPct}%` as any }]} />
+                    </View>
+                    <Text style={styles.progressCaption}>
+                      {prediction.estimatedAttendees} verwag van {event.maxCapacity} kapasiteit
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.emptyText}>Voorspelling nie beskikbaar vir hierdie funksie nie.</Text>
+                )}
               </TouchableOpacity>
             );
           })
@@ -423,23 +443,14 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     forecastTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
     forecastMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
-    confidencePill: {
-      borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    confidenceText: { fontSize: 10, fontWeight: '800' },
 
     forecastNumbers: {
       flexDirection: 'row',
       alignItems: 'center',
     },
     forecastNum: { flex: 1, alignItems: 'center' },
-    forecastNumVal: { fontSize: 20, fontWeight: '900' },
+    forecastNumVal: { fontSize: 20, fontWeight: '900', color: colors.text },
     forecastNumLbl: { fontSize: 10, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
-    forecastRange: { flex: 1.5, alignItems: 'center' },
-    forecastRangeVal: { fontSize: 13, fontWeight: '900', color: colors.text },
-    forecastRangeLbl: { fontSize: 9, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
 
     progressTrack: {
       height: 8,

@@ -7,9 +7,9 @@ export interface EventResponse {
   title: string;
   description: string;
   date: string;
-  enDate?: string;
+  endDate?: string;
   location: string;
-  maxCapacity: string;
+  maxCapacity: number;
   budget: number;
   createdBy: string;
   photographers: string[];
@@ -27,10 +27,10 @@ export interface CreateEventPayload {
   date: string;
   endDate?: string;
   location: string;
-  maxCapacity: string;
+  maxCapacity: number;
   budget?: number;
   photographers?: string[];
-  photographerInstructions: string;
+  photographerInstructions?: string;
   intendedAttendance?: 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS';
   type?: EventType;
 }
@@ -47,7 +47,7 @@ export async function listEvents(from?: string, to?: string): Promise <EventResp
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   const query = params.toString() ? `?${params.toString()}` : '';
-  return apiClient.get<EventResponse[]>('/events/${id');
+  return apiClient.get<EventResponse[]>(`/events${query}`);
 }
 
 export async function getEvent(id: string): Promise<EventResponse> {
@@ -66,6 +66,6 @@ export async function deleteEvent(id: string): Promise <void> {
   return apiClient.delete<void>(`/events/${id}`);
 }
 
-export async function assignPhotographer(id: string, paylaod: AssignPhotographerPayload): Promise <EventResponse> {
-  return apiClient.patch<EventResponse, AssignPhotographerPayload>(`/events/${id}/assign-photograhper`, paylaod);
+export async function assignPhotographer(id: string, payload: AssignPhotographerPayload): Promise <EventResponse> {
+  return apiClient.patch<EventResponse, AssignPhotographerPayload>(`/events/${id}/assign-photographer`, payload);
 }

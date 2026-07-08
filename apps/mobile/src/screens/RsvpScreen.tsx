@@ -16,13 +16,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import {
-  MOCK_EVENTS,
-  STATUS_LABELS,
-  MONTHS_SHORT_AF,
-  type EventStatus,
-} from '../lib/mock-data';
-import { canManageCheckIns, filterEventsForUser } from '../lib/rbac';
+import { listEvents, type EventResponse } from '../api/events';
+import { getEventStatus, STATUS_LABELS, MONTHS_SHORT_AF, type EventStatus } from '../lib/event-status';
+import { canManageCheckIns } from '../lib/rbac';
 import {
   getMyRsvps,
   cancelRsvp,
@@ -40,10 +36,9 @@ const RSVP_STATUS_CONFIG: Record<RsvpStatus, { label: string; bg: string; text: 
 };
 
 const EVENT_STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:   { bg: '#D1FAE5', text: '#065F46' },
-  past:      { bg: '#F3F4F6', text: '#4B5563' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B' },
+  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
+  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
+  past:     { bg: '#F3F4F6', text: '#4B5563' },
 };
 
 export function RsvpScreen() {
@@ -55,12 +50,15 @@ export function RsvpScreen() {
   const role = user?.role ?? 'STUDENT';
   const isManager = canManageCheckIns(role);
 
-  const[filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
+  const [filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
 
   // my rsvps (student/gas)
   const [rsvps, setRsvps] = useState<RsvpWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // manager oorsig (dosent/admin)
+  const [events, setEvents] = useState<EventResponse[]>([]);
 
   // QR per inskrywing
   const [openQrId, setOpenQrId] = useState<string | null>(null);
@@ -70,16 +68,20 @@ export function RsvpScreen() {
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isManager) return;        // manager-aansig gebruik nog die oorsig
     let active = true;
     (async () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await getMyRsvps();
-        if (active) setRsvps(data);
+        if (isManager) {
+          const data = await listEvents();
+          if (active) setEvents(data);
+        } else {
+          const data = await getMyRsvps();
+          if (active) setRsvps(data);
+        }
       } catch {
-        if (active) setLoadError('Kon nie jou RSVPs laai nie.');
+        if (active) setLoadError(isManager ? 'Kon nie funksies laai nie.' : 'Kon nie jou RSVPs laai nie.');
       } finally {
         if (active) setLoading(false);
       }
@@ -125,7 +127,7 @@ export function RsvpScreen() {
               await cancelRsvp(rsvpId);
               setRsvps((prev) =>
                 prev.map((r) =>
-                  r._id === rsvpId ? { ...r, status: 'GEKANSeLLEER' as RsvpStatus} : r,
+                  r._id === rsvpId ? { ...r, status: 'GEKANSELLEER' as RsvpStatus } : r,
                 ),
               );
             } catch {
@@ -153,97 +155,110 @@ export function RsvpScreen() {
           <Text style={styles.pageSubtitle}>Bestuur alle inskrywings</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {MOCK_EVENTS.map((event) => {
-            const fillPct = Math.round((event.registered / event.capacity) * 100);
-            const badge = EVENT_STATUS_BADGE[event.status];
-            const [, m, d] = event.date.split('-').map(Number);
-            return (
-              <TouchableOpacity
-                key={event.id}
-                style={styles.managerCard}
-                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                activeOpacity={0.75}
-                accessibilityLabel={`${event.title} RSVP besonderhede`}
-              >
-                <View style={styles.managerCardTop}>
-                  <View style={styles.managerDateBadge}>
-                    <Text style={styles.managerDay}>{d}</Text>
-                    <Text style={styles.managerMonth}>{MONTHS_SHORT_AF[m - 1]}</Text>
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Feather name="alert-circle" size={32} color={colors.red} />
+            <Text style={styles.emptyTitle}>{loadError}</Text>
+          </View>
+        ) : events.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="calendar" size={32} color={colors.textSubtle} />
+            <Text style={styles.emptyTitle}>Geen funksies nie</Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+            {events.map((event) => {
+              const fillPct = event.maxCapacity > 0
+                ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
+                : 0;
+              const status = getEventStatus(event);
+              const badge = EVENT_STATUS_BADGE[status];
+              const { day, month } = formatDate(event.date);
+              return (
+                <TouchableOpacity
+                  key={event.id}
+                  style={styles.managerCard}
+                  onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+                  activeOpacity={0.75}
+                  accessibilityLabel={`${event.title} RSVP besonderhede`}
+                >
+                  <View style={styles.managerCardTop}>
+                    <View style={styles.managerDateBadge}>
+                      <Text style={styles.managerDay}>{day}</Text>
+                      <Text style={styles.managerMonth}>{month}</Text>
+                    </View>
+                    <View style={styles.managerInfo}>
+                      <Text style={styles.managerTitle} numberOfLines={1}>{event.title}</Text>
+                      <Text style={styles.managerMeta}>{event.location}</Text>
+                    </View>
+                    <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
+                      <Text style={[styles.statusPillText, { color: badge.text }]}>
+                        {STATUS_LABELS[status]}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.managerInfo}>
-                    <Text style={styles.managerTitle} numberOfLines={1}>{event.title}</Text>
-                    <Text style={styles.managerMeta}>{event.time} · {event.location}</Text>
-                  </View>
-                  <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
-                    <Text style={[styles.statusPillText, { color: badge.text }]}>
-                      {STATUS_LABELS[event.status]}
-                    </Text>
-                  </View>
-                </View>
 
-                <View style={styles.managerStats}>
-                  <View style={styles.managerStat}>
-                    <Text style={[styles.managerStatVal, { color: colors.primary }]}>
-                      {event.registered}
-                    </Text>
-                    <Text style={styles.managerStatLbl}>RSVPs</Text>
+                  <View style={styles.managerStats}>
+                    <View style={styles.managerStat}>
+                      <Text style={[styles.managerStatVal, { color: colors.primary }]}>
+                        {event.confirmedAttendees}
+                      </Text>
+                      <Text style={styles.managerStatLbl}>Bygewoon</Text>
+                    </View>
+                    <View style={styles.managerStat}>
+                      <Text style={styles.managerStatVal}>
+                        {event.maxCapacity}
+                      </Text>
+                      <Text style={styles.managerStatLbl}>Kapasiteit</Text>
+                    </View>
+                    <View style={styles.managerStat}>
+                      <Text style={styles.managerStatVal}>{fillPct}%</Text>
+                      <Text style={styles.managerStatLbl}>Vol</Text>
+                    </View>
                   </View>
-                  <View style={styles.managerStat}>
-                    <Text style={[styles.managerStatVal, { color: colors.textSubtle }]}>
-                      ~{event.forecast}
-                    </Text>
-                    <Text style={styles.managerStatLbl}>Voorspel</Text>
-                  </View>
-                  <View style={styles.managerStat}>
-                    <Text style={[styles.managerStatVal, { color: '#F59E0B' }]}>
-                      {event.noShows}
-                    </Text>
-                    <Text style={styles.managerStatLbl}>No-shows</Text>
-                  </View>
-                  <View style={styles.managerStat}>
-                    <Text style={styles.managerStatVal}>{fillPct}%</Text>
-                    <Text style={styles.managerStatLbl}>Vol</Text>
-                  </View>
-                </View>
 
-                <View style={styles.progressTrack}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${fillPct}%` as any,
-                        backgroundColor:
-                          fillPct >= 90 ? '#EF4444' : fillPct >= 70 ? '#F59E0B' : colors.primary,
-                      },
-                    ]}
-                  />
-                </View>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${Math.min(fillPct, 100)}%` as any,
+                          backgroundColor:
+                            fillPct >= 90 ? '#EF4444' : fillPct >= 70 ? '#F59E0B' : colors.primary,
+                        },
+                      ]}
+                    />
+                  </View>
 
-                <View style={styles.managerActions}>
-                  <TouchableOpacity
-                    style={styles.actionBtn}
-                    onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                    accessibilityLabel={`Bestuur RSVPs vir ${event.title}`}
-                  >
-                    <Feather name="users" size={13} color={colors.primary} />
-                    <Text style={styles.actionBtnText}>Bestuur RSVPs</Text>
-                  </TouchableOpacity>
-                  {event.status === 'upcoming' || event.status === 'ongoing' ? (
+                  <View style={styles.managerActions}>
                     <TouchableOpacity
                       style={styles.actionBtn}
-                      onPress={() => navigation.navigate('QrScanner', { eventId: event.id })}
-                      accessibilityLabel={`QR skandeerder vir ${event.title}`}
+                      onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+                      accessibilityLabel={`Bestuur RSVPs vir ${event.title}`}
                     >
-                      <Feather name="maximize" size={13} color={colors.primary} />
-                      <Text style={styles.actionBtnText}>QR Skandeer</Text>
+                      <Feather name="users" size={13} color={colors.primary} />
+                      <Text style={styles.actionBtnText}>Bestuur RSVPs</Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                    {status === 'upcoming' || status === 'ongoing' ? (
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => navigation.navigate('QrScanner', { eventId: event.id })}
+                        accessibilityLabel={`QR skandeerder vir ${event.title}`}
+                      >
+                        <Feather name="maximize" size={13} color={colors.primary} />
+                        <Text style={styles.actionBtnText}>QR Skandeer</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
       </SafeAreaView>
     );
   }
@@ -333,18 +348,18 @@ export function RsvpScreen() {
                 </View>
 
                 {showQr && (
-                  <view style={styles.qrBox}>
+                  <View style={styles.qrBox}>
                     {qrLoadingId === _id ? (
                       <ActivityIndicator color={colors.primary} />
                     ) : qrUriById[_id] ? (
                       <Image
-                        source={{uri: qrUriById[_id] }}
+                        source={{ uri: qrUriById[_id] }}
                         style={styles.qrImage}
                         resizeMode="contain"
                         accessibilityLabel="Jou QR-kode"
                       />
                     ) : null}
-                  </view>
+                  </View>
                 )}
 
                 <View style={styles.rsvpActions}>
@@ -360,7 +375,7 @@ export function RsvpScreen() {
                   {status !== 'GEKANSELLEER' && (
                     <TouchableOpacity
                       style={styles.cancelBtn}
-                      onPress={() => handleCancelRsvp(_id,event.title)}
+                      onPress={() => handleCancelRsvp(_id, event.title)}
                       disabled={cancelingId === _id}
                       accessibilityLabel={`Kanselleer RSVP vir ${event.title}`}
                     >
@@ -482,7 +497,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    qrBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary},
+    qrBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary },
     qrBox: {
       alignSelf: 'center',
       width: 200,

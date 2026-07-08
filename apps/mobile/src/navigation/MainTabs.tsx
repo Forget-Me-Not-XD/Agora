@@ -7,6 +7,7 @@ import { EventsScreen } from '../screens/EventsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { RsvpScreen } from '../screens/RsvpScreen';
 import { AiScreen } from '../screens/AiScreen';
+import { BudgetScreen } from '../screens/BudgetScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { useEffect } from 'react';
 import { canViewNotifications } from '../lib/rbac';
@@ -18,6 +19,7 @@ export type MainTabParamList = {
   Calendar: undefined;
   Rsvp: undefined;
   Ai: undefined;
+  Budget: undefined;
   Notifications: undefined;
 };
 
@@ -97,6 +99,16 @@ export function MainTabs() {
           options={{
             title: 'KI',
             tabBarIcon: ({ color, size }) => <Feather name="cpu" color={color} size={size ?? 20} />,
+          }}
+        />
+      )}
+      {user?.role === 'ADMIN' && (
+        <Tab.Screen
+          name="Budget"
+          component={BudgetScreen}
+          options={{
+            title: 'Begroting',
+            tabBarIcon: ({ color, size }) => <Feather name="dollar-sign" color={color} size={size ?? 20} />,
           }}
         />
       )}

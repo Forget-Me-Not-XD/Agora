@@ -1,5 +1,4 @@
-import type { MockEvent, EventStatus } from './mock-data';
-import type { UserRole } from './mock-data';
+export type UserRole = 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS' | 'PHOTOGRAPHER';
 
 export function canCreateEvents(role: UserRole): boolean {
   return role === 'DOSENT' || role === 'ADMIN';
@@ -27,46 +26,6 @@ export function canRsvpToEvent(role: UserRole): boolean {
 
 export function canViewNotifications(role: UserRole): boolean {
   return role === 'PHOTOGRAPHER';
-}
-
-function isActiveStatus(status: EventStatus): boolean {
-  return status === 'upcoming' || status === 'ongoing';
-}
-
-export function filterEventsForUser(
-  events: MockEvent[],
-  userId: string,
-  role: UserRole,
-): MockEvent[] {
-  switch (role) {
-    case 'ADMIN':
-      return events;
-
-    case 'DOSENT':
-      return events.filter(
-        (e) => isActiveStatus(e.status) || e.createdBy === userId,
-      );
-
-    case 'STUDENT':
-      return events.filter((e) => {
-        const active = isActiveStatus(e.status);
-        const visible =
-          e.type === 'public' ||
-          e.type === 'internal_student' ||
-          e.invitedUsers.includes(userId);
-        return active && visible;
-      });
-
-    case 'GAS':
-      return events.filter((e) => {
-        const active = isActiveStatus(e.status);
-        const visible = e.type === 'public' || e.invitedUsers.includes(userId);
-        return active && visible;
-      });
-
-    default:
-      return [];
-  }
 }
 
 export function getRoleLabel(role: UserRole): string {

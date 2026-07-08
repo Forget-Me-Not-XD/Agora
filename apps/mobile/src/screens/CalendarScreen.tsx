@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -13,15 +14,15 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { listEvents, type EventResponse } from '../api/events';
 import {
-  MOCK_EVENTS,
+  getEventStatus,
+  STATUS_LABELS,
   MONTHS_AF,
   MONTHS_SHORT_AF,
-  STATUS_LABELS,
-  type MockEvent,
+  formatEventTime,
   type EventStatus,
-} from '../lib/mock-data';
-import { filterEventsForUser } from '../lib/rbac';
+} from '../lib/event-status';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,11 +38,16 @@ const EVENT_DOT_COLORS: Record<string, string> = {
 };
 
 const STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:   { bg: '#D1FAE5', text: '#065F46' },
-  past:      { bg: '#F3F4F6', text: '#4B5563' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B' },
+  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
+  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
+  past:     { bg: '#F3F4F6', text: '#4B5563' },
 };
+
+// Plaaslike (nie-UTC) datumsleutel, om tydsone-skuiwe te vermy
+function dateKeyFromIso(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function CalendarScreen() {
   const navigation = useNavigation<Nav>();
@@ -55,22 +61,37 @@ export function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('maand');
 
-  const role = user?.role ?? 'STUDENT';
-  const userId = user?.id ?? '';
+  const [events, setEvents] = useState<EventResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const visibleEvents = useMemo(
-    () => filterEventsForUser(MOCK_EVENTS, userId, role),
-    [userId, role],
-  );
+  // Rol-gebaseerde sigbaarheid word reeds backend-kant afgedwing.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const result = await listEvents();
+        if (active) setEvents(result);
+      } catch {
+        if (active) setLoadError('Kon nie funksies laai nie.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const eventsByDate = useMemo(() => {
-    const map: Record<string, MockEvent[]> = {};
-    for (const e of visibleEvents) {
-      if (!map[e.date]) map[e.date] = [];
-      map[e.date].push(e);
+    const map: Record<string, EventResponse[]> = {};
+    for (const e of events) {
+      const key = dateKeyFromIso(e.date);
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
     }
     return map;
-  }, [visibleEvents]);
+  }, [events]);
 
   const todayKey = toDateKey(today.getFullYear(), today.getMonth() + 1, today.getDate());
 
@@ -104,8 +125,11 @@ export function CalendarScreen() {
 
   // Upcoming events sorted for agenda view
   const upcomingEvents = useMemo(
-    () => [...visibleEvents].sort((a, b) => a.date.localeCompare(b.date)),
-    [visibleEvents],
+    () => events
+      .filter((e) => getEventStatus(e) === 'upcoming' || getEventStatus(e) === 'ongoing')
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [events],
   );
 
   return (
@@ -138,6 +162,16 @@ export function CalendarScreen() {
         ))}
       </View>
 
+      {loading ? (
+        <View style={styles.centerFill}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : loadError ? (
+        <View style={styles.centerFill}>
+          <Feather name="alert-circle" size={28} color={colors.textSubtle} />
+          <Text style={styles.emptyAgendaText}>{loadError}</Text>
+        </View>
+      ) : (
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {viewMode === 'maand' ? (
           <>
@@ -290,6 +324,7 @@ export function CalendarScreen() {
           </>
         )}
       </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -301,7 +336,7 @@ function DayEventCard({
   styles,
   onOpen,
 }: {
-  event: MockEvent;
+  event: EventResponse;
   colors: ReturnType<typeof useThemeColors>;
   styles: ReturnType<typeof makeStyles>;
   onOpen: () => void;
@@ -312,7 +347,7 @@ function DayEventCard({
       <View style={styles.dayEventContent}>
         <Text style={styles.dayEventTitle}>{event.title}</Text>
         <Text style={styles.dayEventMeta}>
-          {event.time} · {event.location} · {event.registered} RSVPs · ~{event.forecast} voorspel
+          {formatEventTime(event.date)} · {event.location} · {event.confirmedAttendees} / {event.maxCapacity}
         </Text>
         <TouchableOpacity style={styles.openBtn} onPress={onOpen} accessibilityLabel={`Maak ${event.title} oop`}>
           <Text style={styles.openBtnText}>Maak oop</Text>
@@ -330,36 +365,36 @@ function AgendaEventCard({
   styles,
   onOpen,
 }: {
-  event: MockEvent;
+  event: EventResponse;
   colors: ReturnType<typeof useThemeColors>;
   styles: ReturnType<typeof makeStyles>;
   onOpen: () => void;
 }) {
-  const [, m, d] = event.date.split('-').map(Number);
-  const badge = STATUS_BADGE[event.status];
+  const d = new Date(event.date);
+  const status = getEventStatus(event);
+  const badge = STATUS_BADGE[status];
   return (
     <TouchableOpacity
       style={styles.agendaCard}
       onPress={onOpen}
       activeOpacity={0.75}
-      accessibilityLabel={`${event.title}, ${d} ${MONTHS_SHORT_AF[m - 1]}`}
+      accessibilityLabel={`${event.title}, ${d.getDate()} ${MONTHS_SHORT_AF[d.getMonth()]}`}
     >
       <View style={styles.agendaDateCol}>
-        <Text style={styles.agendaDay}>{d}</Text>
-        <Text style={styles.agendaMonth}>{MONTHS_SHORT_AF[m - 1]}</Text>
+        <Text style={styles.agendaDay}>{d.getDate()}</Text>
+        <Text style={styles.agendaMonth}>{MONTHS_SHORT_AF[d.getMonth()]}</Text>
       </View>
       <View style={[styles.agendaAccent, { backgroundColor: EVENT_DOT_COLORS[event.type] ?? colors.primary }]} />
       <View style={styles.agendaInfo}>
         <Text style={styles.agendaTitle} numberOfLines={1}>{event.title}</Text>
-        <Text style={styles.agendaMeta}>{event.time} · {event.location}</Text>
+        <Text style={styles.agendaMeta}>{formatEventTime(event.date)} · {event.location}</Text>
         <View style={styles.agendaStatsRow}>
-          <Text style={styles.agendaRsvp}>{event.registered} RSVPs</Text>
-          <Text style={styles.agendaForecast}>  ~{event.forecast} voorspel</Text>
+          <Text style={styles.agendaRsvp}>{event.confirmedAttendees} / {event.maxCapacity}</Text>
         </View>
       </View>
       <View style={[styles.agendaBadge, { backgroundColor: badge.bg }]}>
         <Text style={[styles.agendaBadgeText, { color: badge.text }]}>
-          {STATUS_LABELS[event.status]}
+          {STATUS_LABELS[status]}
         </Text>
       </View>
     </TouchableOpacity>
@@ -400,6 +435,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     toggleBtnTextActive: { color: colors.surface },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 12 },
+    centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
 
     monthNav: {
       flexDirection: 'row',

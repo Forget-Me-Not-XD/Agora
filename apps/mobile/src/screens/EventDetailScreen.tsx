@@ -9,24 +9,24 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import {
-  MOCK_EVENTS,
+  getEventStatus,
   STATUS_LABELS,
   TYPE_LABELS,
   formatFullDate,
+  formatEventTime,
   type EventStatus,
-} from '../lib/mock-data';
+} from '../lib/event-status';
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { createEvent } from '../api/events';
+import { getEvent, createEvent, type EventResponse } from '../api/events';
 import { createRsvp } from '../api/rsvp';
-import { getDraftPrediction } from '../api/analytics';
+import { getDraftPrediction, getPrediction } from '../api/analytics';
 import type { PredictionResult } from '../api/analytics';
 
 const STATUS_PILL: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:   { bg: '#D1FAE5', text: '#065F46' },
-  past:      { bg: '#F3F4F6', text: '#4B5563' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B' },
+  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
+  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
+  past:     { bg: '#F3F4F6', text: '#4B5563' },
 };
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
@@ -43,6 +43,44 @@ export function EventDetailScreen() {
 
   const isCreating = route.params.eventId === 'new';
 
+  const [event, setEvent] = useState<EventResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [predictionLoading, setPredictionLoading] = useState(true);
+  const [predictionUnavailable, setPredictionUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (isCreating) return;
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setLoadFailed(false);
+      try {
+        const data = await getEvent(route.params.eventId);
+        if (active) setEvent(data);
+      } catch {
+        if (active) setLoadFailed(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [isCreating, route.params.eventId]);
+
+  useEffect(() => {
+    if (isCreating || !event) return;
+    let cancelled = false;
+    setPredictionLoading(true);
+    setPredictionUnavailable(false);
+    getPrediction(event.id)
+      .then((r) => { if (!cancelled) setPrediction(r); })
+      .catch(() => { if (!cancelled) setPredictionUnavailable(true); })
+      .finally(() => { if (!cancelled) setPredictionLoading(false); });
+    return () => { cancelled = true; };
+  }, [isCreating, event]);
+
   if (isCreating) {
     return (
       <CreateEventForm
@@ -53,10 +91,19 @@ export function EventDetailScreen() {
     );
   }
 
-  const event = MOCK_EVENTS.find((e) => e.id === route.params.eventId);
   const role = user?.role ?? 'STUDENT';
 
-  if (!event) {
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.errorWrap}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadFailed || !event) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorWrap}>
@@ -70,14 +117,15 @@ export function EventDetailScreen() {
     );
   }
 
-  const fillPct = Math.min(Math.round((event.registered / event.capacity) * 100), 100);
-  const forecastPct = Math.min(Math.round((event.forecast / event.capacity) * 100), 100);
-  const pillColor = STATUS_PILL[event.status];
+  const status = getEventStatus(event);
+  const fillPct = event.maxCapacity > 0 ? Math.min(Math.round((event.confirmedAttendees / event.maxCapacity) * 100), 100) : 0;
+  const predictedPct = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
+  const pillColor = STATUS_PILL[status];
 
   function handleManageRsvps() {
     Alert.alert(
       'Bestuur RSVPs',
-      `${event!.registered} RSVPs vir ${event!.title}. Volle RSVP-bestuur koms binnekort.`,
+      `${event!.confirmedAttendees} bygewoon by ${event!.title}. Volle RSVP-bestuur koms binnekort.`,
       [{ text: 'OK' }],
     );
   }
@@ -130,7 +178,7 @@ export function EventDetailScreen() {
         <Text style={styles.topBarTitle} numberOfLines={1}>Funksie Detail</Text>
         <View style={[styles.statusPill, { backgroundColor: pillColor.bg }]}>
           <Text style={[styles.statusPillText, { color: pillColor.text }]}>
-            {STATUS_LABELS[event.status]}
+            {STATUS_LABELS[status]}
           </Text>
         </View>
       </View>
@@ -141,48 +189,58 @@ export function EventDetailScreen() {
         <View style={styles.titleBlock}>
           <Text style={styles.eventTitle}>{event.title}</Text>
           <Text style={styles.eventSubtitle}>
-            {formatFullDate(event.date)} · {event.time}{event.endTime ? ` – ${event.endTime}` : ''} · {event.location}
+            {formatFullDate(event.date)}{event.endDate ? ` – ${formatEventTime(event.endDate)}` : ''} · {event.location}
           </Text>
         </View>
 
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{event.registered}</Text>
-            <Text style={styles.statLabel}>RSVPs</Text>
+            <Text style={styles.statValue}>{event.confirmedAttendees}</Text>
+            <Text style={styles.statLabel}>Bygewoon</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.textSubtle }]}>{event.forecast}</Text>
-            <Text style={styles.statLabel}>Voorspel</Text>
+            <Text style={[styles.statValue, { color: colors.textSubtle }]}>
+              {prediction ? prediction.estimatedAttendees : '—'}
+            </Text>
+            <Text style={styles.statLabel}>Verwag</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#F59E0B' }]}>{event.noShows}</Text>
-            <Text style={styles.statLabel}>No-shows</Text>
+            <Text style={[styles.statValue, { color: '#F59E0B' }]}>{event.maxCapacity}</Text>
+            <Text style={styles.statLabel}>Kapasiteit</Text>
           </View>
         </View>
 
         {/* ── AI prediction card ── */}
         <View style={styles.aiCard}>
-          <View style={styles.aiTop}>
-            <View>
-              <View style={styles.aiNumRow}>
-                <Text style={styles.aiNum}>{event.forecast}</Text>
-                <Text style={styles.aiLabel}> gaste verwag</Text>
+          {predictionLoading ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : predictionUnavailable || !prediction ? (
+            <Text style={styles.aiSubtitle}>KI-voorspelling nie tans beskikbaar vir hierdie funksie nie.</Text>
+          ) : (
+            <>
+              <View style={styles.aiTop}>
+                <View>
+                  <View style={styles.aiNumRow}>
+                    <Text style={styles.aiNum}>{prediction.estimatedAttendees}</Text>
+                    <Text style={styles.aiLabel}> gaste verwag</Text>
+                  </View>
+                  <Text style={styles.aiSubtitle}>
+                    Vulkoers: {predictedPct}% · No-show: {Math.round(prediction.predictedNoShowRate * 100)}%
+                  </Text>
+                </View>
+                <View style={styles.aiBadge}>
+                  <Feather name="cpu" size={12} color={colors.primary} />
+                  <Text style={styles.aiBadgeText}>KI</Text>
+                </View>
               </View>
-              <Text style={styles.aiSubtitle}>
-                Reeks: {event.forecastLow} – {event.forecastHigh} · {event.forecastConfidence}% vertroue
-              </Text>
-            </View>
-            <View style={styles.aiBadge}>
-              <Feather name="cpu" size={12} color={colors.primary} />
-              <Text style={styles.aiBadgeText}>KI</Text>
-            </View>
-          </View>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${forecastPct}%` }]} />
-          </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
+              </View>
+            </>
+          )}
         </View>
 
         {/* ── Details table ── */}
@@ -190,12 +248,12 @@ export function EventDetailScreen() {
           <DetailRow label="Datum" value={formatFullDate(event.date)} colors={colors} />
           <DetailRow
             label="Tyd"
-            value={`${event.time}${event.endTime ? ` – ${event.endTime}` : ''}`}
+            value={`${formatEventTime(event.date)}${event.endDate ? ` – ${formatEventTime(event.endDate)}` : ''}`}
             colors={colors}
           />
           <DetailRow label="Lokaal" value={event.location} colors={colors} />
           <DetailRow label="Tipe" value={TYPE_LABELS[event.type]} colors={colors} />
-          <DetailRow label="Kapasiteit" value={`${event.registered} / ${event.capacity} (${fillPct}%)`} colors={colors} />
+          <DetailRow label="Kapasiteit" value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`} colors={colors} />
           {canViewBudget(role) && (
             <DetailRow
               label="Begroting"
@@ -240,7 +298,7 @@ export function EventDetailScreen() {
           </>
         )}
 
-        {!canManageCheckIns(role) && event.status === 'upcoming' && (
+        {!canManageCheckIns(role) && (status === 'upcoming' || status === 'ongoing') && (
           <TouchableOpacity
             style={[styles.primaryBtn, rsvpSubmitting && { opacity: 0.6 }]}
             onPress={handleRsvp}
@@ -383,14 +441,25 @@ function CreateEventForm({
     setError(null);
 
     try {
+      const startDate = new Date(date);
+      startDate.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
+
+      let endDate: string | undefined;
+      if (endHour.trim() && endMinute.trim()) {
+        const eh = parseInt(endHour, 10);
+        const em = parseInt(endMinute, 10);
+        if (!isNaN(eh) && !isNaN(em)) {
+          const d = new Date(date);
+          d.setHours(eh, em, 0, 0);
+          endDate = d.toISOString();
+        }
+      }
+
       await createEvent({
         title: title.trim(),
         description: description.trim(),
-        date: (() => {
-          const d = new Date(date);
-          d.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
-          return d.toISOString();
-        })(),
+        date: startDate.toISOString(),
+        endDate,
         location: location.trim(),
         maxCapacity: cap,
         budget: budgetNum,
@@ -868,7 +937,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 10,
     },
     backBtnText: { fontSize: 14, fontWeight: '800', color: colors.surface },
-    
+
     btnDisabled: { opacity: 0.7 },
 
     errorBox: {

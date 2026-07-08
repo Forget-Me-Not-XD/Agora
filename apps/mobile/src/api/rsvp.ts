@@ -64,3 +64,29 @@ export interface ScanResult {
 export async function scanQr(qrPayload: string): Promise<ScanResult> {
     return apiClient.post<ScanResult, { qrPayload: string }>('/rsvp/scan', { qrPayload });
 }
+
+// GET /rsvp/event/:eventId -- ADMIN/DOSENT-only, elke RSVP vir 'n gegewe geleentheid.
+// Let wel: hierdie roete loop deur RsvpResponseDto (velde: `id`), anders as
+// /rsvp/my hierbo wat rou Mongoose-dokumente (velde: `_id`) teruggee.
+export interface RsvpEventUser {
+    id: string;
+    name: string;
+    surname: string;
+    email: string;
+    role: string;
+}
+
+export interface RsvpWithUser {
+    id: string;
+    event: string;
+    user: RsvpEventUser;
+    status: RsvpStatus;
+    qrPayload: string;
+    checkedIn: boolean;
+    checkedInAt: string | null;
+    createdAt: string;
+}
+
+export async function getEventRsvps(eventId: string): Promise<RsvpWithUser[]> {
+    return apiClient.get<RsvpWithUser[]>(`/rsvp/event/${eventId}`);
+}

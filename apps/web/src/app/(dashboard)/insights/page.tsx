@@ -1,7 +1,8 @@
-import { AlertCircle, Star, Users, TrendingUp, Calendar, MessageSquare } from 'lucide-react';
-import { MOCK_EVENTS, MOCK_INSIGHTS } from '@/lib/mock-data';
+import { AlertCircle, Users, TrendingUp, CheckCircle, Calendar } from 'lucide-react';
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { getEvents, type Event } from '@/lib/api/events';
+import { formatDateShort } from '@/lib/format-date';
 import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
@@ -26,25 +27,15 @@ function attendanceColors(rate: number) {
     return { pill: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', bar: 'bg-red-500' };
 }
 
-function StarRow({ rating }: { rating: number }) {
-    return (
-        <div className="flex items-center gap-0.5">
-            {[1, 2, 3, 4, 5].map((n) => (
-                <Star
-                    key={n}
-                    size={13}
-                    className={n <= Math.round(rating) ? 'text-orange-400' : 'text-[var(--color-border)]'}
-                    fill={n <= Math.round(rating) ? 'currentColor' : 'none'}
-                />
-            ))}
-            <span className="text-xs font-semibold text-[var(--color-text)] ml-1">
-                {rating.toFixed(1)}
-            </span>
-        </div>
-    );
+// 'n Geleentheid is "verby" sodra sy einde (of, as daar geen einde is nie, sy begin) reeds verby is
+function isEventPast(event: Event): boolean {
+    const now = Date.now();
+    const start = new Date(event.date).getTime();
+    const end = event.endDate ? new Date(event.endDate).getTime() : start;
+    return now > end;
 }
 
-export default function InsightsPage() {
+export default async function InsightsPage() {
     const user = getCurrentUser();
 
     if (!canViewInsights(user.role)) {
@@ -59,21 +50,15 @@ export default function InsightsPage() {
         );
     }
 
-    const relevantInsights = MOCK_INSIGHTS.filter((insight) => {
-        if (user.role === 'ADMIN') return true;
-        const event = MOCK_EVENTS.find((e) => e.id === insight.eventId);
-        return event?.createdBy === user.id;
-    });
+    const allEvents = await getEvents().catch(() => [] as Event[]);
+    const relevantEvents = (user.role === 'ADMIN' ? allEvents : allEvents.filter((e) => e.createdBy === user.id))
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date));
 
-    const completedInsights = relevantInsights.filter((i) => i.totalAttended > 0);
-    const totalAttended = relevantInsights.reduce((sum, i) => sum + i.totalAttended, 0);
-    const totalRegistered = relevantInsights.reduce((sum, i) => sum + i.totalRegistered, 0);
-    const overallRate = totalRegistered > 0 ? Math.round((totalAttended / totalRegistered) * 100) : 0;
-    const ratedInsights = relevantInsights.filter((i) => i.averageRating > 0);
-    const avgRating =
-        ratedInsights.length > 0
-            ? ratedInsights.reduce((sum, i) => sum + i.averageRating, 0) / ratedInsights.length
-            : 0;
+    const completedEvents = relevantEvents.filter(isEventPast);
+    const totalAttended = completedEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0);
+    const totalCapacity = completedEvents.reduce((sum, e) => sum + e.maxCapacity, 0);
+    const overallRate = totalCapacity > 0 ? Math.round((totalAttended / totalCapacity) * 100) : 0;
 
     return (
         <div className="space-y-6">
@@ -94,21 +79,13 @@ export default function InsightsPage() {
                 <InfoModal title="Oor KI Insigte">
                     <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
                         Hierdie bladsy wys hoe goed jou geleenthede presteer het op grond van
-                        bywoning en deelnemer terugvoer.
+                        werklike bywoning teenoor kapasiteit.
                     </p>
 
                     <div className="space-y-3">
                         <InfoRow
                             label="Bywoning %"
-                            body="Die persentasie geregistreerdes wat werklik opgedaag het. Slegs beskikbaar vir geleenthede wat reeds plaasgevind het."
-                        />
-                        <InfoRow
-                            label="Gem. Gradering"
-                            body="Deelnemers beoordeel geleenthede uit 5 nadat dit plaasgevind het. 'n Nul beteken nog geen graderings ontvang nie."
-                        />
-                        <InfoRow
-                            label="Terugvoer"
-                            body="Kommentaar wat deelnemers nagelaat het. Gebruik dit om toekomstige geleenthede te verbeter."
+                            body="Die aantal ingecheckte gaste teenoor die geleentheid se maksimum kapasiteit. Slegs beskikbaar vir geleenthede wat reeds plaasgevind het."
                         />
                     </div>
 
@@ -140,21 +117,21 @@ export default function InsightsPage() {
                     iconBg="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                     label="Totaal Bygewoon"
                     value={String(totalAttended)}
-                    sub={`van ${totalRegistered} geregistreer`}
+                    sub={`oor ${completedEvents.length} voltooide geleentheid${completedEvents.length !== 1 ? 'e' : ''}`}
                 />
                 <KpiCard
                     icon={<TrendingUp size={20} />}
                     iconBg="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
                     label="Gem. Bywoning"
                     value={`${overallRate}%`}
-                    sub={`${completedInsights.length} geleenthede voltooi`}
+                    sub="teenoor kapasiteit"
                 />
                 <KpiCard
-                    icon={<Star size={20} />}
+                    icon={<CheckCircle size={20} />}
                     iconBg="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
-                    label="Gem. Gradering"
-                    value={avgRating > 0 ? `${avgRating.toFixed(1)} / 5` : 'N/B'}
-                    sub={avgRating > 0 ? `${ratedInsights.length} geleenthede beoordeel` : 'Nog geen graderings'}
+                    label="Geleenthede Voltooi"
+                    value={String(completedEvents.length)}
+                    sub={`van ${relevantEvents.length} in totaal`}
                 />
             </div>
 
@@ -164,23 +141,23 @@ export default function InsightsPage() {
                     Per Geleentheid
                 </h2>
 
-                {relevantInsights.length === 0 ? (
+                {relevantEvents.length === 0 ? (
                     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
                         <p className="text-[var(--color-text-subtle)] text-sm">
                             Geen insigte beskikbaar nie.
                         </p>
                     </div>
                 ) : (
-                    relevantInsights.map((insight) => {
-                        const event = MOCK_EVENTS.find((e) => e.id === insight.eventId);
-                        if (!event) return null;
-
-                        const isPast = insight.totalAttended > 0 || (insight.totalRegistered > 0 && event.status === 'past');
-                        const colors = attendanceColors(insight.attendanceRate);
+                    relevantEvents.map((event) => {
+                        const isPast = isEventPast(event);
+                        const attendanceRate = event.maxCapacity > 0
+                            ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
+                            : 0;
+                        const colors = attendanceColors(attendanceRate);
 
                         return (
                             <div
-                                key={insight.eventId}
+                                key={event.id}
                                 className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden"
                             >
                                 {/* Card header */}
@@ -195,64 +172,36 @@ export default function InsightsPage() {
                                             </span>
                                             <span className="flex items-center gap-1 text-xs text-[var(--color-text-subtle)]">
                                                 <Calendar size={11} />
-                                                {event.date}
+                                                {formatDateShort(event.date)}
                                             </span>
                                         </div>
                                     </div>
-                                    {insight.averageRating > 0 && (
-                                        <StarRow rating={insight.averageRating} />
-                                    )}
                                 </div>
 
                                 {/* Card body */}
                                 <div className="px-5 py-4 space-y-4">
                                     {isPast ? (
-                                        <>
-                                            {/* Attendance metric */}
-                                            <div>
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-xs font-medium text-[var(--color-text-subtle)]">
-                                                        Bywoning
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-medium text-[var(--color-text-subtle)]">
+                                                    Bywoning
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-[var(--color-text-subtle)]">
+                                                        {event.confirmedAttendees} / {event.maxCapacity}
                                                     </span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-[var(--color-text-subtle)]">
-                                                            {insight.totalAttended} / {insight.totalRegistered}
-                                                        </span>
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.pill}`}>
-                                                            {insight.attendanceRate}%
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all ${colors.bar}`}
-                                                        style={{ width: `${insight.attendanceRate}%` }}
-                                                    />
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.pill}`}>
+                                                        {attendanceRate}%
+                                                    </span>
                                                 </div>
                                             </div>
-
-                                            {/* Feedback */}
-                                            {insight.feedback.length > 0 && (
-                                                <div>
-                                                    <div className="flex items-center gap-1.5 mb-2">
-                                                        <MessageSquare size={12} className="text-[var(--color-text-subtle)]" />
-                                                        <span className="text-xs font-medium text-[var(--color-text-subtle)]">
-                                                            Terugvoer ({insight.feedback.length})
-                                                        </span>
-                                                    </div>
-                                                    <ul className="space-y-2">
-                                                        {insight.feedback.map((fb, i) => (
-                                                            <li
-                                                                key={i}
-                                                                className="text-xs text-[var(--color-text)] bg-[var(--color-bg)] border-l-2 border-[var(--color-primary)] rounded-r-lg pl-3 pr-3 py-2 leading-relaxed"
-                                                            >
-                                                                {fb}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </>
+                                            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full transition-all ${colors.bar}`}
+                                                    style={{ width: `${attendanceRate}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="flex items-center gap-3 py-1">
                                             <div className="w-8 h-8 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-center shrink-0">
