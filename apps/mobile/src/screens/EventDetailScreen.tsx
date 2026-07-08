@@ -60,7 +60,13 @@ export function EventDetailScreen() {
       try {
         const data = await getEvent(route.params.eventId);
         if (active) setEvent(data);
-      } catch {
+      } catch (err: unknown) {
+        const axiosErr = err as { message?: string; response?: { status?: number; data?: unknown } };
+        console.error(
+          `[EventDetail] Kon nie geleentheid ${route.params.eventId} laai nie:`,
+          axiosErr?.response?.status,
+          axiosErr?.response?.data ?? axiosErr?.message,
+        );
         if (active) setLoadFailed(true);
       } finally {
         if (active) setLoading(false);
@@ -70,7 +76,14 @@ export function EventDetailScreen() {
   }, [isCreating, route.params.eventId]);
 
   useEffect(() => {
-    if (isCreating || !event) return;
+    // Die model voorspel net vooruit uit kapasiteit/datum -- dit weet niks van
+    // wat werklik gebeur het nie, so vir 'n afgelope geleentheid herhaal dit net
+    // dieselfde raaiskoot as voor die tyd, wat nooit met die regte confirmedAttendees
+    // ooreenstem nie. Ons moet dit dus nie eers vra vir geleenthede wat verby is nie.
+    if (isCreating || !event || getEventStatus(event) === 'past') {
+      setPredictionLoading(false);
+      return;
+    }
     let cancelled = false;
     setPredictionLoading(true);
     setPredictionUnavailable(false);
@@ -213,35 +226,40 @@ export function EventDetailScreen() {
           </View>
         </View>
 
-        {/* ── AI prediction card ── */}
-        <View style={styles.aiCard}>
-          {predictionLoading ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : predictionUnavailable || !prediction ? (
-            <Text style={styles.aiSubtitle}>KI-voorspelling nie tans beskikbaar vir hierdie funksie nie.</Text>
-          ) : (
-            <>
-              <View style={styles.aiTop}>
-                <View>
-                  <View style={styles.aiNumRow}>
-                    <Text style={styles.aiNum}>{prediction.estimatedAttendees}</Text>
-                    <Text style={styles.aiLabel}> gaste verwag</Text>
+        {/* ── AI prediction card ──
+             Verby geleenthede het reeds 'n regte uitkoms (sien "Bygewoon" hierbo) --
+             die model voorspel net vooruit en het geen benul van wat werklik gebeur
+             het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie. */}
+        {status !== 'past' && (
+          <View style={styles.aiCard}>
+            {predictionLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : predictionUnavailable || !prediction ? (
+              <Text style={styles.aiSubtitle}>KI-voorspelling nie tans beskikbaar vir hierdie funksie nie.</Text>
+            ) : (
+              <>
+                <View style={styles.aiTop}>
+                  <View>
+                    <View style={styles.aiNumRow}>
+                      <Text style={styles.aiNum}>{prediction.estimatedAttendees}</Text>
+                      <Text style={styles.aiLabel}> gaste verwag</Text>
+                    </View>
+                    <Text style={styles.aiSubtitle}>
+                      Vulkoers: {predictedPct}% · No-show: {Math.round(prediction.predictedNoShowRate * 100)}%
+                    </Text>
                   </View>
-                  <Text style={styles.aiSubtitle}>
-                    Vulkoers: {predictedPct}% · No-show: {Math.round(prediction.predictedNoShowRate * 100)}%
-                  </Text>
+                  <View style={styles.aiBadge}>
+                    <Feather name="cpu" size={12} color={colors.primary} />
+                    <Text style={styles.aiBadgeText}>KI</Text>
+                  </View>
                 </View>
-                <View style={styles.aiBadge}>
-                  <Feather name="cpu" size={12} color={colors.primary} />
-                  <Text style={styles.aiBadgeText}>KI</Text>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
                 </View>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
-              </View>
-            </>
-          )}
-        </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* ── Details table ── */}
         <View style={styles.detailsCard}>

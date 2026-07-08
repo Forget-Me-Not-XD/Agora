@@ -5,6 +5,7 @@ import type { Event } from '@/lib/api/events';
 import type { PredictionResult } from '@/lib/api/analytics';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getAttendancePredictionAction } from '@/lib/actions/analytics.actions';
+import { deriveStatus } from '@/lib/event-view';
 
 export default function PredictedAttendanceCard() {
     const [events, setEvents] = useState<Event[]>([]);
@@ -13,8 +14,14 @@ export default function PredictedAttendanceCard() {
     const [loading, setLoading] = useState(false);
     const [unavailable, setUnavailable] = useState(false);
 
+    // Die model voorspel net vooruit uit kapasiteit/datum -- dit ken die regte
+    // uitkoms van 'n geleentheid wat reeds plaasgevind het glad nie, so dit gee
+    // net dieselfde raaiskoot terug asof die geleentheid nog moes gebeur. Ons
+    // laat dus nie eers toe dat 'n afgelope geleentheid hier gekies word nie.
     useEffect(() => {
-        listEventsAction().then((result) => setEvents(result.events ?? []));
+        listEventsAction().then((result) =>
+            setEvents((result.events ?? []).filter((e) => deriveStatus(e) !== 'past')),
+        );
     }, []);
 
     useEffect(() => {
