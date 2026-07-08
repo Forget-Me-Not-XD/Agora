@@ -1,16 +1,22 @@
 import { apiClient } from './client';
 
+export type EventType = 'public' | 'internal_student' | 'private' | 'department';
+
 export interface EventResponse {
   id: string;
   title: string;
   description: string;
   date: string;
+  endDate?: string;
   location: string;
   maxCapacity: number;
+  budget: number;
+  createdBy: string;
+  photographers: string[];
+  photographerInstructions: string;
   confirmedAttendees: number;
-  createdBy: string;      // skepper se gebruiker-ID
-  photographerIds: string[];
-  photographerBrief: string;
+  intendedAttendance: string;
+  type: EventType;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,36 +25,47 @@ export interface CreateEventPayload {
   title: string;
   description: string;
   date: string;
+  endDate?: string;
   location: string;
   maxCapacity: number;
   budget?: number;
+  photographers?: string[];
+  photographerInstructions?: string;
+  intendedAttendance?: 'ADMIN' | 'DOSENT' | 'STUDENT' | 'GAS';
+  type?: EventType;
 }
 
-/**
- * Haal alle geleenthede van die backend.
- * Opsioneel: stuur 'from' en 'to' as ISO-datumstrings om
- * slegs geleenthede binne 'n datumreeks te kry.
- *
- * GET /events
- * GET /events?from=2026-01-01&to=2026-12-31
- */
-export async function listEvents(from?: string, to?: string): Promise<EventResponse[]> {
-  let path = '/events';
+export type UpdateEventPayload = Partial<CreateEventPayload>;
 
-  if (from && to) {
-    path += `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  }
+export interface AssignPhotographerPayload {
+  photographerId: string;
+  brief: string;
+} 
 
-  return apiClient.get<EventResponse[]>(path);
+export async function listEvents(from?: string, to?: string): Promise <EventResponse[]> {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return apiClient.get<EventResponse[]>(`/events${query}`);
 }
 
-/**
- * Skep 'n nuwe geleentheid.
- * Slegs DOSENT- en ADMIN-gebruikers het toestemming —
- * die backend stuur outomaties 403 as die rol verkeerd is.
- *
- * POST /events
- */
+export async function getEvent(id: string): Promise<EventResponse> {
+  return apiClient.get<EventResponse>(`/events/${id}`);
+}
+
 export async function createEvent(payload: CreateEventPayload): Promise<EventResponse> {
   return apiClient.post<EventResponse, CreateEventPayload>('/events', payload);
+}
+
+export async function updateEvent(id: string, payload: UpdateEventPayload): Promise <EventResponse> {
+  return apiClient.patch<EventResponse, UpdateEventPayload>(`/events/${id}`, payload);
+}
+
+export async function deleteEvent(id: string): Promise <void> {
+  return apiClient.delete<void>(`/events/${id}`);
+}
+
+export async function assignPhotographer(id: string, payload: AssignPhotographerPayload): Promise <EventResponse> {
+  return apiClient.patch<EventResponse, AssignPhotographerPayload>(`/events/${id}/assign-photographer`, payload);
 }

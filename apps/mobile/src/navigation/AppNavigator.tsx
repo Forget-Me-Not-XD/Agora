@@ -6,6 +6,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { MainTabs } from './MainTabs';
 
 export type RootStackParamList = {
@@ -13,6 +14,7 @@ export type RootStackParamList = {
   Register: undefined;
   Main: undefined;
   Settings: undefined;
+  Profile: undefined;
   EventDetail: { eventId: string };
   QrScanner: { eventId: string };
   AdminCreateUser: undefined;
@@ -29,6 +31,7 @@ export function AppNavigator() {
         <>
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="QrScanner" component={QrScannerScreen} />
           <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />

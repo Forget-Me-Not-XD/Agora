@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Modal,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -16,29 +17,27 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { listEvents, type EventResponse, type EventType } from '../api/events';
 import {
-  MOCK_EVENTS,
+  getEventStatus,
   STATUS_LABELS,
   TYPE_LABELS,
   formatEventDate,
-  type MockEvent,
+  formatEventTime,
   type EventStatus,
-  type EventType,
-} from '../lib/mock-data';
-import { filterEventsForUser, canCreateEvents } from '../lib/rbac';
+} from '../lib/event-status';
+import { canCreateEvents } from '../lib/rbac';
 
 const STATUS_PILL_COLORS: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming:  { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:   { bg: '#D1FAE5', text: '#065F46' },
-  past:      { bg: '#F3F4F6', text: '#4B5563' },
-  cancelled: { bg: '#FEE2E2', text: '#991B1B' },
+  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
+  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
+  past:     { bg: '#F3F4F6', text: '#4B5563' },
 };
 
 const STATUS_PILL_COLORS_DARK: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming:  { bg: '#0C4A6E', text: '#7DD3FC' },
-  ongoing:   { bg: '#064E3B', text: '#6EE7B7' },
-  past:      { bg: '#1F2937', text: '#9CA3AF' },
-  cancelled: { bg: '#7F1D1D', text: '#FCA5A5' },
+  upcoming: { bg: '#0C4A6E', text: '#7DD3FC' },
+  ongoing:  { bg: '#064E3B', text: '#6EE7B7' },
+  past:     { bg: '#1F2937', text: '#9CA3AF' },
 };
 
 type MenuState = { eventId: string; x: number; y: number } | null;
@@ -50,6 +49,10 @@ export function EventsScreen() {
   const styles = makeStyles(colors);
   const isDark = colors.background === '#0B1A24';
 
+  const [events, setEvents] = useState<EventResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
@@ -58,26 +61,39 @@ export function EventsScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const role = user?.role ?? 'STUDENT';
-  const userId = user?.id ?? '';
 
-  const visible = useMemo(
-    () => filterEventsForUser(MOCK_EVENTS, userId, role),
-    [userId, role],
-  );
+  // Rol-gebaseerde sigbaarheid word reeds backend-kant afgedwing (events.service.ts),
+  // so ons wys eenvoudig net wat die API teruggee.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const result = await listEvents();
+        if (active) setEvents(result);
+      } catch {
+        if (active) setLoadError('Kon nie funksies laai nie.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const filtered = useMemo(() => {
-    return visible.filter((e) => {
+    return events.filter((e) => {
       const q = search.toLowerCase();
       const matchSearch =
         e.title.toLowerCase().includes(q) ||
         e.location.toLowerCase().includes(q);
-      const matchStatus = statusFilter === 'all' || e.status === statusFilter;
+      const matchStatus = statusFilter === 'all' || getEventStatus(e) === statusFilter;
       const matchType = typeFilter === 'all' || e.type === typeFilter;
       return matchSearch && matchStatus && matchType;
     });
-  }, [visible, search, statusFilter, typeFilter]);
+  }, [events, search, statusFilter, typeFilter]);
 
-  function openMenu(event: MockEvent) {
+  function openMenu(event: EventResponse) {
     setMenuState({ eventId: event.id, x: 0, y: 0 });
   }
 
@@ -109,7 +125,7 @@ export function EventsScreen() {
   }
 
   const menuEvent = menuState
-    ? MOCK_EVENTS.find((e) => e.id === menuState.eventId)
+    ? events.find((e) => e.id === menuState.eventId)
     : null;
 
   const activeFilters = (statusFilter !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
@@ -168,36 +184,47 @@ export function EventsScreen() {
 
       {/* ── Result count ── */}
       <Text style={styles.resultCount}>
-        {filtered.length} funksie{filtered.length !== 1 ? 's' : ''} sigbaar
+        {loading ? 'Laai...' : `${filtered.length} funksie${filtered.length !== 1 ? 's' : ''} sigbaar`}
       </Text>
 
       {/* ── Event list ── */}
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="calendar" size={32} color={colors.textSubtle} />
-            <Text style={styles.emptyTitle}>Geen funksies gevind nie</Text>
-            <Text style={styles.emptySubtitle}>
-              {search ? "Probeer 'n ander soektog of verwyder filters." : "Geen funksies beskikbaar vir jou rol nie."}
-            </Text>
-          </View>
-        ) : (
-          filtered.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              isDark={isDark}
-              saved={savedEvents.has(event.id)}
-              onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-              onMenuPress={() => openMenu(event)}
-            />
-          ))
-        )}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.centerFill}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : loadError ? (
+        <View style={styles.centerFill}>
+          <Feather name="alert-circle" size={28} color={colors.red} />
+          <Text style={styles.emptySubtitle}>{loadError}</Text>
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {filtered.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Feather name="calendar" size={32} color={colors.textSubtle} />
+              <Text style={styles.emptyTitle}>Geen funksies gevind nie</Text>
+              <Text style={styles.emptySubtitle}>
+                {search ? "Probeer 'n ander soektog of verwyder filters." : "Geen funksies beskikbaar vir jou rol nie."}
+              </Text>
+            </View>
+          ) : (
+            filtered.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                isDark={isDark}
+                saved={savedEvents.has(event.id)}
+                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
+                onMenuPress={() => openMenu(event)}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
 
       {/* ── Filter bottom sheet ── */}
       <Modal
@@ -223,7 +250,7 @@ export function EventsScreen() {
 
             <Text style={[styles.filterLabel, { color: colors.textSubtle }]}>STATUS</Text>
             <View style={styles.filterChips}>
-              {(['all', 'upcoming', 'ongoing', 'past', 'cancelled'] as const).map((s) => (
+              {(['all', 'upcoming', 'ongoing', 'past'] as const).map((s) => (
                 <TouchableOpacity
                   key={s}
                   style={[
@@ -307,7 +334,7 @@ export function EventsScreen() {
             )}
             <TouchableOpacity style={styles.menuItem} onPress={handleSave} accessibilityLabel="Stoor of boekmerk funksie">
               <Feather
-                name={menuState && savedEvents.has(menuState.eventId) ? 'bookmark' : 'bookmark'}
+                name="bookmark"
                 size={16}
                 color={menuState && savedEvents.has(menuState.eventId) ? colors.primary : colors.textSubtle}
               />
@@ -334,7 +361,7 @@ function EventCard({
   onPress,
   onMenuPress,
 }: {
-  event: MockEvent;
+  event: EventResponse;
   isDark: boolean;
   saved: boolean;
   onPress: () => void;
@@ -342,9 +369,8 @@ function EventCard({
 }) {
   const colors = useThemeColors();
   const styles = makeStyles(colors);
-  const pillColors = isDark
-    ? STATUS_PILL_COLORS_DARK[event.status]
-    : STATUS_PILL_COLORS[event.status];
+  const status = getEventStatus(event);
+  const pillColors = isDark ? STATUS_PILL_COLORS_DARK[status] : STATUS_PILL_COLORS[status];
   const { day, month } = formatEventDate(event.date);
 
   return (
@@ -365,20 +391,17 @@ function EventCard({
       <View style={styles.cardContent}>
         <Text style={styles.cardTitle} numberOfLines={1}>{event.title}</Text>
         <Text style={styles.cardMeta} numberOfLines={1}>
-          {event.time} · {event.location}
+          {formatEventTime(event.date)} · {event.location}
         </Text>
         <View style={styles.cardStats}>
           <Text style={styles.rsvpCount}>
-            {event.registered} RSVPs
-          </Text>
-          <Text style={styles.forecastCount}>
-            {'  '}~{event.forecast} voorspel
+            {event.confirmedAttendees} / {event.maxCapacity}
           </Text>
         </View>
         <View style={styles.cardFooter}>
           <View style={[styles.statusPill, { backgroundColor: pillColors.bg }]}>
             <Text style={[styles.statusPillText, { color: pillColors.text }]}>
-              {STATUS_LABELS[event.status]}
+              {STATUS_LABELS[status]}
             </Text>
           </View>
           {saved && (
@@ -486,6 +509,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 24, gap: 10 },
+
+    centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
 
     emptyState: {
       alignItems: 'center',

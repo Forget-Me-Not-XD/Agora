@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Injectable, BadRequestException, ServiceUnavailableException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from 'mongoose';
 import { spawn } from 'child_process';
@@ -124,10 +124,30 @@ export class LstmService {
         ];
     }
 
+    // 'n Geleentheid is "verby" sodra sy einde (of, as daar geen einde is nie, 3 uur
+    // na sy begin) reeds verby is — dieselfde reël as web/mobile se eie status-afleiding.
+    private isEventPast(event: EventDocument): boolean {
+        const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+        const end = event.endDate ? event.endDate.getTime() : event.date.getTime() + THREE_HOURS_MS;
+        return Date.now() > end;
+    }
+
     // Loads the event, runs predict.py, and returns the model's live prediction.
     // Throws ServiceUnavailableException (-> HTTP 503) if the python process fails.
     async predictAttendance(eventId: string): Promise<PredictionResult> {
         const event = await this.eventsService.findById(eventId);
+
+        // The model only ever learns [capacity, dayOfWeek, month, daysInAdvance] —
+        // it has no notion of what actually happened, so for a past event it just
+        // repeats the same forward-looking guess it would have made before the
+        // event ever ran. That reliably disagrees with the real confirmedAttendees
+        // already on record, so we refuse rather than show a misleading number.
+        if (this.isEventPast(event)) {
+            throw new BadRequestException(
+                'Voorspellings is nie beskikbaar vir geleenthede wat reeds plaasgevind het nie.',
+            );
+        }
+
         const [capacity, dayOfWeek, month, daysInAdvance] = this.computeFeatures(event);
 
         try {

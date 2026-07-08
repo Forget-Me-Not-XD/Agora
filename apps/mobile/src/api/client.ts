@@ -120,6 +120,7 @@ export interface UserResponse {
     studyCenter: string;
     isActive: boolean;
     createdAt: string;
+    title: string;
 }
 
 export interface TokenPair {

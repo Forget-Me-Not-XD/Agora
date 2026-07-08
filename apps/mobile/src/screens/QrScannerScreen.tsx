@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -17,11 +18,21 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
 import { CameraView, useCameraPermissions } from 'expo-camera/next';
 import { useResponse } from '../providers/ResponseProvider';
-import { scanQr } from '../api/rsvp';
-import { MOCK_EVENTS, MOCK_CHECK_INS, type MockCheckIn } from '../lib/mock-data';
+import { scanQr, getEventRsvps, type RsvpWithUser } from '../api/rsvp';
+import { getEvent, type EventResponse } from '../api/events';
+import { formatEventTime } from '../lib/event-status';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
+
+// 'n Walk-in registrasie word nooit na die bediener gestuur nie -- daar is
+// tans geen backend-roete om iemand sonder 'n RSVP in te teken nie. Dit
+// bly 'n plaaslike, tydelike lys vir vandag se skof.
+interface WalkIn {
+  id: string;
+  name: string;
+  registeredAt: string;
+}
 
 export function QrScannerScreen() {
   const navigation = useNavigation<Nav>();
@@ -29,19 +40,38 @@ export function QrScannerScreen() {
   const colors = useThemeColors();
   const styles = makeStyles(colors);
 
-  const event = MOCK_EVENTS.find((e) => e.id === route.params.eventId);
+  const [event, setEvent] = useState<EventResponse | null>(null);
+  const [rsvps, setRsvps] = useState<RsvpWithUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [flashOn, setFlashOn] = useState(false);
-  const [checkIns, setCheckIns] = useState<MockCheckIn[]>(MOCK_CHECK_INS);
-  const [lastScanned, setLastScanned] = useState<MockCheckIn | null>(
-    MOCK_CHECK_INS[0] ?? null,
-  );
+  const [walkIns, setWalkIns] = useState<WalkIn[]>([]);
   const [walkInName, setWalkInName] = useState('');
+  const [lastScannedName, setLastScannedName] = useState<string | null>(null);
 
   const { showLoading, showSuccess, showError, showWarning } = useResponse();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const scanLock = useRef(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [eventRes, rsvpRes] = await Promise.all([
+        getEvent(route.params.eventId),
+        getEventRsvps(route.params.eventId),
+      ]);
+      setEvent(eventRes);
+      setRsvps(rsvpRes);
+    } catch {
+      // Bly op die skerm met wat ons het; die kamera werk steeds vir skandering.
+    } finally {
+      setLoading(false);
+    }
+  }, [route.params.eventId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -62,7 +92,9 @@ export function QrScannerScreen() {
     try {
       const res = await scanQr(data);
       showLoading(false);
+      setLastScannedName(res.guestName);
       showSuccess(res, resetScanner);
+      loadData(); // haal die opgedateerde inteken-lys vanaf die bediener
     } catch (err) {
       showLoading(false);
       const status = (err as any)?.response?.status;
@@ -76,14 +108,14 @@ export function QrScannerScreen() {
     }
   }
 
-  const total = event?.registered ?? 87;
-  const checkedInCount = checkIns.length;
-  const outstanding = total - checkedInCount;
+  const confirmedRsvps = rsvps.filter((r) => r.status === 'BEVESTIG');
+  const checkedIn = confirmedRsvps
+    .filter((r) => r.checkedIn)
+    .sort((a, b) => (b.checkedInAt ?? '').localeCompare(a.checkedInAt ?? ''));
 
-  function handleAccept() {
-    if (!lastScanned) return;
-    Alert.alert('Ingemeld', `${lastScanned.name} is suksesvol ingemeld.`);
-  }
+  const total = confirmedRsvps.length;
+  const checkedInCount = checkedIn.length;
+  const outstanding = total - checkedInCount;
 
   function handleWalkIn() {
     const name = walkInName.trim();
@@ -91,18 +123,14 @@ export function QrScannerScreen() {
       Alert.alert('Naam vereiste', 'Voer asseblief die persoon se naam in.');
       return;
     }
-    const entry: MockCheckIn = {
-      id: `ci-walkin-${Date.now()}`,
+    const entry: WalkIn = {
+      id: `walkin-${Date.now()}`,
       name,
-      eventId: route.params.eventId,
-      status: 'bevestig',
-      dietary: null,
-      checkedInAt: new Date().toISOString(),
+      registeredAt: new Date().toISOString(),
     };
-    setLastScanned(entry);
-    setCheckIns((prev) => [entry, ...prev]);
+    setWalkIns((prev) => [entry, ...prev]);
     setWalkInName('');
-    Alert.alert('Geregistreer', `${name} is geregistreer sonder RSVP.`);
+    Alert.alert('Geregistreer', `${name} is plaaslik aangeteken sonder RSVP. Dit word nie na die bediener gestuur nie.`);
   }
 
   return (
@@ -120,7 +148,7 @@ export function QrScannerScreen() {
         <View style={styles.activeBadge}>
           <View style={styles.activeDot} />
           <Text style={styles.activeText}>
-            Aktief: {event?.time ?? '18:00'}–{event?.endTime ?? '22:00'}
+            {loading ? '...' : event ? formatEventTime(event.date) : '—'}
           </Text>
         </View>
       </View>
@@ -161,42 +189,38 @@ export function QrScannerScreen() {
 
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#10B981' }]}>{checkedInCount}</Text>
-            <Text style={styles.statLabel}>Ingemeld</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{total}</Text>
-            <Text style={styles.statLabel}>Totaal</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#F59E0B' }]}>{Math.max(outstanding, 0)}</Text>
-            <Text style={styles.statLabel}>Uitstaande</Text>
-          </View>
+          {loading ? (
+            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 8 }} />
+          ) : (
+            <>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: '#10B981' }]}>{checkedInCount}</Text>
+                <Text style={styles.statLabel}>Ingemeld</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{total}</Text>
+                <Text style={styles.statLabel}>Totaal</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{Math.max(outstanding, 0)}</Text>
+                <Text style={styles.statLabel}>Uitstaande</Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* ── Last scanned card ── */}
-        {lastScanned && (
+        {lastScannedName && (
           <View style={styles.scannedCard}>
             <View style={styles.checkCircle}>
               <Feather name="check" size={18} color="#10B981" />
             </View>
             <View style={styles.scannedInfo}>
-              <Text style={styles.scannedName}>{lastScanned.name}</Text>
-              <Text style={styles.scannedMeta}>
-                {event?.title ?? 'Funksie'} · {lastScanned.status === 'bevestig' ? 'Bevestig' : 'Hangende'}
-                {lastScanned.dietary ? ` · ${lastScanned.dietary}` : ' · Geen dieët'}
-              </Text>
+              <Text style={styles.scannedName}>{lastScannedName}</Text>
+              <Text style={styles.scannedMeta}>{event?.title ?? 'Funksie'} · Suksesvol ingecheck</Text>
             </View>
-            <TouchableOpacity
-              style={styles.acceptBtn}
-              onPress={handleAccept}
-              accessibilityLabel="Aanvaar inmelding"
-            >
-              <Text style={styles.acceptBtnText}>Aanvaar</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -230,7 +254,7 @@ export function QrScannerScreen() {
         <View style={styles.walkInCard}>
           <Text style={styles.walkInTitle}>Registreer persoon sonder RSVP</Text>
           <Text style={styles.walkInSubtitle}>
-            Vir persone wat nie vooraf geregistreer het nie.
+            Vir persone wat nie vooraf geregistreer het nie. Word nie gestoor nie -- plaaslik vir vandag se skof.
           </Text>
           <View style={styles.walkInRow}>
             <TextInput
@@ -252,26 +276,30 @@ export function QrScannerScreen() {
               <Feather name="user-plus" size={16} color={colors.surface} />
             </TouchableOpacity>
           </View>
+          {walkIns.length > 0 && (
+            <View style={styles.walkInList}>
+              {walkIns.map((w) => (
+                <Text key={w.id} style={styles.walkInListItem}>• {w.name}</Text>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* ── Recent check-ins ── */}
-        {checkIns.length > 0 && (
+        {checkedIn.length > 0 && (
           <View style={styles.recentCard}>
             <Text style={styles.recentTitle}>Onlangse inmeldings</Text>
-            {checkIns.slice(0, 5).map((ci) => (
-              <View key={ci.id} style={styles.recentRow}>
+            {checkedIn.slice(0, 5).map((r) => (
+              <View key={r.id} style={styles.recentRow}>
                 <View style={styles.recentDot} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.recentName}>{ci.name}</Text>
-                  {ci.dietary && (
-                    <Text style={styles.recentMeta}>{ci.dietary}</Text>
-                  )}
+                  <Text style={styles.recentName}>{r.user.name} {r.user.surname}</Text>
                 </View>
                 <Feather name="check-circle" size={14} color="#10B981" />
               </View>
             ))}
-            {checkIns.length > 5 && (
-              <Text style={styles.moreText}>+{checkIns.length - 5} meer</Text>
+            {checkedIn.length > 5 && (
+              <Text style={styles.moreText}>+{checkedIn.length - 5} meer</Text>
             )}
           </View>
         )}
@@ -395,13 +423,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     scannedInfo: { flex: 1 },
     scannedName: { fontSize: 15, fontWeight: '900', color: colors.text },
     scannedMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
-    acceptBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-    },
-    acceptBtnText: { fontSize: 13, fontWeight: '900', color: colors.surface },
 
     // Controls
     controlRow: { flexDirection: 'row', gap: 12 },
@@ -454,6 +475,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    walkInList: { marginTop: 12, gap: 4 },
+    walkInListItem: { fontSize: 12, color: colors.textSubtle, fontWeight: '600' },
 
     // Recent check-ins
     recentCard: {

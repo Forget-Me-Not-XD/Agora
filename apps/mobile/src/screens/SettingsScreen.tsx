@@ -32,6 +32,16 @@ export function SettingsScreen({ navigation }: Props) {
         <View style={{ width: 60 }} />
       </View>
 
+      <View style={[styles.card, { marginBottom: 16 }]}>
+        <Text style={styles.cardTitle}>Profiel</Text>
+        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Profile')}>
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel}>{user?.name} {user?.surname}</Text>
+            <Text style={styles.rowSubtitle}>{user?.email} · Wysig profiel</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tema</Text>
         {OPTIONS.map((opt) => {

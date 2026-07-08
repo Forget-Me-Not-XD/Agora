@@ -196,11 +196,15 @@ function randomCapacity(): number {
 // gives a realistic long-running history plus a near-term upcoming pipeline.
 function randomEventDate(): Date {
     const now = new Date();
-    const daysOffset = randInt(-1200, 600);
+    // Skewed toward the future: ~15 months of past history (still plenty for
+    // trend charts) and ~2.5 years of upcoming events, so dashboards and any
+    // "upcoming events" view actually have real data to show.
+    const daysOffset = randInt(-450, 900);
     const d = new Date(now.getTime() + daysOffset * 86_400_000);
     d.setHours(randInt(9, 19), [0, 15, 30, 45][randInt(0, 3)], 0, 0);
     return d;
 }
+
 
 interface SeedUser {
     _id: Types.ObjectId;
@@ -226,6 +230,7 @@ function makeUser(opts: {
     role: string;
     title?: string;
     createdDaysAgo?: number;
+    isActive?: boolean;          // add this line
 }): SeedUser {
     const createdAt = new Date(Date.now() - (opts.createdDaysAgo ?? randInt(30, 900)) * 86_400_000);
     return {
@@ -236,7 +241,7 @@ function makeUser(opts: {
         passwordHash: opts.passwordHash,
         role: opts.role,
         studyCenter: pick(STUDY_CENTERS),
-        isActive: Math.random() > 0.05, // ~95% active, a few inactive for realism
+        isActive: opts.isActive ?? Math.random() > 0.05,   
         failedLoginAttempts: Math.random() > 0.85 ? randInt(1, 3) : 0,
         lockedUntil: null,
         title: opts.title ?? '',
@@ -244,6 +249,7 @@ function makeUser(opts: {
         updatedAt: createdAt,
     };
 }
+
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -280,13 +286,13 @@ async function seed(): Promise<void> {
     const admin = makeUser({
         name: 'Amanda', surname: 'Administrateur',
         email: 'seed-admin@akademia.ac.za',
-        passwordHash, role: 'ADMIN', title: '', createdDaysAgo: 1900,
+        passwordHash, role: 'ADMIN', title: '', createdDaysAgo: 1900, isActive: true,
     });
 
     const namedDosent = makeUser({
         name: 'Johan', surname: 'Botha',
         email: 'seed-dosent@akademia.ac.za',
-        passwordHash, role: 'DOSENT', title: 'Dr.', createdDaysAgo: 1500,
+        passwordHash, role: 'DOSENT', title: 'Dr.', createdDaysAgo: 1500, isActive: true,
     });
     const extraDosents = Array.from({ length: 9 }, (_, i) =>
         makeUser({
@@ -301,7 +307,7 @@ async function seed(): Promise<void> {
     const namedStudent = makeUser({
         name: 'Liam', surname: 'van der Merwe',
         email: 'seed-student@akademia.ac.za',
-        passwordHash, role: 'STUDENT', createdDaysAgo: 300,
+        passwordHash, role: 'STUDENT', createdDaysAgo: 300, isActive: true,
     });
     const NUM_EXTRA_STUDENTS = 123;
     const extraStudents = Array.from({ length: NUM_EXTRA_STUDENTS }, (_, i) =>
@@ -316,7 +322,7 @@ async function seed(): Promise<void> {
     const namedGas = makeUser({
         name: 'Thabo', surname: 'Nkosi',
         email: 'seed-gas@gmail.com',
-        passwordHash, role: 'GAS', createdDaysAgo: 150,
+        passwordHash, role: 'GAS', createdDaysAgo: 150, isActive: true,
     });
     const extraGas = Array.from({ length: 9 }, (_, i) =>
         makeUser({
@@ -330,7 +336,7 @@ async function seed(): Promise<void> {
     const namedPhotographer = makeUser({
         name: 'Chloé', surname: 'Fourie',
         email: 'seed-fotograaf@gmail.com',
-        passwordHash, role: 'PHOTOGRAPHER', createdDaysAgo: 1500,
+        passwordHash, role: 'PHOTOGRAPHER', createdDaysAgo: 1500, isActive: true,
     });
     const extraPhotographers = Array.from({ length: 4 }, (_, i) =>
         makeUser({
