@@ -18,20 +18,16 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
 import { CameraView, useCameraPermissions } from 'expo-camera/next';
 import { useResponse } from '../providers/ResponseProvider';
-import { scanQr, getEventRsvps, type RsvpWithUser } from '../api/rsvp';
+import { scanQr, getEventRsvps, registerWalkIn, type RsvpWithUser } from '../api/rsvp';
 import { getEvent, type EventResponse } from '../api/events';
 import { formatEventTime } from '../lib/event-status';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
 
-// 'n Walk-in registrasie word nooit na die bediener gestuur nie -- daar is
-// tans geen backend-roete om iemand sonder 'n RSVP in te teken nie. Dit
-// bly 'n plaaslike, tydelike lys vir vandag se skof.
-interface WalkIn {
-  id: string;
-  name: string;
-  registeredAt: string;
+function attendeeName(rsvp: RsvpWithUser): string {
+  if (rsvp.user) return `${rsvp.user.name} ${rsvp.user.surname}`;
+  return rsvp.guestName ?? 'Onbekende gas';
 }
 
 export function QrScannerScreen() {
@@ -45,8 +41,8 @@ export function QrScannerScreen() {
   const [loading, setLoading] = useState(true);
 
   const [flashOn, setFlashOn] = useState(false);
-  const [walkIns, setWalkIns] = useState<WalkIn[]>([]);
   const [walkInName, setWalkInName] = useState('');
+  const [walkInSubmitting, setWalkInSubmitting] = useState(false);
   const [lastScannedName, setLastScannedName] = useState<string | null>(null);
 
   const { showLoading, showSuccess, showError, showWarning } = useResponse();
@@ -117,20 +113,26 @@ export function QrScannerScreen() {
   const checkedInCount = checkedIn.length;
   const outstanding = total - checkedInCount;
 
-  function handleWalkIn() {
+  async function handleWalkIn() {
     const name = walkInName.trim();
     if (!name) {
       Alert.alert('Naam vereiste', 'Voer asseblief die persoon se naam in.');
       return;
     }
-    const entry: WalkIn = {
-      id: `walkin-${Date.now()}`,
-      name,
-      registeredAt: new Date().toISOString(),
-    };
-    setWalkIns((prev) => [entry, ...prev]);
-    setWalkInName('');
-    Alert.alert('Geregistreer', `${name} is plaaslik aangeteken sonder RSVP. Dit word nie na die bediener gestuur nie.`);
+    setWalkInSubmitting(true);
+    try {
+      await registerWalkIn(route.params.eventId, name);
+      setWalkInName('');
+      loadData(); // haal die bygewerkte lys vanaf die bediener
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      Alert.alert(
+        'Kon nie registreer nie',
+        status === 409 ? 'Hierdie geleentheid is ongelukkig vol bespreek.' : 'Probeer asseblief weer.',
+      );
+    } finally {
+      setWalkInSubmitting(false);
+    }
   }
 
   return (
@@ -160,6 +162,7 @@ export function QrScannerScreen() {
             <CameraView
               style={StyleSheet.absoluteFillObject}
               facing="back"
+              enableTorch={flashOn}
               onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
             />
@@ -254,7 +257,7 @@ export function QrScannerScreen() {
         <View style={styles.walkInCard}>
           <Text style={styles.walkInTitle}>Registreer persoon sonder RSVP</Text>
           <Text style={styles.walkInSubtitle}>
-            Vir persone wat nie vooraf geregistreer het nie. Word nie gestoor nie -- plaaslik vir vandag se skof.
+            Vir persone wat nie vooraf geregistreer het nie. Word dadelik as ingemeld gestoor.
           </Text>
           <View style={styles.walkInRow}>
             <TextInput
@@ -266,23 +269,22 @@ export function QrScannerScreen() {
               autoCorrect={false}
               returnKeyType="done"
               onSubmitEditing={handleWalkIn}
+              editable={!walkInSubmitting}
               accessibilityLabel="Persoon se naam vir walk-in registrasie"
             />
             <TouchableOpacity
               style={styles.walkInBtn}
               onPress={handleWalkIn}
+              disabled={walkInSubmitting}
               accessibilityLabel="Registreer sonder RSVP"
             >
-              <Feather name="user-plus" size={16} color={colors.surface} />
+              {walkInSubmitting ? (
+                <ActivityIndicator size="small" color={colors.surface} />
+              ) : (
+                <Feather name="user-plus" size={16} color={colors.surface} />
+              )}
             </TouchableOpacity>
           </View>
-          {walkIns.length > 0 && (
-            <View style={styles.walkInList}>
-              {walkIns.map((w) => (
-                <Text key={w.id} style={styles.walkInListItem}>• {w.name}</Text>
-              ))}
-            </View>
-          )}
         </View>
 
         {/* ── Recent check-ins ── */}
@@ -293,7 +295,7 @@ export function QrScannerScreen() {
               <View key={r.id} style={styles.recentRow}>
                 <View style={styles.recentDot} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.recentName}>{r.user.name} {r.user.surname}</Text>
+                  <Text style={styles.recentName}>{attendeeName(r)}</Text>
                 </View>
                 <Feather name="check-circle" size={14} color="#10B981" />
               </View>
@@ -475,8 +477,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    walkInList: { marginTop: 12, gap: 4 },
-    walkInListItem: { fontSize: 12, color: colors.textSubtle, fontWeight: '600' },
+
 
     // Recent check-ins
     recentCard: {

@@ -24,7 +24,6 @@ export default function RecentBookingsTable({ data }: { data: RecentRsvp[] }) {
                         <th className="pb-2 font-medium">Gebruiker</th>
                         <th className="pb-2 font-medium">Datum</th>
                         <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium text-right">Ingeboek</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]">
@@ -40,7 +39,6 @@ export default function RecentBookingsTable({ data }: { data: RecentRsvp[] }) {
                                     {r.status}
                                 </span>
                             </td>
-                            <td className="py-2.5 text-right">{r.checkedIn ? '✓' : '—'}</td>
                         </tr>
                     ))}
                 </tbody>

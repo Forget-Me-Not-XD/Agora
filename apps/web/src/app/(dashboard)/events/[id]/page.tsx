@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, MapPin, Users, ChevronLeft } from 'lucide-react';
+import { Calendar, MapPin, Users, ChevronLeft, Pencil } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
 import { getCurrentUser } from '@/lib/get-current-user';
@@ -15,23 +15,33 @@ export default async function EventDetailPage({ params }: { params: { id: string
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
 
-    // admin sien alle geleenthede, dosent sien net wat hy geskep het
-    const canManagePhotographers = user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
+    // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
+    const canManageEvent = user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
 
     // los die reeds-toegewysde fotograwe op hul ID's op
     const assigned =
-        canManagePhotographers && event.photographers.length
+        canManageEvent && event.photographers.length
             ? await getPhotographersByIds(event.photographers)
             : [];
 
     return (
         <div className="space-y-6 max-w-3xl">
-            <Link
-                href="/events"
-                className="inline-flex items-center gap-1 text-sm text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] transition-colors"
-            >
-                <ChevronLeft size={16} /> Terug na geleenthede
-            </Link>
+            <div className="flex items-center justify-between gap-4">
+                <Link
+                    href="/events"
+                    className="inline-flex items-center gap-1 text-sm text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] transition-colors"
+                >
+                    <ChevronLeft size={16} /> Terug na geleenthede
+                </Link>
+                {canManageEvent && (
+                    <Link
+                        href={`/events/${event.id}/edit`}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl text-sm font-medium hover:border-[var(--color-primary)] transition-colors"
+                    >
+                        <Pencil size={14} /> Wysig
+                    </Link>
+                )}
+            </div>
 
             {/* Geleentheid-besonderhede */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-4">
@@ -52,7 +62,7 @@ export default async function EventDetailPage({ params }: { params: { id: string
             </div>
 
             {/* Fotograaf-afdeling — net vir admin, of die dosent wat die geleentheid geskep het */}
-            {canManagePhotographers && (
+            {canManageEvent && (
                 <PhotographerSection
                     eventId={event.id}
                     initialAssigned={assigned}

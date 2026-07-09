@@ -80,6 +80,19 @@ export async function getMyRsvps(): Promise<MyRsvp[]> {
     return res.json() as Promise<MyRsvp[]>;
 }
 
+// DELETE /api/v1/rsvp/:id — kanselleer jou eie RSVP (204 No Content)
+export async function cancelRsvp(rsvpId: string): Promise<void> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/rsvp/${rsvpId}`, {
+        method:  'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+}
+
 // GET /api/v1/rsvp/:id/qr — PNG-beeld, word server-kant na 'n base64 data-URI omgeskakel
 export async function getRsvpQrDataUri(rsvpId: string): Promise<string> {
     const token = getToken();

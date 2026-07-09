@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { getEventsSummary, type EventsSummary } from '../api/analytics';
+import { getBudgetPerMonth, type BudgetPerMonth } from '../api/analytics';
 
 const MONTHS_AF = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
+
+function fmtRand(v: number): string {
+  return `R${Math.round(v).toLocaleString('af-ZA')}`;
+}
 
 const ACCENTS = {
   blue:   { bgLight: '#DBEAFE', fgLight: '#1D4ED8', bgDark: '#1E3A5F', fgDark: '#93C5FD' },
@@ -16,12 +19,11 @@ const ACCENTS = {
 type AccentKey = keyof typeof ACCENTS;
 
 export function BudgetScreen() {
-  const { user } = useAuthStore();
   const colors = useThemeColors();
   const isDark = colors.background === '#0B1A24';
   const styles = makeStyles(colors, isDark);
 
-  const [data, setData] = useState<EventsSummary | null>(null);
+  const [data, setData] = useState<BudgetPerMonth[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export function BudgetScreen() {
       setLoading(true);
       setError(null);
       try {
-        const result = await getEventsSummary();
+        const result = await getBudgetPerMonth();
         if (active) setData(result);
       } catch (err: unknown) {
         if (!active) return;
@@ -48,18 +50,19 @@ export function BudgetScreen() {
     return () => { active = false; };
   }, []);
 
-  const totalEvents = data?.eventsPerMonth.reduce((sum, m) => sum + m.count, 0) ?? 0;
-  const topEvent = data?.top5Events[0] ?? null;
-  const maxCount = Math.max(...(data?.eventsPerMonth.map((m) => m.count) ?? [1]), 1);
-  const maxRsvps = Math.max(...(data?.top5Events.map((e) => e.totalRsvps) ?? [1]), 1);
+  const totalBudget = data.reduce((sum, m) => sum + m.total, 0);
+  const avgPerMonth = data.length > 0 ? totalBudget / data.length : 0;
+  const peakMonth = data.reduce<BudgetPerMonth | null>(
+    (best, m) => (!best || m.total > best.total ? m : best),
+    null,
+  );
+  const maxTotal = Math.max(...data.map((m) => m.total), 1);
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Begroting</Text>
-        <Text style={styles.subtitle}>
-          {user?.role === 'ADMIN' ? 'Finansiele oorsig vir alle geleenthede' : 'Finansiele oorsig'}
-        </Text>
+        <Text style={styles.subtitle}>Toegekende begroting oor alle geleenthede</Text>
       </View>
 
       {loading ? (
@@ -78,73 +81,45 @@ export function BudgetScreen() {
           <View style={styles.statsGrid}>
             <StatCard
               styles={styles}
-              icon="calendar"
+              icon="dollar-sign"
               accent="blue"
-              label="Totale Geleenthede"
-              value={String(totalEvents)}
-              sub={`oor ${data?.eventsPerMonth.length ?? 0} maand(e)`}
+              label="Totale Begroting"
+              value={fmtRand(totalBudget)}
+              sub={`oor ${data.length} maand(e)`}
             />
             <StatCard
               styles={styles}
               icon="trending-up"
               accent="green"
-              label="Top Geleentheid RSVP's"
-              value={topEvent ? String(topEvent.totalRsvps) : 'N/B'}
-              sub={topEvent ? topEvent.eventTitle : 'Geen data beskikbaar'}
+              label="Gemiddeld per Maand"
+              value={fmtRand(avgPerMonth)}
+              sub="toegeken oor die tydperk"
             />
             <StatCard
               styles={styles}
               icon="bar-chart-2"
               accent="orange"
-              label="Aktiewe Maande"
-              value={String(data?.eventsPerMonth.length ?? 0)}
-              sub="met geleentheidsaktiwiteit"
+              label="Hoogste Maand"
+              value={peakMonth ? fmtRand(peakMonth.total) : 'N/B'}
+              sub={peakMonth ? `${MONTHS_AF[peakMonth.month - 1]} ${peakMonth.year}` : 'Geen data beskikbaar'}
             />
           </View>
 
-          <Text style={styles.sectionTitle}>Geleenthede per Maand</Text>
+          <Text style={styles.sectionTitle}>Begroting per Maand</Text>
           <View style={styles.card}>
-            {(data?.eventsPerMonth.length ?? 0) === 0 ? (
+            {data.length === 0 ? (
               <Text style={styles.emptyText}>Geen maandelikse data beskikbaar nie.</Text>
             ) : (
-              data!.eventsPerMonth.map((item, i) => (
+              data.map((item, i) => (
                 <View key={`${item.year}-${item.month}`} style={[styles.row, i === 0 && styles.rowFirst]}>
                   <View style={styles.rowTop}>
                     <Text style={styles.rowLabel}>{MONTHS_AF[item.month - 1]} {item.year}</Text>
                     <View style={styles.countBadge}>
-                      <Text style={styles.countBadgeText}>
-                        {item.count} geleentheid{item.count !== 1 ? 'e' : ''}
-                      </Text>
+                      <Text style={styles.countBadgeText}>{fmtRand(item.total)}</Text>
                     </View>
                   </View>
                   <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${Math.round((item.count / maxCount) * 100)}%` }]} />
-                  </View>
-                </View>
-              ))
-            )}
-          </View>
-
-          <Text style={styles.sectionTitle}>Top 5 Geleenthede (RSVP&apos;s)</Text>
-          <View style={styles.card}>
-            {(data?.top5Events.length ?? 0) === 0 ? (
-              <Text style={styles.emptyText}>Geen RSVP-data beskikbaar nie.</Text>
-            ) : (
-              data!.top5Events.map((item, i) => (
-                <View key={item.eventTitle} style={[styles.row, i === 0 && styles.rowFirst]}>
-                  <View style={styles.rowTop}>
-                    <View style={styles.rowTitleWrap}>
-                      <Text style={styles.rankText}>#{i + 1}</Text>
-                      <Text style={styles.rowLabel} numberOfLines={1}>{item.eventTitle}</Text>
-                    </View>
-                    <View style={[styles.countBadge, styles.countBadgeGreen]}>
-                      <Text style={[styles.countBadgeText, styles.countBadgeTextGreen]}>
-                        {item.totalRsvps} RSVP&apos;s
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressFillGreen, { width: `${Math.round((item.totalRsvps / maxRsvps) * 100)}%` }]} />
+                    <View style={[styles.progressFill, { width: `${Math.round((item.total / maxTotal) * 100)}%` }]} />
                   </View>
                 </View>
               ))
@@ -272,8 +247,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
       },
       rowFirst: { borderTopWidth: 0 },
       rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
-      rowTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
-      rankText: { color: colors.textSubtle, fontSize: 12, fontWeight: '900' },
       rowLabel: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
 
       countBadge: {
@@ -283,12 +256,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
         paddingVertical: 2,
       },
       countBadgeText: { color: isDark ? '#93C5FD' : '#1D4ED8', fontSize: 11, fontWeight: '800' },
-      countBadgeGreen: { backgroundColor: isDark ? '#064E3B' : '#D1FAE5' },
-      countBadgeTextGreen: { color: isDark ? '#6EE7B7' : '#047857' },
 
       progressTrack: { height: 6, borderRadius: 999, backgroundColor: colors.border, overflow: 'hidden' },
       progressFill: { height: '100%', borderRadius: 999, backgroundColor: colors.primary },
-      progressFillGreen: { height: '100%', borderRadius: 999, backgroundColor: '#22C55E' },
     }),
   } as const;
 }

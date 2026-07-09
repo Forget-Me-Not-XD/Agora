@@ -69,8 +69,8 @@ export default async function InsightsPage() {
                     <h1 className="text-2xl font-bold text-[var(--color-text)]">KI Insigte</h1>
                     <p className="text-sm text-[var(--color-text-subtle)] mt-1">
                         {user.role === 'ADMIN'
-                            ? 'Prestasie oorsig vir alle geleenthede'
-                            : 'Prestasie oorsig vir jou geleenthede'}
+                            ? 'Prestasie oorsig vir alle voltooide geleenthede'
+                            : 'Prestasie oorsig vir jou voltooide geleenthede'}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -135,21 +135,20 @@ export default async function InsightsPage() {
                 />
             </div>
 
-            {/* ── Per-event cards ── */}
+            {/* ── Per-event cards (slegs voltooide geleenthede) ── */}
             <div className="space-y-3">
                 <h2 className="text-base font-semibold text-[var(--color-text)]">
                     Per Geleentheid
                 </h2>
 
-                {relevantEvents.length === 0 ? (
+                {completedEvents.length === 0 ? (
                     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
                         <p className="text-[var(--color-text-subtle)] text-sm">
-                            Geen insigte beskikbaar nie.
+                            Geen voltooide geleenthede om insigte oor te wys nie.
                         </p>
                     </div>
                 ) : (
-                    relevantEvents.map((event) => {
-                        const isPast = isEventPast(event);
+                    completedEvents.map((event) => {
                         const attendanceRate = event.maxCapacity > 0
                             ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
                             : 0;
@@ -179,40 +178,28 @@ export default async function InsightsPage() {
                                 </div>
 
                                 {/* Card body */}
-                                <div className="px-5 py-4 space-y-4">
-                                    {isPast ? (
-                                        <div>
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="text-xs font-medium text-[var(--color-text-subtle)]">
-                                                    Bywoning
+                                <div className="px-5 py-4">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-xs font-medium text-[var(--color-text-subtle)]">
+                                                Bywoning
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-[var(--color-text-subtle)]">
+                                                    {event.confirmedAttendees} / {event.maxCapacity}
                                                 </span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-[var(--color-text-subtle)]">
-                                                        {event.confirmedAttendees} / {event.maxCapacity}
-                                                    </span>
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.pill}`}>
-                                                        {attendanceRate}%
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all ${colors.bar}`}
-                                                    style={{ width: `${attendanceRate}%` }}
-                                                />
+                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.pill}`}>
+                                                    {attendanceRate}%
+                                                </span>
                                             </div>
                                         </div>
-                                    ) : (
-                                        <div className="flex items-center gap-3 py-1">
-                                            <div className="w-8 h-8 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)] flex items-center justify-center shrink-0">
-                                                <Calendar size={14} className="text-[var(--color-text-subtle)]" />
-                                            </div>
-                                            <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                                Hierdie geleentheid het nog nie plaasgevind nie. Statistieke sal
-                                                outomaties hier verskyn nadat dit plaasgevind het.
-                                            </p>
+                                        <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all ${colors.bar}`}
+                                                style={{ width: `${attendanceRate}%` }}
+                                            />
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             </div>
                         );

@@ -1,5 +1,5 @@
 ﻿// ========== Imports: ==========
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Res, StreamableFile, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -9,6 +9,7 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { Role } from '../common/enums/role.enums';
 import { RsvpService, ScanResponse } from './rsvp.service';
 import { CreateRsvpDto } from './dto/create-rsvp.dto';
+import { CreateWalkInDto } from './dto/create-walk-in.dto';
 import { RsvpDocument } from './schemas/rsvp.schema';
 import { ScanRsvpDto } from './dto/scan-rsvp.dto';
 import { RsvpResponseDto } from './dto/rsvp-response.dto';
@@ -34,8 +35,21 @@ export class RsvpController {
     @HttpCode(HttpStatus.OK)
     async scanRsvp(
         @Body() dto: ScanRsvpDto,
+        @CurrentUser() user: JwtPayload,
     ): Promise <ScanResponse> {
-        return this.rsvpService.scanRsvp(dto.qrPayload);
+        return this.rsvpService.scanRsvp(dto.qrPayload, user.sub, user.role);
+    }
+
+    @Post('walk-in')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    @HttpCode(HttpStatus.CREATED)
+    async registerWalkIn(
+        @Body() dto: CreateWalkInDto,
+        @CurrentUser() user: JwtPayload,
+    ): Promise<RsvpResponseDto> {
+        const rsvp = await this.rsvpService.registerWalkIn(dto, user.sub, user.role);
+        return RsvpResponseDto.fromDocument(rsvp as RsvpDocument & { user?: UserDocument | null });
     }
 
     @Get('my')
@@ -50,9 +64,21 @@ export class RsvpController {
     @Roles(Role.ADMIN, Role.DOSENT)
     async findRsvpsByEvent(
         @Param('eventId') eventId: string,
+        @CurrentUser() user: JwtPayload,
     ): Promise<RsvpResponseDto[]> {
-        const rsvps = await this.rsvpService.findRsvpsByEvent(eventId);
+        const rsvps = await this.rsvpService.findRsvpsByEvent(eventId, user.sub, user.role);
         return rsvps.map(r => RsvpResponseDto.fromDocument(r as RsvpDocument & { user: UserDocument }));
+    }
+
+    @Patch(':id/check-in')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async checkIn(
+        @Param('id') id: string,
+        @CurrentUser() user: JwtPayload,
+    ): Promise<RsvpResponseDto> {
+        const rsvp = await this.rsvpService.checkInRsvp(id, user.sub, user.role);
+        return RsvpResponseDto.fromDocument(rsvp as RsvpDocument & { user: UserDocument });
     }
 
     @Get (':id/qr')

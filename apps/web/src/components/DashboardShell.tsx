@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { UserProvider } from './UserContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -13,17 +12,12 @@ export default function DashboardShell({
     user: MockUser;
     children: React.ReactNode;
 }) {
-    const [sidebarOpen, setSidebarOpen] = useState(true);
-
     return (
         <UserProvider user={user}>
             <div className="flex h-screen bg-[var(--color-bg)] overflow-hidden">
-                <Sidebar
-                    isOpen={sidebarOpen}
-                    onClose={() => setSidebarOpen(false)}
-                />
+                <Sidebar />
                 <div className="flex flex-col flex-1 overflow-hidden">
-                    <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+                    <Header />
                     <main className="flex-1 overflow-y-auto p-6">{children}</main>
                 </div>
             </div>

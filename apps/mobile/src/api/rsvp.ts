@@ -76,10 +76,13 @@ export interface RsvpEventUser {
     role: string;
 }
 
+// `user` is null vir 'n walk-in (iemand sonder 'n rekening wat ter plekke geregistreer is) --
+// gebruik dan `guestName` om die gas te wys.
 export interface RsvpWithUser {
     id: string;
     event: string;
-    user: RsvpEventUser;
+    user: RsvpEventUser | null;
+    guestName: string | null;
     status: RsvpStatus;
     qrPayload: string;
     checkedIn: boolean;
@@ -89,4 +92,17 @@ export interface RsvpWithUser {
 
 export async function getEventRsvps(eventId: string): Promise<RsvpWithUser[]> {
     return apiClient.get<RsvpWithUser[]>(`/rsvp/event/${eventId}`);
+}
+
+// PATCH /rsvp/:id/check-in -- ADMIN/DOSENT-only, teken 'n gas direk in sonder QR-skandering
+export async function checkInRsvp(rsvpId: string): Promise<RsvpWithUser> {
+    return apiClient.patch<RsvpWithUser>(`/rsvp/${rsvpId}/check-in`);
+}
+
+// POST /rsvp/walk-in -- ADMIN/DOSENT-only, registreer + teken dadelik in iemand sonder RSVP
+export async function registerWalkIn(eventId: string, guestName: string): Promise<RsvpWithUser> {
+    return apiClient.post<RsvpWithUser, { eventId: string; guestName: string }>('/rsvp/walk-in', {
+        eventId,
+        guestName,
+    });
 }

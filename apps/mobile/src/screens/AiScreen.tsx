@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -17,52 +17,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 // elkeen is 'n aparte model-inferensie, so ons beperk dit tot 'n redelike getal.
 const MAX_FORECASTS = 10;
 
-interface MetricInfo {
-  key: string;
-  label: string;
-  value: string;
-  description: string;
-}
-
-const LSTM_METRICS: MetricInfo[] = [
-  {
-    key: 'r2',
-    label: 'R²-telling',
-    value: '0.9119',
-    description: 'Hoe goed die model variasie verklaar. Nader aan 1.0 is beter — 0.91 dui op uitstekende passing.',
-  },
-  {
-    key: 'mae',
-    label: 'MAE',
-    value: '±10.3',
-    description: 'Gemiddelde absolute fout. Die model voorspel bywoningsgetalle binne ~10 persone van die werklikheid.',
-  },
-  {
-    key: 'inference',
-    label: 'Inferensie',
-    value: '8ms',
-    description: 'Tyd om een voorspelling te maak. 8ms beteken voorspellings word in reële tyd bereken.',
-  },
-  {
-    key: 'params',
-    label: 'Parameters',
-    value: '3 649',
-    description: 'Aantal leerbare parameters in die model. Geoptimeer vir lae geheueverbruik op mobile toestelle.',
-  },
-  {
-    key: 'epochs',
-    label: 'Opleidingsepogte',
-    value: '250',
-    description: 'Die model is oor 250 iterasies opgelei op historiese bywoningsdata.',
-  },
-  {
-    key: 'window',
-    label: 'Venstergrootte',
-    value: '12 weke',
-    description: 'Die model gebruik die afgelope 12 weke se data om toekomstige bywoning te voorspel.',
-  },
-];
-
 interface Forecast {
   event: EventResponse;
   prediction: PredictionResult | null;
@@ -74,7 +28,6 @@ export function AiScreen() {
   const colors = useThemeColors();
   const styles = makeStyles(colors);
 
-  const [selectedMetric, setSelectedMetric] = useState<MetricInfo | null>(null);
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -121,6 +74,11 @@ export function AiScreen() {
     );
   }
 
+  // Geen enkele "model-status" eindpunt bestaan nie -- ons lei dit eerlik af uit
+  // hoeveel van die regte per-funksie voorspellings hieronder werklik geslaag het.
+  const modelAvailable = forecasts.length === 0 || forecasts.some((f) => f.prediction !== null);
+  const availableCount = forecasts.filter((f) => f.prediction !== null).length;
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.pageHeader}>
@@ -135,42 +93,18 @@ export function AiScreen() {
           <View style={styles.modelCardTop}>
             <View>
               <Text style={styles.modelCardTitle}>KI / LSTM Model</Text>
-              <Text style={styles.modelCardSub}>Aktief en bereken voorspellings</Text>
+              <Text style={styles.modelCardSub}>
+                {loading
+                  ? 'Kontroleer status...'
+                  : forecasts.length === 0
+                  ? 'Geen aankomende funksies om te voorspel nie'
+                  : `${availableCount} van ${forecasts.length} funksies het 'n beskikbare voorspelling`}
+              </Text>
             </View>
-            <View style={styles.modelActivePill}>
-              <View style={styles.activeDot} />
-              <Text style={styles.modelActiveText}>Aktief</Text>
+            <View style={[styles.modelActivePill, !modelAvailable && styles.modelInactivePill]}>
+              <View style={[styles.activeDot, !modelAvailable && styles.inactiveDot]} />
+              <Text style={styles.modelActiveText}>{modelAvailable ? 'Aktief' : 'Onbeskikbaar'}</Text>
             </View>
-          </View>
-
-          {/* Model metrics grid */}
-          <View style={styles.metricsGrid}>
-            {LSTM_METRICS.slice(0, 4).map((m) => (
-              <TouchableOpacity
-                key={m.key}
-                style={styles.metricBox}
-                onPress={() => setSelectedMetric(m)}
-                accessibilityLabel={`${m.label}: ${m.value}. Tik vir meer inligting.`}
-              >
-                <Text style={styles.metricLabel}>{m.label}</Text>
-                <Text style={styles.metricValue}>{m.value}</Text>
-                <Feather name="info" size={10} color={colors.textSubtle} style={{ marginTop: 4 }} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View style={styles.metricRow}>
-            {LSTM_METRICS.slice(4).map((m) => (
-              <TouchableOpacity
-                key={m.key}
-                style={styles.metricBoxWide}
-                onPress={() => setSelectedMetric(m)}
-                accessibilityLabel={`${m.label}: ${m.value}. Tik vir meer inligting.`}
-              >
-                <Text style={styles.metricLabel}>{m.label}</Text>
-                <Text style={styles.metricValue}>{m.value}</Text>
-              </TouchableOpacity>
-            ))}
           </View>
         </View>
 
@@ -274,31 +208,6 @@ export function AiScreen() {
         </View>
 
       </ScrollView>
-
-      {/* ── Metric detail modal ── */}
-      <Modal
-        visible={!!selectedMetric}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedMetric(null)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedMetric(null)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedMetric?.label}</Text>
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setSelectedMetric(null)}
-                accessibilityLabel="Maak toe"
-              >
-                <Feather name="x" size={16} color={colors.textSubtle} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalValue}>{selectedMetric?.value}</Text>
-            <Text style={styles.modalBody}>{selectedMetric?.description}</Text>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -389,27 +298,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#10B981' },
     modelActiveText: { fontSize: 11, fontWeight: '800', color: colors.text },
-
-    metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-    metricBox: {
-      width: '48%',
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      padding: 12,
-    },
-    metricRow: { flexDirection: 'row', gap: 8 },
-    metricBoxWide: {
-      flex: 1,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      padding: 12,
-    },
-    metricLabel: { fontSize: 10, fontWeight: '800', color: colors.textSubtle },
-    metricValue: { fontSize: 18, fontWeight: '900', color: colors.text, marginTop: 4 },
+    modelInactivePill: { borderColor: colors.textSubtle },
+    inactiveDot: { backgroundColor: colors.textSubtle },
 
     sectionTitle: {
       fontSize: 10,
@@ -483,38 +373,5 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     howTitle: { fontSize: 14, fontWeight: '900', color: colors.text, marginBottom: 4 },
-
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center',
-      padding: 24,
-    },
-    modalCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 20,
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    modalTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    modalClose: {
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    modalValue: { fontSize: 28, fontWeight: '900', color: colors.primary, marginBottom: 10 },
-    modalBody: { fontSize: 13, fontWeight: '600', color: colors.textSubtle, lineHeight: 19 },
   });
 }
