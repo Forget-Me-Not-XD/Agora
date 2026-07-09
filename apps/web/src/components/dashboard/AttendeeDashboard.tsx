@@ -1,4 +1,4 @@
-import { Calendar, MapPin, Ticket, CheckCircle2, Clock, CalendarCheck } from 'lucide-react';
+import { Calendar, MapPin, Ticket, CheckCircle2, Clock } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import MyBookingsTable from './MyBookingsTable';
 import { getMyRsvps } from '@/lib/api/rsvp';
@@ -11,7 +11,6 @@ export default async function AttendeeDashboard() {
 
     const confirmed = rsvps.filter((r) => r.status === 'BEVESTIG');
     const pending = rsvps.filter((r) => r.status === 'HANGENDE');
-    const attended = rsvps.filter((r) => r.checkedIn);
 
     const now = Date.now();
     const upcoming = rsvps
@@ -22,11 +21,10 @@ export default async function AttendeeDashboard() {
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <StatCard label="My Besprekings" value={rsvps.length} sub="in totaal" icon={Ticket} color="blue" />
                 <StatCard label="Bevestig" value={confirmed.length} sub="gereed om by te woon" icon={CheckCircle2} color="green" />
                 <StatCard label="Hangende" value={pending.length} sub="wag vir bevestiging" icon={Clock} color="orange" />
-                <StatCard label="Bygewoon" value={attended.length} sub="ingeboek by geleentheid" icon={CalendarCheck} color="red" />
             </div>
 
             {next?.event && (

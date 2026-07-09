@@ -136,11 +136,7 @@ export function EventDetailScreen() {
   const pillColor = STATUS_PILL[status];
 
   function handleManageRsvps() {
-    Alert.alert(
-      'Bestuur RSVPs',
-      `${event!.confirmedAttendees} bygewoon by ${event!.title}. Volle RSVP-bestuur koms binnekort.`,
-      [{ text: 'OK' }],
-    );
+    navigation.navigate('RsvpManagement', { eventId: event!.id });
   }
 
   function handleQrScanner() {

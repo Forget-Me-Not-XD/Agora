@@ -57,7 +57,6 @@ export function EventsScreen() {
   const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
   const [menuState, setMenuState] = useState<MenuState>(null);
-  const [savedEvents, setSavedEvents] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
 
   const role = user?.role ?? 'STUDENT';
@@ -111,17 +110,6 @@ export function EventsScreen() {
     if (!menuState) return;
     closeMenu();
     navigation.navigate('EventDetail', { eventId: menuState.eventId });
-  }
-
-  function handleSave() {
-    if (!menuState) return;
-    const id = menuState.eventId;
-    setSavedEvents((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-    closeMenu();
   }
 
   const menuEvent = menuState
@@ -217,7 +205,6 @@ export function EventsScreen() {
                 key={event.id}
                 event={event}
                 isDark={isDark}
-                saved={savedEvents.has(event.id)}
                 onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
                 onMenuPress={() => openMenu(event)}
               />
@@ -332,16 +319,6 @@ export function EventsScreen() {
                 <Text style={[styles.menuItemText, { color: colors.text }]}>RSVP vir hierdie funksie</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.menuItem} onPress={handleSave} accessibilityLabel="Stoor of boekmerk funksie">
-              <Feather
-                name="bookmark"
-                size={16}
-                color={menuState && savedEvents.has(menuState.eventId) ? colors.primary : colors.textSubtle}
-              />
-              <Text style={[styles.menuItemText, { color: colors.text }]}>
-                {menuState && savedEvents.has(menuState.eventId) ? 'Verwyder boekmerk' : 'Stoor / Boekmerk'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>
@@ -357,13 +334,11 @@ function canRsvpVisible(role: string): boolean {
 function EventCard({
   event,
   isDark,
-  saved,
   onPress,
   onMenuPress,
 }: {
   event: EventResponse;
   isDark: boolean;
-  saved: boolean;
   onPress: () => void;
   onMenuPress: () => void;
 }) {
@@ -404,9 +379,6 @@ function EventCard({
               {STATUS_LABELS[status]}
             </Text>
           </View>
-          {saved && (
-            <Feather name="bookmark" size={12} color={colors.primary} style={{ marginLeft: 6 }} />
-          )}
         </View>
       </View>
 

@@ -15,9 +15,10 @@
  * Password for every seeded account (including the extras): Seed@1234!
  *
  * Volume: 150 users total (1 admin, 10 dosents, 124 students, 10 gas, 5
- *         photographers) × 1000 events spread across ~5 years (roughly 3.3
- *         years ago → 1.6 years from now) × RSVPs generated per-event from
- *         the role-eligible attendee pool.
+ *         photographers) × 1000 events — exactly 850 in the past (spread over
+ *         the last ~3 years) and exactly 150 upcoming (capped so none fall in
+ *         2027 or later) × RSVPs generated per-event from the role-eligible
+ *         attendee pool.
  *
  * Every schema field is populated with a plausible value — no field is left
  * at an empty/zero default unless that default is itself the realistic
@@ -171,6 +172,14 @@ function weightedRsvpStatus(): (typeof RSVP_STATUSES)[number] {
     return 'GEKANSELLEER';
 }
 
+// 'n Verlede geleentheid kan nie meer 'n "hangende" RSVP hê nie -- teen die tyd
+// wat dit plaasgevind het, is elke inskrywing lankal bevestig of gekanselleer.
+// Oorwegend BEVESTIG hou die werklike bywoning (BEVESTIG-telling / kapasiteit)
+// naby die geteikende ~95%-gemiddeld.
+function weightedPastRsvpStatus(): (typeof RSVP_STATUSES)[number] {
+    return Math.random() < 0.99 ? 'BEVESTIG' : 'GEKANSELLEER';
+}
+
 function clamp(v: number, lo: number, hi: number): number {
     return Math.max(lo, Math.min(hi, v));
 }
@@ -183,6 +192,15 @@ function randomFillRate(): number {
     return clamp(0.05 + blended * 0.85, 0.05, 0.95);
 }
 
+// Vir verlede geleenthede: hoeveel van die berykbare (kapasiteit-beperkte) skare
+// werklik ingeskryf het. Triangulêr tussen 90%-100%, gemiddeld 95% -- gekombineer
+// met weightedPastRsvpStatus() (97% BEVESTIG) gee dit 'n werklike bygewoon-koers
+// (BEVESTIG-telling / maxCapacity) van ±95% se gemiddeld oor baie geleenthede.
+function randomPastFillRate(): number {
+    const blended = (Math.random() + Math.random()) / 2;
+    return clamp(0.92 + blended * 0.08, 0.92, 1.0);
+}
+
 function randomCapacity(): number {
     const r = Math.random();
     if (r < 0.40) return randInt(20, 80);
@@ -191,16 +209,45 @@ function randomCapacity(): number {
     return randInt(500, 800);
 }
 
-// Event dates spread across ~5 years (roughly 3.3 years ago to 1.6 years from
-// now, relative to today), keeping the same past-heavy ratio as before —
-// gives a realistic long-running history plus a near-term upcoming pipeline.
-function randomEventDate(): Date {
+// Vir verlede geleenthede moet kapasiteit histories haalbaar wees: met net ~145
+// gesimuleerde gebruikers in totaal kan 'n geleentheid met plek vir 500+ mense
+// nooit werklik 95% gevul word nie (daar bestaan eenvoudig nie genoeg mense nie).
+// Kies dus 'n kapasiteit as 'n aandeel van die werklik-kwalifiserende poel vir
+// hierdie spesifieke geleentheid se sigbaarheidsvlak, sodat 'n hoë vulkoers
+// wiskundig haalbaar bly.
+function randomPastCapacity(eligiblePoolSize: number): number {
+    // Let op: GEEN kunsmatige minimum-vloer hier nie (bv. 10) -- vir 'n rol-vlak met
+    // net 1-11 werklike mense (DOSENT/ADMIN-beperkte geleenthede) sou 'n vloer die
+    // kapasiteit groter as die poel self maak, wat 'n 95%-vulkoers weer onbereikbaar
+    // maak. 'n Klein kapasiteit (bv. 1-11) is trouens realisties vir so 'n beperkte,
+    // interne geleentheid.
+    const usable = Math.max(eligiblePoolSize, 1);
+    const blended = (Math.random() + Math.random()) / 2;
+    const ratio = 0.55 + blended * 0.35; // 55%-90% van die poel, gemiddeld ~72%
+    return Math.max(1, Math.round(usable * ratio));
+}
+
+// Harde grens: geen toekomstige geleentheid mag in 2027 (of later) val nie.
+const FUTURE_CUTOFF = new Date('2026-12-31T23:59:59');
+// Verlede geleenthede is versprei oor die afgelope ~3 jaar — 'n realistiese
+// deurlopende geskiedenis vir 'n universiteit se funksiestelsel.
+const PAST_WINDOW_DAYS = 1095;
+
+// `isFuture` bepaal presies watter kant van vandag die datum val: die skrip
+// wat hierdie funksie aanroep, ken elke geleentheid vooraf 'n vaste toekoms/
+// verlede-vlag toe sodat die 850/150-verdeling presies (nie net waarskynlik)
+// uitkom.
+function randomEventDate(isFuture: boolean): Date {
     const now = new Date();
-    // Skewed toward the future: ~15 months of past history (still plenty for
-    // trend charts) and ~2.5 years of upcoming events, so dashboards and any
-    // "upcoming events" view actually have real data to show.
-    const daysOffset = randInt(-450, 900);
-    const d = new Date(now.getTime() + daysOffset * 86_400_000);
+    let d: Date;
+    if (isFuture) {
+        const maxDaysAhead = Math.max(1, Math.floor((FUTURE_CUTOFF.getTime() - now.getTime()) / 86_400_000));
+        const daysOffset = randInt(1, maxDaysAhead);
+        d = new Date(now.getTime() + daysOffset * 86_400_000);
+    } else {
+        const daysOffset = randInt(1, PAST_WINDOW_DAYS);
+        d = new Date(now.getTime() - daysOffset * 86_400_000);
+    }
     d.setHours(randInt(9, 19), [0, 15, 30, 45][randInt(0, 3)], 0, 0);
     return d;
 }
@@ -372,8 +419,24 @@ async function seed(): Promise<void> {
     const EVENT_TYPES = ['public', 'internal_student', 'private', 'department'];
     const creators = [admin, ...dosents];
 
+    // Vervroeg vanaf die RSVP-afdeling hieronder -- kapasiteit vir verlede
+    // geleenthede moet reeds tydens generering weet hoeveel mense werklik
+    // kwalifiseer vir 'n gegewe sigbaarheidsvlak.
+    const ROLE_LEVEL: Record<string, number> = { GAS: 1, STUDENT: 2, DOSENT: 3, ADMIN: 4 };
+    const attendeePool = [...students, ...gasUsers, ...dosents, admin];
+
     console.log('Generating events…');
     const NUM_EVENTS = 1000;
+    const NUM_FUTURE_EVENTS = 150;
+
+    // Presiese 150/850-verdeling: bou 'n vlaggie per geleentheid-indeks en skommel
+    // dit (Fisher–Yates), sodat dit nie net waarskynlik is nie, maar altyd presies uitkom.
+    const isFutureFlags = Array.from({ length: NUM_EVENTS }, (_, i) => i < NUM_FUTURE_EVENTS);
+    for (let i = isFutureFlags.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [isFutureFlags[i], isFutureFlags[j]] = [isFutureFlags[j], isFutureFlags[i]];
+    }
+
     const eventDocs: Array<{
         _id: Types.ObjectId;
         title: string;
@@ -395,13 +458,24 @@ async function seed(): Promise<void> {
 
     // Guarantee the named dosent has authored a handful of events for their dashboard
     for (let i = 0; i < NUM_EVENTS; i++) {
-        const date = randomEventDate();
+        const isPast = !isFutureFlags[i];
+        const date = randomEventDate(isFutureFlags[i]);
         const daysInAdvance = randInt(7, 60);
         const createdAt = new Date(date.getTime() - daysInAdvance * 86_400_000);
-        const capacity = randomCapacity();
+        const intendedAttendance = pick(ATTENDANCE_ROLES);
         const hasPhotographer = Math.random() < 0.4;
         const assignedPhotographer = hasPhotographer ? pick(photographers) : null;
         const creator = i < 20 ? namedDosent : pick(creators);
+
+        // Vir verlede geleenthede: kapasiteit moet histories haalbaar wees gegewe
+        // hoeveel mense werklik in hierdie sigbaarheidsvlak kwalifiseer, anders kan
+        // die geteikende ~95%-bygewoning nooit wiskundig bereik word nie. Toekomstige
+        // geleenthede het nog geen bygewoning-geskiedenis nie, so hulle behou die
+        // vrye kapasiteitverspreiding.
+        const eligiblePoolSize = attendeePool.filter(
+            (u) => ROLE_LEVEL[u.role] >= ROLE_LEVEL[intendedAttendance],
+        ).length;
+        const capacity = isPast ? randomPastCapacity(eligiblePoolSize) : randomCapacity();
 
         eventDocs.push({
             _id: new Types.ObjectId(),
@@ -416,7 +490,7 @@ async function seed(): Promise<void> {
             photographers: assignedPhotographer ? [assignedPhotographer._id] : [],
             photographerInstructions: assignedPhotographer ? pick(PHOTO_INSTRUCTIONS) : '',
             confirmedAttendees: 0, // filled in after RSVPs are generated below
-            intendedAttendance: pick(ATTENDANCE_ROLES),
+            intendedAttendance,
             type: pick(EVENT_TYPES),
             createdAt,
             updatedAt: date,
@@ -425,8 +499,6 @@ async function seed(): Promise<void> {
 
     // ─── RSVPs ────────────────────────────────────────────────────────────────
     console.log('Generating RSVPs…');
-    const ROLE_LEVEL: Record<string, number> = { GAS: 1, STUDENT: 2, DOSENT: 3, ADMIN: 4 };
-    const attendeePool = [...students, ...gasUsers, ...dosents, admin];
     const now = Date.now();
 
     const rsvpDocs: object[] = [];
@@ -434,19 +506,19 @@ async function seed(): Promise<void> {
 
     for (let i = 0; i < eventDocs.length; i++) {
         const event = eventDocs[i];
+        const isPastEvent = event.date.getTime() < now;
         const requiredLevel = ROLE_LEVEL[event.intendedAttendance];
         const eligible = attendeePool.filter((u) => ROLE_LEVEL[u.role] >= requiredLevel);
         if (eligible.length === 0) continue;
 
         const pool = Math.min(event.maxCapacity, eligible.length);
-        const rsvpCount = Math.max(1, Math.round(pool * randomFillRate()));
+        const rsvpCount = Math.max(1, Math.round(pool * (isPastEvent ? randomPastFillRate() : randomFillRate())));
         const selected = pickUniqueIndices(eligible.length, rsvpCount).map((idx) => eligible[idx]);
 
         let confirmedForEvent = 0;
-        const isPastEvent = event.date.getTime() < now;
 
         for (const user of selected) {
-            const status = weightedRsvpStatus();
+            const status = isPastEvent ? weightedPastRsvpStatus() : weightedRsvpStatus();
             const confirmed = status === 'BEVESTIG';
             if (confirmed) confirmedForEvent++;
 
@@ -488,9 +560,9 @@ async function seed(): Promise<void> {
         const extras = pickUniqueIndices(candidateEvents.length, 5).map((idx) => candidateEvents[idx]);
 
         for (const event of extras) {
-            const status = weightedRsvpStatus();
-            const confirmed = status === 'BEVESTIG';
             const isPastEvent = event.date.getTime() < now;
+            const status = isPastEvent ? weightedPastRsvpStatus() : weightedRsvpStatus();
+            const confirmed = status === 'BEVESTIG';
             const checkedIn = confirmed && isPastEvent && Math.random() < 0.85;
 
             rsvpDocs.push({
@@ -556,8 +628,9 @@ async function seed(): Promise<void> {
     console.log('  GAS          seed-gas@gmail.com');
     console.log('  PHOTOGRAPHER seed-fotograaf@gmail.com');
     console.log('──────────────────────────────────────────────────────────────');
+    const futureCount = eventDocs.filter((e) => e.date.getTime() > Date.now()).length;
     console.log(`  Total users:         ${allUsers.length}`);
-    console.log(`  Events inserted:     ${eventDocs.length}`);
+    console.log(`  Events inserted:     ${eventDocs.length} (${futureCount} future / ${eventDocs.length - futureCount} past)`);
     console.log(`  RSVPs inserted:      ${rsvpDocs.length}`);
     console.log(`  Notifications:       ${notificationDocs.length}`);
     console.log(`  Photographer profiles: ${photographerProfiles.length}`);

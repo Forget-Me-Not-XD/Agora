@@ -24,18 +24,22 @@ class UserInRsvpDto {
 export class RsvpResponseDto {
     id!: string;
     event!: string;
-    user!: UserInRsvpDto;
+    user!: UserInRsvpDto | null;
+    guestName!: string | null;
     status!: RsvpStatus;
     qrPayload!: string;
     checkedIn!: boolean;
     checkedInAt!: Date | null;
     createdAt!: Date;
 
-    static fromDocument(rsvp: RsvpDocument & { user: UserDocument }): RsvpResponseDto {
+    // 'n Walk-in het geen gekoppelde gebruiker nie -- `user` is dan null en
+    // `guestName` (op die geleentheid ingesamel) word gebruik om die gas te wys.
+    static fromDocument(rsvp: RsvpDocument & { user?: UserDocument | null }): RsvpResponseDto {
         return {
             id: rsvp._id.toString(),
             event: rsvp.event.toString(),
-            user: UserInRsvpDto.fromDocument(rsvp.user),
+            user: rsvp.user ? UserInRsvpDto.fromDocument(rsvp.user) : null,
+            guestName: rsvp.guestName ?? null,
             status: rsvp.status,
             qrPayload: rsvp.qrPayload,
             checkedIn: rsvp.checkedIn,

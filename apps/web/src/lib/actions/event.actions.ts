@@ -1,8 +1,8 @@
 'use server';
 
 // ========== Imports: ==========
-import { createEvent, getEvents } from '@/lib/api/events';
-import type { CreateEventPayload, Event } from '@/lib/api/events';
+import { createEvent, getEvents, updateEvent } from '@/lib/api/events';
+import type { CreateEventPayload, Event, UpdateEventPayload } from '@/lib/api/events';
 
 export async function createEventAction(
     payload: CreateEventPayload,
@@ -11,6 +11,18 @@ export async function createEventAction(
         await createEvent(payload);
     } catch (err) {
         return err instanceof Error ? err.message : 'Geleentheid skep het misluk.';
+    }
+    return null;
+}
+
+export async function updateEventAction(
+    id: string,
+    payload: UpdateEventPayload,
+): Promise<string | null> {
+    try {
+        await updateEvent(id, payload);
+    } catch (err) {
+        return err instanceof Error ? err.message : 'Geleentheid opdateer het misluk.';
     }
     return null;
 }

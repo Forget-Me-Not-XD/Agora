@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { MyRsvp } from '@/lib/api/rsvp';
 import { formatDateShort } from '@/lib/format-date';
+import RsvpQrButton from '@/components/RsvpQrButton';
 
 const STATUS_STYLE: Record<string, string> = {
     BEVESTIG: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -38,7 +39,7 @@ export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
                         <th className="pb-2 font-medium">Datum</th>
                         <th className="pb-2 font-medium">Ligging</th>
                         <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium text-right">Ingeboek</th>
+                        <th className="pb-2 font-medium text-right">QR-kode</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]">
@@ -64,7 +65,13 @@ export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
                                     {STATUS_LABEL[r.status] ?? r.status}
                                 </span>
                             </td>
-                            <td className="py-2.5 text-right">{r.checkedIn ? '✓' : '—'}</td>
+                            <td className="py-2.5 text-right">
+                                <RsvpQrButton
+                                    rsvpId={r._id}
+                                    eventTitle={r.event?.title ?? 'Geleentheid'}
+                                    disabled={r.status === 'GEKANSELLEER'}
+                                />
+                            </td>
                         </tr>
                     ))}
                 </tbody>

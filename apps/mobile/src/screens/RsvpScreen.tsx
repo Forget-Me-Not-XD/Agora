@@ -314,7 +314,7 @@ export function RsvpScreen() {
             </Text>
           </View>
         ) : (
-          filteredRsvps.map(({ _id, status, checkedIn, event }) => {
+          filteredRsvps.map(({ _id, status, event }) => {
             const cfg = RSVP_STATUS_CONFIG[status];
             const { day, month } = formatDate(event.date);
             const showQr = openQrId === _id;
@@ -338,12 +338,6 @@ export function RsvpScreen() {
                   <View style={styles.rsvpDetailRow}>
                     <Text style={styles.rsvpDetailLabel}>Status</Text>
                     <Text style={[styles.rsvpDetailValue, { color: cfg.text }]}>{cfg.label}</Text>
-                  </View>
-                  <View style={styles.rsvpDetailRow}>
-                    <Text style={styles.rsvpDetailLabel}>Ingemeld</Text>
-                    <Text style={styles.rsvpDetailValue}>
-                      {checkedIn ? 'Ja' : 'Nee'}
-                    </Text>
                   </View>
                 </View>
 

@@ -39,6 +39,8 @@ export interface CreateEventPayload {
     type?:                     EventType;
 }
 
+export type UpdateEventPayload = Partial<CreateEventPayload>;
+
 export interface EventFilters {
     from?: string;
     to?:   string;
@@ -80,6 +82,13 @@ export async function getEventById(id: string): Promise<Event> {
 export async function createEvent(payload: CreateEventPayload): Promise<Event> {
     return apiFetch<Event>('/api/v1/events', {
         method: 'POST',
+        body:   JSON.stringify(payload),
+    });
+}
+
+export async function updateEvent(id: string, payload: UpdateEventPayload): Promise<Event> {
+    return apiFetch<Event>(`/api/v1/events/${id}`, {
+        method: 'PATCH',
         body:   JSON.stringify(payload),
     });
 }

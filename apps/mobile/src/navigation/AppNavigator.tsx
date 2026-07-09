@@ -5,6 +5,7 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
+import { RsvpManagementScreen } from '../screens/RsvpManagementScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { MainTabs } from './MainTabs';
@@ -17,6 +18,7 @@ export type RootStackParamList = {
   Profile: undefined;
   EventDetail: { eventId: string };
   QrScanner: { eventId: string };
+  RsvpManagement: { eventId: string };
   AdminCreateUser: undefined;
 };
 
@@ -34,6 +36,7 @@ export function AppNavigator() {
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="EventDetail" component={EventDetailScreen} />
           <Stack.Screen name="QrScanner" component={QrScannerScreen} />
+          <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
           <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
         </>
       ) : (

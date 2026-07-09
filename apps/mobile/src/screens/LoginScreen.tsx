@@ -108,13 +108,6 @@ export function LoginScreen({ navigation }: Props) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => Alert.alert('Binnekort', 'Biometriese aanmelding kom in ' + "'n" + ' volgende weergawe.')}
-            >
-              <Text style={styles.secondaryText}>Biometriese Aanmelding</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={styles.forgotBtn}
               onPress={() => Alert.alert('Wagwoord', 'Kontak jou administrateur om jou wagwoord te herstel.')}
             >
@@ -211,18 +204,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     primaryText: { color: colors.primaryText, fontSize: 15, fontWeight: '800' },
     buttonDisabled: { opacity: 0.7 },
 
-    secondaryBtn: {
-      marginTop: 12,
-      borderRadius: 12,
-      paddingVertical: 14,
-      alignItems: 'center',
-      backgroundColor: 'transparent',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    secondaryText: { color: colors.text, fontSize: 14, fontWeight: '700' },
-
-    forgotBtn: { marginTop: 12, alignItems: 'center' },
+    forgotBtn: { marginTop: 20, alignItems: 'center' },
     forgotText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
 
     footer: { marginTop: 14, textAlign: 'center', color: colors.textSubtle, fontSize: 11 },

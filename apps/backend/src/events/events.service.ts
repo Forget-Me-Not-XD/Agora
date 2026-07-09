@@ -49,17 +49,13 @@ export class EventsService {
         }
 
         // Rol-gebaseerde sigbaarheid: 'n gebruiker sien geleenthede op sy vlak en laer.
-        // ADMIN sien alles, PHOTOGRAPHER(vlak 2) sien ook waar hy toegewys is.
-        if (viewerRole !== Role.ADMIN) {
-            const allowed = visibleAttendanceRoles(viewerRole);
-            if (viewerRole === Role.PHOTOGRAPHER) {
-                filter.$or = [
-                    { intendedAttendance: { $in: allowed } },
-                    { photographers: new Types.ObjectId(viewerId) },
-                ];
-            } else {
-                filter.intendedAttendance = { $in: allowed };
-            }
+        // ADMIN sien alles. PHOTOGRAPHER is 'n uitsondering op die vlak-stelsel: hulle
+        // sien NOOIT geleenthede op grond van intendedAttendance nie -- slegs geleenthede
+        // waaraan 'n Dosent/Admin hulle spesifiek as fotograaf toegewys het.
+        if (viewerRole === Role.PHOTOGRAPHER) {
+            filter.photographers = new Types.ObjectId(viewerId);
+        } else if (viewerRole !== Role.ADMIN) {
+            filter.intendedAttendance = { $in: visibleAttendanceRoles(viewerRole) };
         }
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
@@ -83,11 +79,12 @@ export class EventsService {
 
     private canView(event: EventDocument, viewerRole: Role, viewerId?: string): boolean {
         if (viewerRole === Role.ADMIN) return true;
-        if (visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance)) return true;
-        if (viewerRole === Role.PHOTOGRAPHER && viewerId) {
-            return event.photographers.some((p) => p.toString() === viewerId);
+        // PHOTOGRAPHER is 'n uitsondering: nooit op grond van intendedAttendance sigbaar
+        // nie, slegs as hulle spesifiek as fotograaf aan hierdie geleentheid toegewys is.
+        if (viewerRole === Role.PHOTOGRAPHER) {
+            return !!viewerId && event.photographers.some((p) => p.toString() === viewerId);
         }
-        return false;
+        return visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance);
     }
 
     async incrementConfirmedAttendees(id: string): Promise<EventDocument> {
@@ -192,7 +189,7 @@ export class EventsService {
         }
     }
 
-    private assertOwnership(
+    assertOwnership(
         event: EventDocument,
         requesterId: string,
         requesterRole: Role,

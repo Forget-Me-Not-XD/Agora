@@ -1,4 +1,4 @@
-import type { MockEvent, MockUser, UserRole } from './mock-data';
+import type { UserRole } from './mock-data';
 
 export function canCreateEvents(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
@@ -9,43 +9,11 @@ export function canViewInsights(role: UserRole): boolean {
 }
 
 export function canViewBudget(role: UserRole): boolean {
-    return role === 'DOSENT' || role === 'ADMIN';
+    return role === 'ADMIN';
 }
 
 export function canManageUsers(role: UserRole): boolean {
     return role === 'ADMIN';
-}
-
-export function filterEventsForUser(events: MockEvent[], user: MockUser): MockEvent[] {
-    switch (user.role) {
-        case 'ADMIN':
-            return events;
-
-        case 'DOSENT':
-            return events.filter(
-            (e) => e.status === 'upcoming' || e.status === 'ongoing' || e.createdBy === user.id
-            );
-
-        case 'STUDENT':
-            return events.filter((e) => {
-        const isActive = e.status === 'upcoming' || e.status === 'ongoing';
-        const isVisible =
-            e.type === 'public' ||
-            e.type === 'internal_student' ||
-            e.invitedUsers.includes(user.id);
-        return isActive && isVisible;
-        });
-
-    case 'GAS':
-        return events.filter((e) => {
-        const isActive = e.status === 'upcoming' || e.status === 'ongoing';
-        const isVisible = e.type === 'public' || e.invitedUsers.includes(user.id);
-        return isActive && isVisible;
-        });
-
-    default:
-        return [];
-    }
 }
 
 export function getRoleLabel(role: UserRole): string {

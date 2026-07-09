@@ -1,11 +1,15 @@
 // ========== Imports: ==========
 import { Suspense } from 'react';
-import { AlertCircle, Calendar, BarChart2, TrendingUp } from 'lucide-react';
-import { getEventsSummary } from '@/lib/api/analytics';
+import { AlertCircle, Wallet, TrendingUp, CalendarClock } from 'lucide-react';
+import { getBudgetPerMonth } from '@/lib/api/analytics';
+import { mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import { canViewBudget } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
+import BudgetTrendChart from '@/components/charts/BudgetTrendChart';
 
-const MAAND_NAME = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
+function fmtRand(v: number): string {
+    return `R${Math.round(v).toLocaleString('af-ZA')}`;
+}
 
 function KpiSkeleton() {
     return (
@@ -28,14 +32,7 @@ function BudgetSkeleton() {
                 <KpiSkeleton />
                 <KpiSkeleton />
             </div>
-            <div className="space-y-3">
-                {[0, 1, 2, 3].map((i) => (
-                    <div
-                        key={i}
-                        className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl h-16 animate-pulse"
-                    />
-                ))}
-            </div>
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl h-64 animate-pulse" />
         </div>
     );
 }
@@ -52,108 +49,50 @@ function BudgetError({ message }: { message: string }) {
 
 async function BudgetData() {
     try {
-        const { eventsPerMonth, top5Events } = await getEventsSummary();
+        const budgetPerMonth = await getBudgetPerMonth();
+        const monthly = mergeSingleMonthlySeries(budgetPerMonth);
 
-        const totalEvents = eventsPerMonth.reduce((sum, m) => sum + m.count, 0);
-        const topEvent    = top5Events[0] ?? null;
-        const maxCount    = Math.max(...eventsPerMonth.map((m) => m.count), 1);
-        const maxRsvps    = Math.max(...top5Events.map((e) => e.totalRsvps), 1);
+        const totalBudget = budgetPerMonth.reduce((sum, m) => sum + m.total, 0);
+        const avgPerMonth = budgetPerMonth.length > 0 ? totalBudget / budgetPerMonth.length : 0;
+        const peakMonth = budgetPerMonth.reduce<typeof budgetPerMonth[number] | null>(
+            (best, m) => (!best || m.total > best.total ? m : best),
+            null,
+        );
 
         return (
             <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <KpiCard
-                        icon={<Calendar size={20} />}
+                        icon={<Wallet size={20} />}
                         iconBg="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                        label="Totale Geleenthede"
-                        value={String(totalEvents)}
-                        sub={`oor ${eventsPerMonth.length} maand(e)`}
+                        label="Totale Begroting"
+                        value={fmtRand(totalBudget)}
+                        sub={`oor ${budgetPerMonth.length} maand(e)`}
                     />
                     <KpiCard
                         icon={<TrendingUp size={20} />}
                         iconBg="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-                        label="Top Geleentheid RSVP's"
-                        value={topEvent ? String(topEvent.totalRsvps) : 'N/B'}
-                        sub={topEvent ? topEvent.eventTitle : 'Geen data beskikbaar'}
+                        label="Gemiddeld per Maand"
+                        value={fmtRand(avgPerMonth)}
+                        sub="toegeken oor die tydperk"
                     />
                     <KpiCard
-                        icon={<BarChart2 size={20} />}
+                        icon={<CalendarClock size={20} />}
                         iconBg="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
-                        label="Aktiewe Maande"
-                        value={String(eventsPerMonth.length)}
-                        sub="met geleenthedsaktiwiteit"
+                        label="Hoogste Maand"
+                        value={peakMonth ? fmtRand(peakMonth.total) : 'N/B'}
+                        sub={peakMonth ? `${peakMonth.month}/${peakMonth.year}` : 'Geen data beskikbaar'}
                     />
                 </div>
 
-                <div className="space-y-4">
-                    <h2 className="text-base font-semibold text-[var(--color-text)]">Geleenthede per Maand</h2>
-
-                    {eventsPerMonth.length === 0 ? (
-                        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
-                            <p className="text-[var(--color-text-subtle)] text-sm">
-                                Geen maandelikse data beskikbaar nie.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl divide-y divide-[var(--color-border)]">
-                            {eventsPerMonth.map((item) => (
-                                <div key={`${item.year}-${item.month}`} className="px-5 py-4 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium text-[var(--color-text)]">
-                                            {MAAND_NAME[item.month - 1]} {item.year}
-                                        </span>
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                            {item.count} geleentheid{item.count !== 1 ? 'e' : ''}
-                                        </span>
-                                    </div>
-                                    <div className="h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-[var(--color-primary)] transition-all"
-                                            style={{ width: `${Math.round((item.count / maxCount) * 100)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-4">
-                    <h2 className="text-base font-semibold text-[var(--color-text)]">Top 5 Geleenthede (RSVP&apos;s)</h2>
-
-                    {top5Events.length === 0 ? (
-                        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
-                            <p className="text-[var(--color-text-subtle)] text-sm">
-                                Geen RSVP-data beskikbaar nie.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl divide-y divide-[var(--color-border)]">
-                            {top5Events.map((item, index) => (
-                                <div key={item.eventTitle} className="px-5 py-4 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <span className="text-sm font-bold text-[var(--color-text-subtle)] shrink-0">
-                                                #{index + 1}
-                                            </span>
-                                            <span className="text-sm font-medium text-[var(--color-text)] truncate">
-                                                {item.eventTitle}
-                                            </span>
-                                        </div>
-                                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 shrink-0">
-                                            {item.totalRsvps} RSVP&apos;s
-                                        </span>
-                                    </div>
-                                    <div className="h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-green-500 transition-all"
-                                            style={{ width: `${Math.round((item.totalRsvps / maxRsvps) * 100)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                    <div className="mb-2">
+                        <h2 className="text-base font-semibold text-[var(--color-text)]">Begroting per Maand</h2>
+                        <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
+                            Toegekende begroting per geleentheid · afgelope 12 maande
+                        </p>
+                    </div>
+                    <BudgetTrendChart data={monthly} />
                 </div>
             </>
         );
@@ -183,9 +122,7 @@ export default function BudgetPage() {
             <div>
                 <h1 className="text-2xl font-bold text-[var(--color-text)]">Begroting</h1>
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                    {user.role === 'ADMIN'
-                        ? 'Finansiele oorsig vir alle geleenthede'
-                        : 'Finansiele oorsig vir jou geleenthede'}
+                    Toegekende begroting oor alle geleenthede
                 </p>
             </div>
 

@@ -1,12 +1,18 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import type { MainTabParamList } from '../navigation/MainTabs';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { listEvents, type EventResponse } from '../api/events';
+import { getMyRsvps, type RsvpWithEvent } from '../api/rsvp';
+import { getPrediction, type PredictionResult } from '../api/analytics';
+import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from '../lib/event-status';
 
 export function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -15,7 +21,65 @@ export function DashboardScreen() {
   const styles = makeStyles(colors);
   const [aiInfoOpen, setAiInfoOpen] = useState(false);
 
+  const [events, setEvents] = useState<EventResponse[]>([]);
+  const [myRsvps, setMyRsvps] = useState<RsvpWithEvent[]>([]);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const isStaff = user?.role === 'ADMIN' || user?.role === 'DOSENT';
+
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const eventList = await listEvents();
+        if (!active) return;
+        setEvents(eventList);
+
+        if (!isStaff) {
+          const rsvpList = await getMyRsvps();
+          if (active) setMyRsvps(rsvpList);
+        }
+
+        const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
+        if (isStaff && upcoming.length > 0) {
+          try {
+            const pred = await getPrediction(upcoming[0].id);
+            if (active) setPrediction(pred);
+          } catch {
+            if (active) setPrediction(null);
+          }
+        }
+      } catch {
+        if (active) setLoadError('Kon nie paneelbord-data laai nie.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, [user?.id, isStaff]);
+
   if (!user) return null;
+
+  const upcomingEvents = events.filter((e) => getEventStatus(e) !== 'past');
+  const nextEvent = upcomingEvents[0] ?? null;
+  const otherUpcoming = upcomingEvents.slice(1, 4);
+
+  const activeRsvps = myRsvps.filter((r) => r.status !== 'GEKANSELLEER');
+  const upcomingRsvpsCount = activeRsvps.filter((r) => getEventStatus(r.event) !== 'past').length;
+
+  const totalConfirmedAttendees = events.reduce((sum, e) => sum + e.confirmedAttendees, 0);
+  const totalBudget = events.reduce((sum, e) => sum + (e.budget ?? 0), 0);
+  const fillRates = events.filter((e) => e.maxCapacity > 0).map((e) => e.confirmedAttendees / e.maxCapacity);
+  const averageAttendancePct = fillRates.length
+    ? Math.round((fillRates.reduce((a, b) => a + b, 0) / fillRates.length) * 100)
+    : 0;
 
   const roleLabel = {
     ADMIN:  'Administrateur',
@@ -55,91 +119,148 @@ export function DashboardScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Oorsig</Text>
-        <View style={styles.statsGrid}>
-          {user.role === 'ADMIN' && (
-            <StatCard styles={styles} label="Totale RSVPs" value="1 847" delta="+8.2%" />
-          )}
-          {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
-            <StatCard styles={styles} label="Funksies OT" value="24" delta="+12%" />
-          )}
-          {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
-            <StatCard styles={styles} label="Bywoning" value="82%" delta="+6.8%" />
-          )}
-          {user.role === 'ADMIN' && (
-            <StatCard styles={styles} label="Begroting" value="R187k" delta="-3.1%" />
-          )}
-          {(user.role === 'STUDENT' || user.role === 'GAS') && (
-            <StatCard styles={styles} label="Jou RSVPs" value="3" />
-          )}
-          {(user.role === 'STUDENT' || user.role === 'GAS') && (
-            <StatCard styles={styles} label="Aankomend" value="5" />
-          )}
-        </View>
-
-        <Text style={styles.sectionTitle}>Volgende</Text>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Volgende funksie</Text>
-            <TouchableOpacity style={styles.linkBtn} disabled>
-              <Text style={styles.linkText}>Besigtig</Text>
-              <Feather name="chevron-right" size={16} color={colors.primary} />
-            </TouchableOpacity>
+        {loading && (
+          <View style={styles.card}>
+            <ActivityIndicator color={colors.primary} />
           </View>
-          <View style={styles.highlight}>
-            <Text style={styles.highlightTitle}>Glasieklink 2026</Text>
-            <Text style={styles.highlightMeta}>15 Mrt 2026 • 18:00 • Hoofsaal</Text>
-            <View style={styles.progressRow}>
-              <Text style={styles.progressLabel}>87 RSVPs</Text>
-              <Text style={styles.progressSub}>-73 verwag</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: '64%' }]} />
-            </View>
-            <Text style={styles.progressFoot}>64% van RSVP vs verwag</Text>
-          </View>
-        </View>
+        )}
 
-        {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
+        {!loading && loadError && (
+          <View style={styles.card}>
+            <Text style={styles.highlightMeta}>{loadError}</Text>
+          </View>
+        )}
+
+        {!loading && !loadError && (
           <>
-            <Text style={styles.sectionTitle}>KI</Text>
+            <Text style={styles.sectionTitle}>Oorsig</Text>
+            <View style={styles.statsGrid}>
+              {user.role === 'ADMIN' && (
+                <StatCard styles={styles} label="Totale RSVPs" value={String(totalConfirmedAttendees)} />
+              )}
+              {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
+                <StatCard styles={styles} label="Aankomende funksies" value={String(upcomingEvents.length)} />
+              )}
+              {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
+                <StatCard styles={styles} label="Gem. bywoning" value={`${averageAttendancePct}%`} />
+              )}
+              {user.role === 'ADMIN' && (
+                <StatCard styles={styles} label="Begroting" value={`R${totalBudget.toLocaleString('af-ZA')}`} />
+              )}
+              {(user.role === 'STUDENT' || user.role === 'GAS') && (
+                <StatCard styles={styles} label="Jou RSVPs" value={String(activeRsvps.length)} />
+              )}
+              {(user.role === 'STUDENT' || user.role === 'GAS') && (
+                <StatCard styles={styles} label="Aankomend" value={String(upcomingRsvpsCount)} />
+              )}
+            </View>
+
+            <Text style={styles.sectionTitle}>Volgende</Text>
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>KI / LSTM status</Text>
-                <TouchableOpacity style={styles.iconBtnSm} onPress={() => setAiInfoOpen(true)}>
-                  <Feather name="info" size={16} color={colors.textSubtle} />
+                <Text style={styles.cardTitle}>Volgende funksie</Text>
+                <TouchableOpacity
+                  style={styles.linkBtn}
+                  disabled={!nextEvent}
+                  onPress={() => nextEvent && navigation.navigate('EventDetail', { eventId: nextEvent.id })}
+                >
+                  <Text style={styles.linkText}>Besigtig</Text>
+                  <Feather name="chevron-right" size={16} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+              {nextEvent ? (
+                <View style={styles.highlight}>
+                  <Text style={styles.highlightTitle}>{nextEvent.title}</Text>
+                  <Text style={styles.highlightMeta}>
+                    {formatFullDate(nextEvent.date)} • {formatEventTime(nextEvent.date)} • {nextEvent.location}
+                  </Text>
+                  <View style={styles.progressRow}>
+                    <Text style={styles.progressLabel}>{nextEvent.confirmedAttendees} RSVPs</Text>
+                    <Text style={styles.progressSub}>van {nextEvent.maxCapacity}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${nextEvent.maxCapacity > 0 ? Math.min(100, (nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.progressFoot}>
+                    {nextEvent.maxCapacity > 0 ? Math.round((nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}% van kapasiteit gevul
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.highlightMeta}>Geen aankomende funksies nie.</Text>
+              )}
+            </View>
+
+            {isStaff && (
+              <>
+                <Text style={styles.sectionTitle}>KI</Text>
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.cardTitle}>Voorspelling: volgende funksie</Text>
+                    <TouchableOpacity style={styles.iconBtnSm} onPress={() => setAiInfoOpen(true)}>
+                      <Feather name="info" size={16} color={colors.textSubtle} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {prediction ? (
+                    <>
+                      <View style={styles.kpiGrid}>
+                        <Kpi styles={styles} label="Voorspelde vulkoers" value={`${Math.round(prediction.predictedFillRate * 100)}%`} />
+                        <Kpi styles={styles} label="Verwagte RSVPs" value={String(prediction.estimatedRsvps)} />
+                        <Kpi styles={styles} label="Verwagte bywoners" value={String(prediction.estimatedAttendees)} />
+                        <Kpi styles={styles} label="Beraamde begroting" value={`R${Math.round(prediction.estimatedBudgetZAR).toLocaleString('af-ZA')}`} />
+                      </View>
+                      <View style={styles.modelPill}>
+                        <View style={styles.dot} />
+                        <Text style={styles.modelText}>Model aktief</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.highlightMeta}>
+                      {nextEvent ? 'Voorspelling nie tans beskikbaar nie.' : 'Geen aankomende funksie om te voorspel nie.'}
+                    </Text>
+                  )}
+                </View>
+              </>
+            )}
+
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Aankomende funksies</Text>
+                <TouchableOpacity
+                  style={styles.linkBtn}
+                  onPress={() => navigation.getParent<BottomTabNavigationProp<MainTabParamList>>()?.navigate('Events')}
+                >
+                  <Text style={styles.linkText}>Sien almal</Text>
+                  <Feather name="chevron-right" size={16} color={colors.primary} />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.kpiGrid}>
-                <Kpi styles={styles} label="R²-telling" value="0.9119" />
-                <Kpi styles={styles} label="MAE" value="±10.3" />
-                <Kpi styles={styles} label="Inferensie" value="8ms" />
-                <Kpi styles={styles} label="Parameters" value="3 649" />
-              </View>
-
-              <View style={styles.modelPill}>
-                <View style={styles.dot} />
-                <Text style={styles.modelText}>Model aktief</Text>
-              </View>
+              {otherUpcoming.length > 0 ? (
+                otherUpcoming.map((e) => {
+                  const { day, month } = formatEventDate(e.date);
+                  return (
+                    <UpcomingRow
+                      key={e.id}
+                      styles={styles}
+                      title={e.title}
+                      date={`${day} ${month}`}
+                      time={formatEventTime(e.date)}
+                      rsvps={String(e.confirmedAttendees)}
+                      capacity={String(e.maxCapacity)}
+                    />
+                  );
+                })
+              ) : (
+                <Text style={styles.highlightMeta}>Geen verdere aankomende funksies nie.</Text>
+              )}
             </View>
           </>
         )}
-
-        {/* ── Upcoming functions list ──────────────────────── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Aankomende funksies</Text>
-            <TouchableOpacity style={styles.linkBtn} disabled>
-              <Text style={styles.linkText}>Sien almal</Text>
-              <Feather name="chevron-right" size={16} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <UpcomingRow styles={styles} title="Glasieklink 2026" date="15 Mrt" time="18:00" rsvps="87" forecast="73" />
-          <UpcomingRow styles={styles} title="Graadplegtigheid Q1" date="22 Mrt" time="10:00" rsvps="215" forecast="198" />
-          <UpcomingRow styles={styles} title="Gaslesing – Dr Venter" date="28 Mrt" time="14:00" rsvps="44" forecast="38" />
-        </View>
 
         <Text style={styles.versionText}>Pre-Alfa v0.1.0</Text>
 
@@ -160,12 +281,12 @@ export function DashboardScreen() {
               </TouchableOpacity>
             </View>
 
-            <InfoRow styles={styles} title="R²-telling" body="Hoe goed die model variasie verklaar. Nader aan 1 is beter." />
-            <InfoRow styles={styles} title="MAE" body="Gemiddelde absolute fout. Laer beteken meer akkurate voorspellings." />
-            <InfoRow styles={styles} title="Inferensie" body="Hoe lank dit neem om ’n voorspelling te maak. Laer is vinniger." />
-            <InfoRow styles={styles} title="Parameters" body="Model-kompleksiteit. Meer parameters kan meer leer, maar is swaarder om te bereken." />
+            <InfoRow styles={styles} title="Voorspelde vulkoers" body="Persentasie van kapasiteit wat die model verwag om gevul te word." />
+            <InfoRow styles={styles} title="Verwagte RSVPs" body="Aantal RSVPs wat die model verwag teen die funksie se datum." />
+            <InfoRow styles={styles} title="Verwagte bywoners" body="Beraamde aantal mense wat werklik gaan opdaag (na no-shows)." />
+            <InfoRow styles={styles} title="Beraamde begroting" body="Model se beraming van benodigde begroting gebaseer op verwagte bywoning." />
 
-            <Text style={styles.modalFoot}>Hierdie waardes is ’n opsomming en kan per funksie verskil.</Text>
+            <Text style={styles.modalFoot}>Hierdie waardes kom van die regte voorspellingsmodel vir die eersvolgende funksie.</Text>
           </Pressable>
         </Pressable>
       </Modal>
@@ -220,14 +341,14 @@ function UpcomingRow({
   date,
   time,
   rsvps,
-  forecast,
+  capacity,
 }: {
   styles: DashboardStyles;
   title: string;
   date: string;
   time: string;
   rsvps: string;
-  forecast: string;
+  capacity: string;
 }) {
   return (
     <View style={styles.upcomingRow}>
@@ -240,8 +361,8 @@ function UpcomingRow({
         <Text style={styles.upcomingSub}>RSVP</Text>
       </View>
       <View style={styles.upcomingRight}>
-        <Text style={styles.upcomingNumMuted}>{forecast}</Text>
-        <Text style={styles.upcomingSub}>Voorspel</Text>
+        <Text style={styles.upcomingNumMuted}>{capacity}</Text>
+        <Text style={styles.upcomingSub}>Kapasiteit</Text>
       </View>
     </View>
   );

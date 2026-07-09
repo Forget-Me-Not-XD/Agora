@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import {
@@ -28,7 +29,7 @@ export default function EventCard({ event }: EventCardProps) {
             {/* Coloured top accent */}
             <div className={`h-1 w-full ${STATUS_COLORS[status]}`} />
 
-            <div className="p-5 flex flex-col gap-3 flex-1">
+            <Link href={`/events/${event.id}`} className="p-5 pb-0 flex flex-col gap-3 flex-1">
                 {/* Title + badges */}
                 <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-[var(--color-text)] leading-snug flex-1">
@@ -83,7 +84,9 @@ export default function EventCard({ event }: EventCardProps) {
                         {isAlmostFull && <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Byna vol</span>}
                     </div>
                 </div>
+            </Link>
 
+            <div className="p-5 pt-3">
                 <RsvpModal event={event} />
             </div>
         </div>

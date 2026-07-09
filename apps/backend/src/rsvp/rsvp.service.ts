@@ -6,10 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { toBuffer } from 'qrcode';
 import { Rsvp, RsvpDocument, RsvpStatus } from './schemas/rsvp.schema';
 import { CreateRsvpDto } from "./dto/create-rsvp.dto";
+import { CreateWalkInDto } from "./dto/create-walk-in.dto";
 import { EventsService } from "../events/events.service";
 import { Role } from '../common/enums/role.enums';
 import { User } from '../users/schemas/user.schema';
-import { Event } from '../events/schemas/event.schema';
 
 export interface ScanResponse {
     guestName: string;
@@ -52,8 +52,10 @@ export class RsvpService {
         .exec();
     }
 
-    async findRsvpsByEvent(eventId: string): Promise<RsvpDocument[]>{
-        await this.eventsService.findById(eventId);
+    async findRsvpsByEvent(eventId: string, requesterId: string, requesterRole: Role): Promise<RsvpDocument[]>{
+        const event = await this.eventsService.findById(eventId);
+        this.eventsService.assertOwnership(event, requesterId, requesterRole);
+
         return this.rsvpModel
         .find({ event: eventId })
         .populate('user', '-passwordHash -__v')
@@ -68,16 +70,50 @@ export class RsvpService {
         const rsvp = await this.rsvpModel.findById(rsvpId).exec();
         if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
 
-        if (requesterRole !== Role.ADMIN && rsvp.user.toString() !== requesterId) {
-            throw new ForbiddenException('Jy mag slegs jou eie RSVP kanselleer');
+        const event = await this.eventsService.findById(rsvp.event.toString());
+
+        // 'n Gebruiker mag altyd sy eie RSVP kanselleer; om iemand anders s'n te
+        // kanselleer (of 'n walk-in sonder gekoppelde gebruiker) moet jy ADMIN wees,
+        // of die DOSENT wat die geleentheid geskep het.
+        const isOwnRsvp = rsvp.user?.toString() === requesterId;
+        if (!isOwnRsvp) {
+            this.eventsService.assertOwnership(event, requesterId, requesterRole);
         }
 
         rsvp.status = RsvpStatus.GEKANSELLEER;
         await rsvp.save();
 
-        const event = await this.eventsService.findById(rsvp.event.toString());
         event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
         await event.save();
+    }
+
+    async checkInRsvp(rsvpId: string, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {
+        if (!isValidObjectId(rsvpId)) {
+            throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+        }
+
+        const rsvp = await this.rsvpModel
+        .findById(rsvpId)
+        .populate('user', '-passwordHash -__v')
+        .exec();
+        if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
+
+        const event = await this.eventsService.findById(rsvp.event.toString());
+        this.eventsService.assertOwnership(event, requesterId, requesterRole);
+
+        if (rsvp.status === RsvpStatus.GEKANSELLEER) {
+            throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
+        }
+        if (rsvp.checkedIn) {
+            throw new ConflictException('Gas het reeds ingecheck');
+        }
+
+        rsvp.checkedIn = true;
+        rsvp.checkedInAt = new Date();
+        rsvp.status = RsvpStatus.BEVESTIG;
+        await rsvp.save();
+
+        return rsvp;
     }
 
     async getQrCode(rsvpId: string, requesterId: string, requesterRole: Role):Promise<Buffer>{
@@ -88,7 +124,7 @@ export class RsvpService {
         const rsvp = await this.rsvpModel.findById(rsvpId).exec();
         if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
 
-        if (requesterRole !== Role.ADMIN && rsvp.user.toString() !== requesterId) {
+        if (requesterRole !== Role.ADMIN && rsvp.user?.toString() !== requesterId) {
             throw new ForbiddenException(`Jy mag nie hierdie QR-kode opvra nie`);
         }
         
@@ -96,16 +132,18 @@ export class RsvpService {
         return toBuffer(rsvp.qrPayload);
     }
 
-    async scanRsvp(qrPayload: string): Promise <ScanResponse> {
+    async scanRsvp(qrPayload: string, requesterId: string, requesterRole: Role): Promise <ScanResponse> {
         const rsvp = await this.rsvpModel
         .findOne({ qrPayload })
         .populate<{ user: User }>('user')
-        .populate<{ event: Event }>('event')
         .exec();
 
         if (!rsvp) {
             throw new NotFoundException('Ongeldige QR-kode');
         }
+
+        const event = await this.eventsService.findById(rsvp.event.toString());
+        this.eventsService.assertOwnership(event, requesterId, requesterRole);
 
         if (rsvp.checkedIn) {
             throw new ConflictException('Gas het reeds ingecheck');
@@ -118,8 +156,29 @@ export class RsvpService {
 
         return {
             guestName: `${rsvp.user.name} ${rsvp.user.surname}`,
-            eventTitle: rsvp.event.title,
-            eventDate: rsvp.event.date,
+            eventTitle: event.title,
+            eventDate: event.date,
         };
+    }
+
+    // Iemand wat sonder 'n vooraf-RSVP opdaag: ons skep 'n RSVP sonder gekoppelde
+    // gebruiker (net 'n naam) en teken hulle onmiddellik in, net soos 'n kaartjie
+    // by die deur. Dit tel steeds teen die geleentheid se kapasiteit.
+    async registerWalkIn(dto: CreateWalkInDto, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {
+        const event = await this.eventsService.findById(dto.eventId);
+        this.eventsService.assertOwnership(event, requesterId, requesterRole);
+
+        await this.eventsService.incrementConfirmedAttendees(dto.eventId);
+
+        const rsvp = new this.rsvpModel({
+            event: dto.eventId,
+            guestName: dto.guestName.trim(),
+            qrPayload: uuidv4(),
+            status: RsvpStatus.BEVESTIG,
+            checkedIn: true,
+            checkedInAt: new Date(),
+        });
+
+        return rsvp.save();
     }
 }
