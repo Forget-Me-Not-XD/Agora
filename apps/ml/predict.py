@@ -31,18 +31,22 @@ import sys
 import numpy as np
 
 try:
-    import tflite_runtime.interpreter as tflite          # Pi: lightweight runtime
+    import ai_edge_litert.interpreter as tflite          # Pi: lightweight runtime (tflite-runtime's successor;
+                                                          # required for op versions emitted by TF 2.15+ converters)
 except ImportError:
     try:
-        import tensorflow as _tf
-        tflite = _tf.lite                                # Dev machine: use TF's bundled interpreter
+        import tflite_runtime.interpreter as tflite      # older Pi installs pinned to tflite-runtime
     except ImportError:
-        sys.stderr.write(
-            "ERROR: Neither tflite-runtime nor tensorflow is installed.\n"
-            "On Raspberry Pi:  pip install -r requirements-infer.txt\n"
-            "On dev machine:   pip install -r requirements-train.txt\n"
-        )
-        sys.exit(1)
+        try:
+            import tensorflow as _tf
+            tflite = _tf.lite                            # Dev machine: use TF's bundled interpreter
+        except ImportError:
+            sys.stderr.write(
+                "ERROR: Neither ai-edge-litert, tflite-runtime, nor tensorflow is installed.\n"
+                "On Raspberry Pi:  pip install -r requirements-infer.txt\n"
+                "On dev machine:   pip install -r requirements-train.txt\n"
+            )
+            sys.exit(1)
     
 
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape

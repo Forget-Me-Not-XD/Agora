@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  Alert,
+  Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,13 +10,20 @@ import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { useThemeStore } from '../stores/theme.store';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+const agoraIconLight = require('../../assets/agora-icon.png');
+const agoraIconDark = require('../../assets/agora-icon-dark.png');
 
 export function LoginScreen({ navigation }: Props) {
   const { login, isLoading, error, clearError } = useAuthStore();
   const colors = useThemeColors();
   const styles = makeStyles(colors);
+  const mode = useThemeStore((s) => s.mode);
+  const systemScheme = useThemeStore((s) => s.systemScheme);
+  const isDark = (mode === 'system' ? systemScheme : mode) === 'dark';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -42,11 +49,16 @@ export function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.brand}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoLetter}>A</Text>
+            <Image
+              source={isDark ? agoraIconDark : agoraIconLight}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <View style={styles.wordmarkRow}>
+              <Text style={styles.wordmark}>agora</Text>
+              <View style={styles.wordmarkDot} />
             </View>
-            <Text style={styles.brandTitle}>Akademia</Text>
-            <Text style={styles.brandSubtitle}>Funksiebestuurstelsel</Text>
+            <Text style={styles.tagline}>vergader · beplan · verbind</Text>
           </View>
 
           <View style={styles.form}>
@@ -141,18 +153,11 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
 
     brand: { alignItems: 'center', marginBottom: 26, marginTop: 10 },
-    logoCircle: {
-      width: 64,
-      height: 64,
-      borderRadius: 999,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 12,
-    },
-    logoLetter: { color: colors.primaryText, fontWeight: '900', fontSize: 26 },
-    brandTitle: { fontSize: 28, fontWeight: '900', color: colors.text, marginTop: 2 },
-    brandSubtitle: { fontSize: 13, color: colors.textSubtle, marginTop: 6 },
+    logo: { width: 92, height: 105 },
+    wordmarkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 },
+    wordmark: { fontSize: 40, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
+    wordmarkDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
+    tagline: { fontSize: 13, color: colors.textSubtle, marginTop: 6, letterSpacing: 0.3 },
 
     form: {
       backgroundColor: colors.background,
