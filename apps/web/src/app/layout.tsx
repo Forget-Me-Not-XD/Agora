@@ -6,7 +6,7 @@ import '@/theme/globals.css';
 const inter = Inter({ subsets: ['latin'], weight: ['400', '700', '900'] });
 
 export const metadata: Metadata = {
-  title: 'Akademia Funksiebestuurstelsel',
+  title: 'AGORA',
   description: 'Bestuur funksies, RSVPs en bywoning.',
 };
 

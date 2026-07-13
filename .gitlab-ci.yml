@@ -1,0 +1,37 @@
+stages:
+  - build
+
+.build_template:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  before_script:
+    # Cross-arch build support (this repo targets arm64 Raspberry Pis; GitLab
+    # shared runners are typically amd64) — same QEMU technique used locally.
+    - docker run --rm --privileged tonistiigi/binfmt --install arm64
+    - docker buildx create --use
+    - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+build-backend:
+  extends: .build_template
+  script:
+    - >
+      docker buildx build --platform linux/arm64 -f apps/backend/Dockerfile
+      -t ghcr.io/koek1/span4-backend:$CI_COMMIT_SHORT_SHA
+      --push .
+    - echo "Pushed ghcr.io/koek1/span4-backend:$CI_COMMIT_SHORT_SHA"
+
+build-web:
+  extends: .build_template
+  script:
+    - >
+      docker buildx build --platform linux/arm64 -f apps/web/Dockerfile
+      --build-arg NEXT_PUBLIC_API_URL=https://api.use-agora.com
+      -t ghcr.io/koek1/span4-web:$CI_COMMIT_SHORT_SHA
+      --push .
+    - echo "Pushed ghcr.io/koek1/span4-web:$CI_COMMIT_SHORT_SHA"

@@ -1,35 +1,44 @@
 {
-    "expo": {
-      "name": "Akademia-Funksiebestuur",
-      "slug": "akademia-mobile",
-      "version": "0.1.0",
-      "orientation": "portrait",
-      "userInterfaceStyle": "automatic",
-      "splash": {
-        "resizeMode": "contain",
+  "expo": {
+    "name": "AGORA",
+    "slug": "akademia-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1E3A5F"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Laat Akademia toe om die kamera te gebruik om gaste se QR-kodes te skandeer."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ac.akademia.app"
+    },
+    "android": {
+      "package": "ac.akademia.app",
+      "adaptiveIcon": {
         "backgroundColor": "#1E3A5F"
       },
-      "assetBundlePatterns": ["**/*"],
-      "plugins": [
-        [
-          "expo-camera",
-          {
-            "cameraPermission": "Laat Akademia toe om die kamera te gebruik om gaste se QR-kodes te skandeer."
-          }
-        ]
-      ],
-      "ios": {
-        "supportsTablet": true,
-        "bundleIdentifier": "ac.akademia.app"
-      },
-      "android": {
-        "package": "ac.akademia.app",
-        "adaptiveIcon": {
-          "backgroundColor": "#1E3A5F"
-        }
-      },
-      "extra": {
-        "apiUrl": "http://10.0.2.2:3000/api/v1"
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "extra": {
+      "apiUrl": "http://10.0.2.2:3000/api/v1",
+      "eas": {
+        "projectId": "3bb685b0-d97f-4fd4-b968-af704e8499be"
       }
     }
   }
+}

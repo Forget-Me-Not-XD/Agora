@@ -121,6 +121,44 @@ npm start
 
 ---
 
+## Produksie-ontplooiing
+
+Die stelsel loop in produksie op 'n self hosted k3s-Kubernetes-cluster (3 Raspberry Pi's - Mater(Pi5), Node1(Pi4), Node2(PI4)), met publieke HTTPS-toegang via 'n Cloudflare Tunnel (die cluster is agter CGNAT, dus is geen port-forwarding moontlik nie).
+
+| Onderdeel | Waar |
+|---|---|
+| K8s-manifeste (databasisse, backend, web, cloudflared, NetworkPolicy) | [`deploy/`](deploy/) |
+| Backend-houerbeeld | `ghcr.io/koek1/span4-backend` |
+| Web-houerbeeld | `ghcr.io/koek1/span4-web` |
+| Publieke URL's | `https://web.use-agora.com` · `https://api.use-agora.com` |
+| CI (bou + stoot houerbeelde) | [`.gitlab-ci.yml`](.gitlab-ci.yml) — ontplooiing na die cluster bly 'n **handmatige** `kubectl apply`-stap |
+
+Belangrike verskil tussen `NEXT_PUBLIC_API_URL` (web) / `EXPO_PUBLIC_API_URL` (mobiel) en `API_URL` (web, bediener-kant): die `NEXT_PUBLIC_`/`EXPO_PUBLIC_`-veranderlikes word tydens **bou-tyd** in die JavaScript-bundel vasgebak — 'n verandering hier vereis 'n nuwe houerbeeld-bou (web) of 'n nuwe EAS-bou (mobiel), nie net 'n herbegin nie. `API_URL` (sonder voorvoegsel) word wel tydens **loop-tyd** deur die Next.js-bediener self gelees, en wys na die interne cluster-adres van die backend.
+
+'n Nuwe `/api/v1/health/live` en `/api/v1/health/ready` eindpunt is bygevoeg spesifiek vir Kubernetes se readiness/liveness-toetse (`/ready` bevestig 'n werklike Mongo-verbinding, nie net dat die proses loop nie).
+
+### Plaaslike toetsing bly ongeraak
+
+Bogenoemde produksie-opset verander niks aan die plaaslike ontwikkelingsvloei hierbo nie — `docker compose up`, `npm run dev`, en `npx expo start` werk soos voorheen, teen jou plaaslike MongoDB/RabbitMQ/Redis. Om tydelik teen die **produksie**-API te toets sonder 'n nuwe bou:
+
+```bash
+# Web (in apps/web/, tydelike terminaal-sessie):
+$env:API_URL="https://api.use-agora.com"; npm run dev
+
+# Mobiel (in apps/mobile/):
+$env:EXPO_PUBLIC_API_URL="https://api.use-agora.com/api/v1"; npx expo start
+```
+
+Vir 'n installeerbare APK om op 'n fisiese toestel te toets (met die produksie-API reeds vasgebak, sien `apps/mobile/eas.json`):
+
+```bash
+cd apps/mobile
+npx eas-cli login
+npx eas-cli build --platform android --profile preview
+```
+
+---
+
 ## Kenmerke van Stelsel
 
 ### Geleentheidskeping
@@ -151,11 +189,15 @@ Admins kan alle geregistreerde gebruikers sien en bestuur.
 ```
 span4/
 ├── apps/
-│   ├── backend/        # NestJS API
-│   ├── web/            # Next.js 14 web-dashboard
-│   ├── mobile/         # React Native + Expo mobiele toepassing
+│   ├── backend/        # NestJS API (Dockerfile, src/health/ vir k8s probes)
+│   ├── web/             # Next.js 14 web-dashboard (Dockerfile, standalone output)
+│   ├── mobile/          # React Native + Expo mobiele toepassing (eas.json)
+│   ├── ml/              # LSTM bywoning-voorspeller (predict.py, deur backend as kindproses aangeroep)
 │
-├── docker-compose.yaml
+├── deploy/              # Produksie k8s-manifeste (databasisse, backend, web, cloudflared, NetworkPolicy)
+├── .gitlab-ci.yml       # CI: bou + stoot houerbeelde na GHCR (ontplooiing bly handmatig)
+├── .dockerignore
+├── docker-compose.yaml  # Plaaslike ontwikkeling (MongoDB/RabbitMQ/Redis)
 ├── .env.example
 └── README.md
 ```

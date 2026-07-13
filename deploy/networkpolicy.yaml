@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-backend-only
+  namespace: span4
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [mongodb, rabbitmq, redis]
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: span4-api

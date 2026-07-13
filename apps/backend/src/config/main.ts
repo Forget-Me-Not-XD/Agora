@@ -1,7 +1,8 @@
-// ========== Imports: ========== 
+// ========== Imports: ==========
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -10,6 +11,25 @@ async function bootstrap() {
     });
 
     const config = app.get(ConfigService);
+
+    // ========== Security headers ==========
+    // contentSecurityPolicy is disabled: this is a JSON-only API, not an
+    // HTML-serving app, so CSP doesn't apply (the Next.js web app sets its
+    // own headers independently in next.config.js). crossOriginResourcePolicy
+    // is relaxed because this API is intentionally called cross-origin by
+    // web.use-agora.com and the mobile app — helmet's 'same-origin' default
+    // would otherwise let browsers block those responses.
+    app.use(
+        helmet({
+            contentSecurityPolicy: false,
+            crossOriginResourcePolicy: { policy: 'cross-origin' },
+            hsts: {
+                maxAge: 63072000, // 2 years, matches apps/web/next.config.js
+                includeSubDomains: true,
+                preload: true,
+            },
+        }),
+    );
 
     // ========== CORS - allow mobile + web frontends ==========
     const rawOrigins = config.get<string>('ALLOWED_ORIGINS') ?? '';

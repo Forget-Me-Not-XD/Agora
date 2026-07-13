@@ -1,12 +1,16 @@
 'use client';
 
 // ========== Imports: ==========
-import { useRef, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { loginAction } from '@/lib/actions/auth.actions';
 import { SnakeFieldBorder, type SnakeFieldBorderHandle } from '@/components/SnakeFieldBorder';
 
 export default function LoginPage() {
+  const { resolvedTheme }                     = useTheme();
+  const [mounted, setMounted]                 = useState(false);
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -14,6 +18,8 @@ export default function LoginPage() {
   const [error, setError]                     = useState<string | null>(null);
   const [isPending, startTransition]          = useTransition();
   const [forgotInfo, setForgotInfo]           = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const formRef                               = useRef<HTMLFormElement>(null);
   const emailInputRef                         = useRef<HTMLInputElement>(null);
@@ -39,16 +45,30 @@ export default function LoginPage() {
   return (
     <div className="w-full max-w-sm">
 
-      {/* Opskrif */}
-      <div className="flex flex-col items-center mb-8">
-        <h1
-          className="text-[28px] font-black tracking-tight"
-          style={{ color: 'var(--color-primary)' }}
+      {/* Logo */}
+      <div className="flex flex-col items-center mb-6">
+        <Image
+          src={mounted && resolvedTheme === 'dark' ? '/agora-icon-dark.png' : '/agora-icon.png'}
+          alt=""
+          width={104}
+          height={119}
+          priority
+        />
+        <p
+          className="text-[44px] font-black tracking-tight mt-2 flex items-center gap-1.5"
+          style={{ color: 'var(--color-text)' }}
         >
-          Akademia
-        </h1>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
-          Funksiebestuurstelsel
+          agora
+          <span
+            className="w-2.5 h-2.5 rounded-full inline-block"
+            style={{ background: 'var(--color-primary)' }}
+          />
+        </p>
+        <p
+          className="text-[13px] mt-1 tracking-wide"
+          style={{ color: 'var(--color-text-subtle)' }}
+        >
+          vergader · beplan · verbind
         </p>
       </div>
 
@@ -60,24 +80,10 @@ export default function LoginPage() {
           borderColor: 'var(--color-border)',
         }}
       >
-        {/* A-sirkel + Aanmeld */}
+        {/* Aanmeld */}
         <div className="flex flex-col items-center mb-5">
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mb-3"
-            style={{ background: 'var(--color-primary)' }}
-          >
-            <span
-              className="font-black text-2xl"
-              style={{ color: 'var(--color-primary-text)' }}
-            >
-              A
-            </span>
-          </div>
           <p className="text-[18px] font-black" style={{ color: 'var(--color-text)' }}>
             Aanmeld
-          </p>
-          <p className="text-[13px] mt-0.5" style={{ color: 'var(--color-text-subtle)' }}>
-            Funksiebestuurstelsel
           </p>
         </div>
 

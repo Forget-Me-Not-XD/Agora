@@ -14,8 +14,9 @@ import { EventsModule } from '../events/events.module';
 import { RsvpModule } from '../rsvp/rsvp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
-import { ExportModule } from '../export/export.module'; 
+import { ExportModule } from '../export/export.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { HealthModule } from '../health/health.module';
 
 
 @Module({
@@ -47,6 +48,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     }),
 
     // ========== Domain modules ==========
+    HealthModule,
     MessagingModule,    // RabbitMQ must load before consumers
     UsersModule,
     AuthModule,

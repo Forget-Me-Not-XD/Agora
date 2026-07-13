@@ -2,13 +2,13 @@
 # Full TensorFlow (~500 MB) will not install cleanly on Raspberry Pi OS Bookworm.
 
 # tflite-runtime vs ai-edge-litert — the tradeoff:
-#   tflite-runtime  uses: import tflite_runtime.interpreter  (what predict.py uses)
-#   ai-edge-litert  uses: import ai_edge_litert.interpreter  (Google's newer replacement)
-# Google deprecated tflite-runtime after 2.14.0 and released ai-edge-litert 1.0+
-# as its successor. We stay on tflite-runtime because predict.py already uses its
-# import path. If you ever retrain with TF 2.15+ and need to upgrade, switch to
-# ai-edge-litert and update the import at the top of predict.py accordingly.
-tflite-runtime>=2.13.0,<2.15.0
+#   tflite-runtime  uses: import tflite_runtime.interpreter  (deprecated after 2.14.0)
+#   ai-edge-litert  uses: import ai_edge_litert.interpreter  (Google's replacement)
+# model.tflite is exported by train.py using TensorFlow 2.15.1, whose converter
+# emits op versions (e.g. FULLY_CONNECTED v12) that tflite-runtime 2.14.0's
+# interpreter doesn't recognise. ai-edge-litert supports these newer op
+# versions, so predict.py now imports ai_edge_litert.interpreter.
+ai-edge-litert>=1.0.1
 
 # Array operations — building and reshaping the (1, 5, 4) input tensor.
 numpy>=1.24.0

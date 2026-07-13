@@ -40,9 +40,10 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Ip() ip: string,
+    @Headers('cf-connecting-ip') cfConnectingIp: string,
     @Headers('user-agent') userAgent: string,
   ): Promise<TokenPairDto> {
-    return this.authService.login(dto, ip, userAgent ?? 'unknown');
+    return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
   }
 
   @Get('me')
