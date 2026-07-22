@@ -5,6 +5,11 @@ metadata:
   namespace: span4
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: span4-api
@@ -15,8 +20,6 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-pull-secret
-      # Prefer spreading the 2 replicas across different nodes so one Pi
-      # going down doesn't take out both.
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -28,7 +31,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: api
-          image: ghcr.io/koek1/span4-backend:v2
+          image: ghcr.io/koek1/span4-backend:v3
           ports:
             - containerPort: 3000
           env:

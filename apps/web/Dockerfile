@@ -29,10 +29,12 @@ ENV NODE_ENV=production
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
 
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
+COPY --chown=nextjs:nodejs apps/web/server-wrapper.js ./server-wrapper.js
 
 USER nextjs
 EXPOSE 3001
 ENV PORT=3001
-CMD ["node", "server.js"]
+CMD ["node", "server-wrapper.js"]
