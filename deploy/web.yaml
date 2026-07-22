@@ -5,6 +5,11 @@ metadata:
   namespace: span4
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: span4-web
@@ -26,7 +31,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: web
-          image: ghcr.io/koek1/span4-web:v2
+          image: ghcr.io/koek1/span4-web:v4
           ports:
             - containerPort: 3001
           env:
@@ -34,10 +39,6 @@ spec:
               value: "production"
             - name: PORT
               value: "3001"
-            # Server-side only (Next's own Node process) — stays in-cluster,
-            # never bounces back out through Cloudflare. Distinct from
-            # NEXT_PUBLIC_API_URL, which is baked into the browser bundle
-            # at image build time.
             - name: API_URL
               value: "http://span4-api:3000"
           resources:

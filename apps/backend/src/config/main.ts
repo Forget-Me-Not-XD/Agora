@@ -67,6 +67,11 @@ async function bootstrap() {
 
     app.setGlobalPrefix('api/v1');
 
+    // ========== Keep-alive timeouts to sync Node server and Cloudflare timeouts  ==========
+    const httpServer = app.getHttpServer();
+    httpServer.keepAliveTimeout = 100_000;
+    httpServer.headersTimeout = 185_000;
+
     const port = config.get<number>('port') ?? 3000;
     await app.listen(port, '0.0.0.0');
 
