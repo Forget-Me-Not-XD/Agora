@@ -1,0 +1,32 @@
+gitlabUrl: https://gitlab.akademia.ac.za
+
+nodeSelector:
+  ci-eligible: "true"
+
+concurrent: 1
+
+runners:
+  secret: gitlab-runner-token
+  config: |
+    [[runners]]
+      executor = "kubernetes"
+      [runners.kubernetes]
+        namespace = "gitlab-runner"
+        privileged = true
+        node_selector = {"ci-eligible" = "true"}
+        cpu_request = "250m"
+        memory_request = "256Mi"
+        cpu_limit = "1"
+        memory_limit = "1Gi"
+        service_cpu_request = "250m"
+        service_memory_request = "256Mi"
+        service_cpu_limit = "1"
+        service_memory_limit = "1Gi"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
