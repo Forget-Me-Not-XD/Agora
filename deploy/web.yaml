@@ -31,7 +31,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: web
-          image: ghcr.io/koek1/span4-web:v4
+          image: ghcr.io/koek1/span4-web:9590dcae
           ports:
             - containerPort: 3001
           env:
