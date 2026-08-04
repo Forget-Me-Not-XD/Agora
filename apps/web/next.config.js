@@ -12,6 +12,7 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   compress: true,
+  productionBrowserSourceMaps: false,
 
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
