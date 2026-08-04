@@ -29,6 +29,9 @@ runners:
         service_memory_request = "256Mi"
         service_cpu_limit = "1"
         service_memory_limit = "1Gi"
+        [[runners.kubernetes.volumes.empty_dir]]
+          name = "docker-certs"
+          mount_path = "/certs/client"
 
 resources:
   requests:
