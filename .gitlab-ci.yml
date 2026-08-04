@@ -17,7 +17,8 @@ stages:
     # Cross-arch build support (this repo targets arm64 Raspberry Pis; GitLab
     # shared runners are typically amd64) — same QEMU technique used locally.
     - docker run --rm --privileged tonistiigi/binfmt --install arm64
-    - docker buildx create --use
+    - docker context create tls-environment --docker "host=tcp://localhost:2376,ca=/certs/client/ca.pem,cert=/certs/client/cert.pem,key=/certs/client/key.pem"
+    - docker buildx create tls-environment --use
     - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
 build-backend:
