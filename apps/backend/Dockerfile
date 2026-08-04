@@ -12,7 +12,7 @@ RUN npm ci
 
 COPY apps/backend/tsconfig.json apps/backend/nest-cli.json ./
 COPY apps/backend/src ./src
-RUN npm run build
+RUN npm run build && find ./dist -name '*.js.map' -delete
 
 # ── Runtime stage ───────────────────────────────
 # Debian (glibc), not Alpine (musl): tflite-runtime only ships manylinux/glibc
