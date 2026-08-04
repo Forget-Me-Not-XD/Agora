@@ -1,5 +1,11 @@
 gitlabUrl: https://gitlab.akademia.ac.za
 
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+
 nodeSelector:
   ci-eligible: "true"
 
