@@ -121,16 +121,12 @@ export function LoginScreen({ navigation }: Props) {
 
             <TouchableOpacity
               style={styles.forgotBtn}
-              onPress={() => Alert.alert('Wagwoord', 'Kontak jou administrateur om jou wagwoord te herstel.')}
+              onPress={() => Alert.alert('Wagwoord', 'Kontak die Agora stelseladministrateur om jou wagwoord te herstel.')}
             >
               <Text style={styles.forgotText}>Wagwoord vergeet?</Text>
             </TouchableOpacity>
 
             <Text style={styles.footer}>POPIA-beskermde aanmeld • SSL</Text>
-
-            <Text style={styles.registerHelper}>
-              Geen rekening? Kontak jou administrateur
-            </Text>
 
             <TouchableOpacity
               style={[styles.registerBtn, isLoading && styles.buttonDisabled]}
@@ -139,6 +135,12 @@ export function LoginScreen({ navigation }: Props) {
             >
               <Text style={styles.registerBtnText}>Registreer</Text>
             </TouchableOpacity>
+
+            <Text style={styles.registerHelper}>
+              Is jy &apos;n Dosent?{'\n\n'} 
+              Kontak die Agora stelseladministrateur vir &apos;n rekening.
+            </Text>
+            
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
