@@ -39,6 +39,7 @@ export function RegisterScreen({ navigation }: Props) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [ popiaAccepted, setPopiaAccepted ] = useState(false);
   const [form, setForm] = useState<RegisterPayload>({
     name: '',
     surname: '',
@@ -81,9 +82,9 @@ export function RegisterScreen({ navigation }: Props) {
   // Only GAS hides study center; STUDENT shares GAS privileges but still provides a study center.
   const showStudyCenter = uiRole !== 'GAS';
 
-  const handleSubmit = async () => {
+    const handleSubmit = async () => {
     clearError();
-    if (!allPasswordRulesPass || !passwordsMatch) return;
+    if (!allPasswordRulesPass || !passwordsMatch || !popiaAccepted) return;
     try {
       await register({
         ...form,
@@ -94,6 +95,7 @@ export function RegisterScreen({ navigation }: Props) {
       // Error is stored in the Zustand store and displayed below
     }
   };
+
 
 
   return (
@@ -291,10 +293,35 @@ export function RegisterScreen({ navigation }: Props) {
               })}
             </View>
 
+            <View style={styles.popiaBox}>
+              <Text style={styles.popiaTitle}>POPIA Kennisgewing</Text>
+              <Text style={styles.popiaText}>
+                Persoonlike data word verwerk ooreenkomstig POPIA en slegs vir
+                stelseltoegangsbeheer gebruik.
+              </Text>
+              <View style={styles.popiaRow}>
+                <TouchableOpacity
+                  style={[styles.checkbox, popiaAccepted && styles.checkboxChecked]}
+                  onPress={() => setPopiaAccepted((v) => !v)}
+                  disabled={isLoading}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: popiaAccepted }}
+                >
+                  {popiaAccepted && <Feather name="check" size={12} color={colors.primaryText} />}
+                </TouchableOpacity>
+                <Text style={styles.popiaLabel} onPress={() => setPopiaAccepted((v) => !v)}>
+                  Ek stem saam met die{' '}
+                  <Text style={styles.popiaLink} onPress={() => navigation.navigate('Popia')}>
+                    POPIA-kennisgewing
+                  </Text>
+                </Text>
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
+              style={[styles.button, (isLoading || !popiaAccepted) && styles.buttonDisabled]}
               onPress={handleSubmit}
-              disabled={isLoading}
+              disabled={isLoading || !popiaAccepted}
             >
               {isLoading ? (
                 <ActivityIndicator color={colors.primaryText} />
@@ -459,6 +486,29 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     roleCardTitleActive: { color: colors.primaryText },
     roleCardSub: { color: colors.textSubtle, fontSize: 12, fontWeight: '700', marginTop: 4 },
     roleCardSubActive: { color: colors.primaryText },
+    popiaBox: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      padding: 12,
+      marginBottom: 16,
+    },
+    popiaTitle: { color: colors.primary, fontSize: 12, fontWeight: '800', marginBottom: 4 },
+    popiaText: { color: colors.textSubtle, fontSize: 11, lineHeight: 16, marginBottom: 10 },
+    popiaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    checkbox: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+    popiaLabel: { flex: 1, color: colors.textSubtle, fontSize: 12, fontWeight: '700' },
+    popiaLink: { color: colors.primary, textDecorationLine: 'underline' },
     button: {
       backgroundColor: colors.primary,
       borderRadius: 12,

@@ -8,6 +8,7 @@ import { QrScannerScreen } from '../screens/QrScannerScreen';
 import { RsvpManagementScreen } from '../screens/RsvpManagementScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { PopiaScreen } from '../screens/PopiaScreen';
 import { MainTabs } from './MainTabs';
 
 export type RootStackParamList = {
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   QrScanner: { eventId: string };
   RsvpManagement: { eventId: string };
   AdminCreateUser: undefined;
+  Popia: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -38,11 +40,13 @@ export function AppNavigator() {
           <Stack.Screen name="QrScanner" component={QrScannerScreen} />
           <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
           <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
+          <Stack.Screen name="Popia" component={PopiaScreen} />
         </>
       ) : (
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Popia" component={PopiaScreen} />
         </>
       )}
     </Stack.Navigator>

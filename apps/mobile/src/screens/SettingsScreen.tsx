@@ -64,6 +64,16 @@ export function SettingsScreen({ navigation }: Props) {
         })}
       </View>
 
+      <View style={[styles.card, { marginTop: 16 }]}>
+        <Text style={styles.cardTitle}>Wetlik</Text>
+        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Popia')}>
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel}>POPIA / Privaatheid</Text>
+            <Text style={styles.rowSubtitle}>Hoe ons jou data versamel en gebruik</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {user?.role === 'ADMIN' && (
         <View style={[styles.card, styles.adminCard]}>
           <Text style={styles.cardTitle}>Administrasie</Text>
