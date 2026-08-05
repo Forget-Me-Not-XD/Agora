@@ -157,6 +157,12 @@ export default function Sidebar() {
                     >
                         {getRoleLabel(role)}
                     </span>
+                    <Link
+                        href="/popia"
+                        className="block mt-2 text-xs text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] hover:underline"
+                    >
+                        POPIA / Privaatheid
+                    </Link>
                 </div>
             </div>
         </aside>

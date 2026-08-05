@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Circle, ChevronDown, X } from 'lucide-react';
 import { registerAction } from '@/lib/actions/auth.actions';
 import type { RegisterPayload } from '@/lib/types';
+import Link from 'next/link';
 
 type UiRole = 'GAS' | 'STUDENT';
 
@@ -486,7 +487,7 @@ export default function RegisterPage() {
               Information Act (POPIA). Data word slegs gebruik vir stelseltoegangsbeheer
               en sal NIE met derde partye gedeel word nie.
             </p>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div className="flex items-center gap-2 select-none">
               <button
                 type="button"
                 role="checkbox"
@@ -511,10 +512,20 @@ export default function RegisterPage() {
                   </svg>
                 )}
               </button>
-              <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
-                Ek stem saam met die POPIA voorwaardes
+              <span className="text-[12px] font-bold cursor-pointer" style={{ color: 'var(--color-text-subtle)' }} onClick={() => setPopiaAccepted((v) => !v)}>
+                Ek stem saam met die{' '}
+                <Link
+                  href="/popia"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                  style={{ color: 'var(--color-primary)' }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  POPIA-kennisgewing
+                </Link>
               </span>
-            </label>
+            </div>
           </div>
 
           {/* Kanselleer + Registreer */}
