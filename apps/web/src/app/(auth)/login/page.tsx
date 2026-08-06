@@ -100,7 +100,7 @@ export default function LoginPage() {
               color:       'var(--color-text)',
             }}
           >
-            Kontak jou administrateur om jou wagwoord te herstel.
+            Kontak die Agora stelseladministrateur om jou wagwoord te herstel.
           </div>
         )}
 
@@ -225,25 +225,33 @@ export default function LoginPage() {
         </form>
       </div>
 
-      {/* Geen rekening */}
-      <p className="mt-5 text-center text-[13px]" style={{ color: 'var(--color-text-subtle)' }}>
-        Geen rekening? Kontak jou administrateur
-      </p>
-
       {/* Registreer skakel */}
-      <div className="mt-3">
+      <div className="mt-5">
+
         <a
-          href="/register"
-          className="block w-full text-center rounded-[12px] py-[13px] text-[14px] font-bold border transition"
-          style={{
-            background:  'var(--color-surface)',
-            borderColor: 'var(--color-border)',
-            color:       'var(--color-text-subtle)',
+           href="/register"
+           className="block w-full text-center rounded-[12px] py-[13px] text-[14px] font-bold border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all duration-200"
+           style={{
+            background: 'var(--color-surface)',
+            color: 'var(--color-text-subtle)',
           }}
         >
           Registreer
+        
         </a>
+
       </div>
+
+      {/* Geen rekening onderteks */}
+          <p
+            className="mt-3 text-center text-[13px]"
+            style={{ color: 'var(--color-text-subtle)' }}
+          >
+          Is jy &apos;n Dosent?
+          <span className="block h-2" />
+          Kontak die Agora stelseladministrateur vir &apos;n rekening.
+          </p>
     </div>
+    
   );
 }
