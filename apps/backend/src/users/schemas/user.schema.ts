@@ -3,12 +3,14 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
 import { UserTitle } from '../../common/enums/user-title.enum'
+import { SsoProvider } from '../../common/enums/sso-provider.enum';
+import { CalendarConnection, CalendarConnectionSchema } from './calendar-connection.schema';
 export type UserDocument = HydratedDocument<User>;
 
 /**
  * User entity — the central identity record.
  *
- * Sensitive fields (passwordHash) are NEVER returned in API responses.
+ * Sensitive fields (passwordHash, calendar tokens) are NEVER returned in API responses.
  * UserResponseDto.fromDocument() strips them before serialisation.
  */
 @Schema({ timestamps: true, collection: 'users' })
@@ -22,8 +24,8 @@ export class User {
     @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
     email!: string;
 
-    @Prop({ required: true })
-    passwordHash!: string;
+    @Prop({ required: false })
+    passwordHash?: string;
 
     @Prop({ required: true, enum: Role, default: Role.GAS, index: true })
     role!: Role;
@@ -42,6 +44,18 @@ export class User {
 
     @Prop({ type: String, enum: Object.values(UserTitle), default: UserTitle.NONE})
     title!: string;
+
+    @Prop({ type: String, enum: SsoProvider, default: null })
+    ssoProvider!: SsoProvider | null;
+
+    @Prop({ type: String, default: null, index: true })
+    ssoId!: string | null;
+
+    @Prop({ type: CalendarConnectionSchema, default: () => ({}) })
+    googleCalendar!: CalendarConnection;
+
+    @Prop({ type: CalendarConnectionSchema, default: () => ({}) })
+    outlookCalendar!: CalendarConnection;
 
     // Timestamps added by Mongoose timestamps: true
     createdAt?: Date;
