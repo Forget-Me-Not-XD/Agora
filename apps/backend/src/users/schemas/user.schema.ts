@@ -25,6 +25,9 @@ export class User {
     @Prop({ required: true })
     passwordHash!: string;
 
+    @Prop({ type: Date, default: Date.now })
+    passwordChangedAt!: Date;
+
     @Prop({ required: true, enum: Role, default: Role.GAS, index: true })
     role!: Role;
 
