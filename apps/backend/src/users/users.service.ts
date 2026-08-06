@@ -3,7 +3,9 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
+import { CalendarConnection } from './schemas/calendar-connection.schema';
 import { Role } from '../common/enums/role.enums';
+import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
@@ -40,6 +42,35 @@ export class UsersService {
     return created.save();
   }
 
+  async createSsoUser(data: {
+    name: string;
+    surname: string;
+    email: string;
+    ssoProvider: SsoProvider;
+    ssoId: string;
+  }): Promise<UserDocument> {
+    const existing = await this.findByEmail(data.email);
+    if (existing) throw new ConflictException('Email already registered');
+
+    const created = new this.userModel({
+      name: data.name,
+      surname: data.surname,
+      email: data.email.toLowerCase(),
+      role: Role.GAS,
+      studyCenter: '',
+      ssoProvider: data.ssoProvider,
+      ssoId: data.ssoId,
+    });
+    return created.save();
+  }
+
+  async linkSsoProvider(userId: string, provider: SsoProvider, ssoId: string): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { ssoProvider: provider, ssoId } },
+    ).exec();
+  }
+
   async incrementFailedAttempts(userId: string): Promise<void> {
     const MAX_ATTEMPTS = 5;
     const LOCKOUT_MINUTES = 15;
@@ -67,6 +98,40 @@ export class UsersService {
     if (!updated) throw new NotFoundException(`User ${id} not found`);
 
     return UserResponseDto.fromDocument(updated);
+  }
+
+  async updateGoogleCalendarConnection(userId: string, connection: CalendarConnection): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { googleCalendar: connection } },
+    ).exec();
+  }
+
+  async updateOutlookCalendarConnection(userId: string, connection: CalendarConnection): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { outlookCalendar: connection } },
+    ).exec();
+  }
+
+  async clearGoogleCalendarConnection(userId: string): Promise<void> {
+    await this.updateGoogleCalendarConnection(userId, {
+      connected: false,
+      accountEmail: null,
+      accessToken: null,
+      refreshToken: null,
+      tokenExpiresAt: null,
+    });
+  }
+
+  async clearOutlookCalendarConnection(userId: string): Promise<void> {
+    await this.updateOutlookCalendarConnection(userId, {
+      connected: false,
+      accountEmail: null,
+      accessToken: null,
+      refreshToken: null,
+      tokenExpiresAt: null,
+    });
   }
 
   async search(role: Role, q?: string, ids?: string[]): Promise<UserResponseDto[]> {

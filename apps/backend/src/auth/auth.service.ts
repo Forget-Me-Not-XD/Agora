@@ -1,3 +1,4 @@
+// ========== Imports: ==========
 import {
     Injectable,
     UnauthorizedException,
@@ -18,6 +19,8 @@ import {
   import { LoginDto } from './dto/login.dto';
   import { TokenPairDto } from './dto/token-pair.dto';
   import { JwtPayload } from './strategies/jwt.strategy';
+  import { SsoProfile } from './interfaces/sso-profile.interface';
+  import { SsoProvider } from '../common/enums/sso-provider.enum';
   import { RabbitMQService } from '../messaging/rabbitmq.service';
   import { Role } from '../common/enums/role.enums';
   import {
@@ -127,6 +130,11 @@ import {
         await this.publishFailedLogin(dto.email, ip, 'account_locked');
         throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
       }
+
+      if (!user.passwordHash) {
+        await this.publishFailedLogin(dto.email, ip, 'sso_only_account');
+        throw new UnauthorizedException('This account uses SSO login. Sign in with Google or Microsoft instead.');
+      }
   
       const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
       if (!passwordValid) {
@@ -148,6 +156,54 @@ import {
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_LOGIN, event);
   
       this.logger.log(`-- User logged in: ${user.email}`);
+      return this.issueTokenPair(user);
+    }
+
+    /**
+     * Authenticate (or provision) a user via Google/Microsoft SSO.
+     * First login for an unseen email creates a new GAS-role account.
+     * If a password account already exists with that email, it is linked
+     * to the SSO provider rather than duplicated.
+     */
+    async loginWithSso(profile: SsoProfile, provider: SsoProvider): Promise<TokenPairDto> {
+      let user = await this.usersService.findByEmail(profile.email);
+
+      if (!user) {
+        user = await this.usersService.createSsoUser({
+          name: profile.name,
+          surname: profile.surname || profile.name,
+          email: profile.email,
+          ssoProvider: provider,
+          ssoId: profile.ssoId,
+        });
+
+        const event: UserRegisteredEvent = {
+          userId: user._id.toString(),
+          email: user.email,
+          name: `${user.name} ${user.surname}`,
+          role: user.role,
+          timestamp: new Date().toISOString(),
+        };
+        await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED, event);
+        this.logger.log(`-- SSO user registered: ${user.email} via ${provider}`);
+      } else if (!user.ssoProvider) {
+        await this.usersService.linkSsoProvider(user._id.toString(), provider, profile.ssoId);
+      }
+
+      if (!user.isActive) {
+        throw new ForbiddenException('Account is deactivated');
+      }
+
+      const event: UserLoginEvent = {
+        userId: user._id.toString(),
+        email: user.email,
+        ipAddress: 'sso',
+        userAgent: provider,
+        timestamp: new Date().toISOString(),
+      };
+      await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_LOGIN, event);
+
+      this.logger.log(`-- SSO login: ${user.email} via ${provider}`);
       return this.issueTokenPair(user);
     }
   
