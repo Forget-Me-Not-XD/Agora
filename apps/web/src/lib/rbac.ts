@@ -1,4 +1,4 @@
-import type { UserRole } from './mock-data';
+import type { UserRole, UserTag } from './mock-data';
 
 export function canCreateEvents(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
@@ -8,8 +8,12 @@ export function canViewInsights(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
 }
 
-export function canViewBudget(role: UserRole): boolean {
-    return role === 'ADMIN';
+export function hasFinanceTag(tags?: UserTag[]): boolean {
+    return (tags ?? []).includes('FINANCE');
+}
+
+export function canViewBudget(role: UserRole, tags?: UserTag[]): boolean {
+    return role === 'ADMIN' || hasFinanceTag(tags);
 }
 
 export function canManageUsers(role: UserRole): boolean {
@@ -36,4 +40,19 @@ export function getRoleBadgeColor(role: UserRole): string {
     PHOTOGRAPHER: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
     };
     return colors[role] ?? '';
+}
+
+export const ALL_USER_TAGS: { value: UserTag; label: string }[] = [
+    { value: 'FINANCE', label: 'Finansies' },
+];
+
+export function getTagLabel(tag: UserTag): string {
+    return ALL_USER_TAGS.find((t) => t.value === tag)?.label ?? tag;
+}
+
+export function getTagBadgeColor(tag: UserTag): string {
+    const colors: Record<UserTag, string> = {
+        FINANCE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    };
+    return colors[tag] ?? '';
 }

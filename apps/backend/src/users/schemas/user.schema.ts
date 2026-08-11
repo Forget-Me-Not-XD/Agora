@@ -5,6 +5,7 @@ import { Role } from '../../common/enums/role.enums';
 import { UserTitle } from '../../common/enums/user-title.enum'
 import { SsoProvider } from '../../common/enums/sso-provider.enum';
 import { CalendarConnection, CalendarConnectionSchema } from './calendar-connection.schema';
+import { UserTag } from '../../common/enums/user-tag.enum';
 export type UserDocument = HydratedDocument<User>;
 
 /**
@@ -26,6 +27,9 @@ export class User {
 
     @Prop({ required: false })
     passwordHash?: string;
+
+    @Prop({ type: Date, default: Date.now })
+    passwordChangedAt!: Date;
 
     @Prop({ required: true, enum: Role, default: Role.GAS, index: true })
     role!: Role;
@@ -56,6 +60,9 @@ export class User {
 
     @Prop({ type: CalendarConnectionSchema, default: () => ({}) })
     outlookCalendar!: CalendarConnection;
+
+    @Prop({ type: [String], enum: Object.values(UserTag), default: [] })
+    tags!: UserTag[];
 
     // Timestamps added by Mongoose timestamps: true
     createdAt?: Date;

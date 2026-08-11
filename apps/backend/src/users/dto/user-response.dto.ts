@@ -3,6 +3,7 @@ import { Role } from '../../common/enums/role.enums';
 import { UserDocument } from '../schemas/user.schema';
 import { UserTitle } from '../../common/enums/user-title.enum';
 import { SsoProvider } from '../../common/enums/sso-provider.enum';
+import { UserTag } from '../../common/enums/user-tag.enum';
 /**
  * Public-facing User shape.
  * NEVER includes passwordHash, failedLoginAttempts, lockedUntil, or calendar tokens.
@@ -20,6 +21,7 @@ export class UserResponseDto {
     title!: string;
     ssoProvider!: SsoProvider | null;
     calendars!: { google: boolean; microsoft: boolean };
+    tags!: UserTag[];
 
     static fromDocument(user: UserDocument): UserResponseDto {
         return {
@@ -37,6 +39,7 @@ export class UserResponseDto {
                 google: user.googleCalendar?.connected ?? false,
                 microsoft: user.outlookCalendar?.connected ?? false,
             },
+            tags: user.tags ?? [],
         };
     }
 }

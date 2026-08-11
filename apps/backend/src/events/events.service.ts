@@ -7,6 +7,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { Role } from '../common/enums/role.enums';
+import { UserTag } from '../common/enums/user-tag.enum';
 import { visibleAttendanceRoles } from '../common/rbac/event-visibility';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging/events.constants';
@@ -25,11 +26,16 @@ export class EventsService {
         const end   = dto.endDate ? new Date(dto.endDate) : undefined;
         this.assertEndAfterStart(start, end);
 
+        if (dto.assignedTo) {
+            await this.assertValidAssignee(dto.assignedTo);
+        }
+
         const created = new this.eventModel({
             ...dto,
-            date:      start,
-            endDate:   end,
-            createdBy: creatorId,
+            date:       start,
+            endDate:    end,
+            createdBy:  creatorId,
+            assignedTo: dto.assignedTo ? new Types.ObjectId(dto.assignedTo) : null,
         });
         return created.save();
     }
@@ -51,11 +57,16 @@ export class EventsService {
         // Rol-gebaseerde sigbaarheid: 'n gebruiker sien geleenthede op sy vlak en laer.
         // ADMIN sien alles. PHOTOGRAPHER is 'n uitsondering op die vlak-stelsel: hulle
         // sien NOOIT geleenthede op grond van intendedAttendance nie -- slegs geleenthede
-        // waaraan 'n Dosent/Admin hulle spesifiek as fotograaf toegewys het.
+        // waaraan 'n Dosent/Admin hulle spesifiek as fotograaf toegewys het. 'n Gebruiker
+        // met die Finansies-tag sien (ongeag rol) ook enige geleentheid waaraan
+        // hulle finansieel toegeken is, bo en behalwe hul normale rol-sigbaarheid.
         if (viewerRole === Role.PHOTOGRAPHER) {
             filter.photographers = new Types.ObjectId(viewerId);
         } else if (viewerRole !== Role.ADMIN) {
-            filter.intendedAttendance = { $in: visibleAttendanceRoles(viewerRole) };
+            filter.$or = [
+                { intendedAttendance: { $in: visibleAttendanceRoles(viewerRole) } },
+                { assignedTo: new Types.ObjectId(viewerId) },
+            ];
         }
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
@@ -79,6 +90,9 @@ export class EventsService {
 
     private canView(event: EventDocument, viewerRole: Role, viewerId?: string): boolean {
         if (viewerRole === Role.ADMIN) return true;
+        // Die Finansies-toegekende gebruiker mag hierdie geleentheid altyd sien,
+        // ongeag rol-vlak, sodat hulle die begroting kan bereik.
+        if (viewerId && event.assignedTo && event.assignedTo.toString() === viewerId) return true;
         // PHOTOGRAPHER is 'n uitsondering: nooit op grond van intendedAttendance sigbaar
         // nie, slegs as hulle spesifiek as fotograaf aan hierdie geleentheid toegewys is.
         if (viewerRole === Role.PHOTOGRAPHER) {
@@ -122,10 +136,15 @@ export class EventsService {
             await this.assertValidPhotographers(dto.photographers);
         }
 
+        if (dto.assignedTo) {
+            await this.assertValidAssignee(dto.assignedTo);
+        }
+
         const { date, endDate, ...rest } = dto;
         Object.assign(event, rest);
-        if (date)    event.date    = new Date(date);
-        if (endDate) event.endDate = new Date(endDate);
+        if (date)          event.date       = new Date(date);
+        if (endDate)       event.endDate    = new Date(endDate);
+        if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
 
         this.assertEndAfterStart(event.date, event.endDate);
 
@@ -185,6 +204,15 @@ export class EventsService {
         if (invalidIds.length > 0) {
             throw new BadRequestException(
                 `Ongeldige fotograaf-ID('s): ${invalidIds.join(', ')}`,
+            );
+        }
+    }
+
+    private async assertValidAssignee(userId: string): Promise<void> {
+        const found = await this.usersService.search(undefined, undefined, [userId], UserTag.FINANCE);
+        if (found.length === 0) {
+            throw new BadRequestException(
+                `Die gekose gebruiker het nie die Finansies-tag nie`,
             );
         }
     }

@@ -36,6 +36,7 @@ import {
     private readonly logger = new Logger(AuthService.name);
     private readonly BCRYPT_ROUNDS = 12;
     private readonly SELF_REGISTERABLE_ROLES = [Role.GAS, Role.STUDENT];
+    private readonly PASSWORD_EXPIRY_DAYS = 90;
   
     constructor(
       private readonly usersService: UsersService,
@@ -141,6 +142,11 @@ import {
         await this.usersService.incrementFailedAttempts(user._id.toString());
         await this.publishFailedLogin(dto.email, ip, 'wrong_password');
         throw new UnauthorizedException('Invalid credentials');
+      }
+
+      if (this.isPasswordExpired(user.passwordChangedAt)) {
+        await this.publishFailedLogin(dto.email, ip, 'password_expired');
+        throw new ForbiddenException('Password has expired. Please reset your password before logging in.');
       }
   
       // Successful login — clear lockout state
@@ -253,5 +259,11 @@ import {
         timestamp: new Date().toISOString(),
       };
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_FAILED_LOGIN, event);
+    }
+
+    private isPasswordExpired(passwordChangedAt: Date): boolean {
+      const expiryMs = this.PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+      const ageMs = Date.now() - passwordChangedAt.getTime();
+      return ageMs > expiryMs;
     }
   }

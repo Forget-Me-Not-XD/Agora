@@ -1,7 +1,7 @@
 // ========== Imports: ==========
 import { Injectable, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync } from 'fs';
@@ -122,8 +122,13 @@ export class AnalyticsService {
         ]).exec();
     }
 
-    async getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
+    async getBudgetPerMonth(assignedToUserId?: string): Promise<BudgetPerMonth[]> {
+        const scopeStage = assignedToUserId
+            ? [{ $match: { assignedTo: new Types.ObjectId(assignedToUserId) } }]
+            : [];
+
         return this.eventModel.aggregate<BudgetPerMonth>([
+            ...scopeStage,
             {
                 $group: {
                     _id: {

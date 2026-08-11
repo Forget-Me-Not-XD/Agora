@@ -18,6 +18,7 @@ export interface Event {
     createdBy:                string;
     photographers:            string[];
     photographerInstructions: string;
+    assignedTo:               string | null;
     confirmedAttendees:       number;
     intendedAttendance:       AttendanceRole;
     type:                     EventType;
@@ -36,6 +37,7 @@ export interface CreateEventPayload {
     intendedAttendance?:       AttendanceRole;
     photographers?:            string[];
     photographerInstructions?: string;
+    assignedTo?:               string;
     type?:                     EventType;
 }
 
