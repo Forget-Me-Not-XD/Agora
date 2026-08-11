@@ -21,6 +21,7 @@ export class EventResponseDto {
     createdBy!: string;
     photographers!: string[];
     photographerInstructions!: string;
+    assignedTo!: string | null;
     confirmedAttendees!: number;
     intendedAttendance!: Role;
     type!: EventType;
@@ -40,6 +41,7 @@ export class EventResponseDto {
             createdBy:                  event.createdBy.toString(),
             photographers:              event.photographers.map((id: Types.ObjectId) => id.toString()),
             photographerInstructions:   event.photographerInstructions,
+            assignedTo:                 event.assignedTo ? event.assignedTo.toString() : null,
             confirmedAttendees:         event.confirmedAttendees,
             intendedAttendance:         event.intendedAttendance,
             type:                       event.type,

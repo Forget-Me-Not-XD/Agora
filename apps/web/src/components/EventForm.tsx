@@ -10,6 +10,7 @@ import { createEventAction, updateEventAction } from '@/lib/actions/event.action
 import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
 import type { EventType } from '@/lib/api/events';
 import EventPredictionPanel from '@/components/EventPredictionPanel';
+import FinanceAssigneeSelect from '@/components/FinanceAssigneeSelect';
 
 const STUDY_CENTERS = [
     'Centurion - Leriba',
@@ -29,6 +30,8 @@ export interface EventFormValues {
     intendedAttendance: AttendanceRole;
     capacity:           string;
     budget:             string;
+    assignedTo:         string;
+    assignedToName:     string;
     studyCenter:        string;
 }
 
@@ -91,6 +94,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 maxCapacity:        Number(formData.capacity),
                 budget:             Number(formData.budget),
                 intendedAttendance: formData.intendedAttendance,
+                assignedTo:         formData.assignedTo || undefined,
                 type:               formData.type,
             };
             const err =
@@ -290,6 +294,19 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                             <p className="text-xs text-[var(--color-red)] mt-1">{errors.budget}</p>
                         )}
                     </div>
+                </div>
+
+                <div>
+                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                        Toegeken aan (Finansies)
+                    </label>
+                    <FinanceAssigneeSelect
+                        value={formData.assignedTo}
+                        valueName={formData.assignedToName}
+                        onChange={(id, name) =>
+                            setFormData((prev) => ({ ...prev, assignedTo: id, assignedToName: name }))
+                        }
+                    />
                 </div>
 
                 {apiError && (

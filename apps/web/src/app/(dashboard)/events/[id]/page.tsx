@@ -1,13 +1,19 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, MapPin, Users, ChevronLeft, Pencil } from 'lucide-react';
+import { Calendar, MapPin, Users, ChevronLeft, Pencil, Wallet } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
+import { getUsersByIds } from '@/lib/api/users';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { getToken } from '@/lib/session';
 import { formatDateLong as formatDate } from '@/lib/format-date';
 import PhotographerSection from '@/components/PhotographerSection';
 
 export const dynamic = 'force-dynamic';
+
+function fmtRand(v: number): string {
+    return `R${Math.round(v).toLocaleString('af-ZA')}`;
+}
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
     const user = getCurrentUser();
@@ -17,11 +23,20 @@ export default async function EventDetailPage({ params }: { params: { id: string
 
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
     const canManageEvent = user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
+    // die begroting is sigbaar vir bestuurders van die geleentheid, en vir die
+    // gebruiker met die Finansies-tag wat spesifiek hieraan toegeken is
+    const canViewFinance = canManageEvent || event.assignedTo === user.id;
 
     // los die reeds-toegewysde fotograwe op hul ID's op
     const assigned =
         canManageEvent && event.photographers.length
             ? await getPhotographersByIds(event.photographers)
+            : [];
+
+    // los die toegekende Finansies-gebruiker se naam op (net nodig vir wie dit bestuur)
+    const assignee =
+        canManageEvent && event.assignedTo
+            ? await getUsersByIds([event.assignedTo], getToken())
             : [];
 
     return (
@@ -60,6 +75,26 @@ export default async function EventDetailPage({ params }: { params: { id: string
                     </div>
                 </div>
             </div>
+
+            {/* Finansiële afdeling — bestuurders van die geleentheid, en die toegekende Finansies-gebruiker */}
+            {canViewFinance && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Wallet size={16} className="text-[var(--color-primary)]" />
+                        <span className="text-sm font-semibold text-[var(--color-text)]">Finansies</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--color-text-subtle)]">Begroting</span>
+                        <span className="font-medium text-[var(--color-text)]">{fmtRand(event.budget)}</span>
+                    </div>
+                    {assignee[0] && (
+                        <div className="flex items-center justify-between text-sm">
+                            <span className="text-[var(--color-text-subtle)]">Toegeken aan</span>
+                            <span className="font-medium text-[var(--color-text)]">{assignee[0].name} {assignee[0].surname}</span>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Fotograaf-afdeling — net vir admin, of die dosent wat die geleentheid geskep het */}
             {canManageEvent && (

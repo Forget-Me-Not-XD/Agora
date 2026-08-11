@@ -1,11 +1,11 @@
 import { Suspense } from 'react';
 import { AlertCircle } from 'lucide-react';
-import { canManageUsers, getRoleLabel, getRoleBadgeColor } from '@/lib/rbac';
+import { canManageUsers } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
 import { getUsers } from '@/lib/api/users';
-import type { UserRole } from '@/lib/mock-data';
 import CreateUserForm from './create-user-form';
+import UserRow from './user-row';
 
 export default function UsersPage() {
     const user = getCurrentUser();
@@ -83,38 +83,7 @@ async function UsersTable() {
                 ) : (
                     <div className="divide-y divide-[var(--color-border)]">
                         {users.map((u) => (
-                            <div
-                                key={u.id}
-                                className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center hover:bg-[var(--color-bg)] transition-colors"
-                            >
-                                <p className="text-sm font-medium text-[var(--color-text)]">
-                                    {u.name} {u.surname}
-                                </p>
-                                <p className="text-sm text-[var(--color-text-subtle)] truncate">
-                                    {u.email}
-                                </p>
-                                <div>
-                                    <span
-                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(u.role as UserRole)}`}
-                                    >
-                                        {getRoleLabel(u.role as UserRole)}
-                                    </span>
-                                </div>
-                                <p className="text-sm text-[var(--color-text-subtle)]">
-                                    {u.studyCenter}
-                                </p>
-                                <div>
-                                    <span
-                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                            u.isActive
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                                        }`}
-                                    >
-                                        {u.isActive ? 'Aktief' : 'Onaktief'}
-                                    </span>
-                                </div>
-                            </div>
+                            <UserRow key={u.id} user={u} />
                         ))}
                     </div>
                 )}

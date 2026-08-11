@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
+import { UserTag } from '../common/enums/user-tag.enum';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
@@ -69,8 +70,11 @@ export class UsersService {
     return UserResponseDto.fromDocument(updated);
   }
 
-  async search(role: Role, q?: string, ids?: string[]): Promise<UserResponseDto[]> {
-    const filter: FilterQuery<UserDocument> = { role };
+  async search(role?: Role, q?: string, ids?: string[], tag?: UserTag): Promise<UserResponseDto[]> {
+    const filter: FilterQuery<UserDocument> = {};
+
+    if (role) filter.role = role;
+    if (tag) filter.tags = tag;
 
     if ( ids && ids.length) {
       filter._id = { $in: ids };

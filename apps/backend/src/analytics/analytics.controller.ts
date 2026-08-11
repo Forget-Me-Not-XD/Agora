@@ -5,6 +5,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService, TrainingDataItem, PredictionResult } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth } from './analytics.service';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
@@ -86,11 +88,14 @@ export class AnalyticsController {
         return this.analyticsService.getRsvpStatusBreakdown();
     }
 
+    // ADMIN sien die volle begroting oor alle geleenthede. Enige ander aangemelde
+    // gebruiker sien slegs die begroting van geleenthede waaraan hulle (as die
+    // Finansies-toegekende persoon) toegewys is, of 'n leë lys as hulle aan niks
+    // toegewys is nie.
     @Get('budget-per-month')
-    @UseGuards(RolesGuard)
-    @Roles(Role.ADMIN)
-    async getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
-        return this.analyticsService.getBudgetPerMonth();
+    async getBudgetPerMonth(@CurrentUser() user: JwtPayload): Promise<BudgetPerMonth[]> {
+        const assignedToUserId = user.role === Role.ADMIN ? undefined : user.sub;
+        return this.analyticsService.getBudgetPerMonth(assignedToUserId);
     }
 
     @Get('export')

@@ -11,6 +11,7 @@ export interface UserResponse {
   isActive: boolean;
   createdAt: string;
   title: string;
+  tags: string[];
 }
 
 export interface TokenPair {
