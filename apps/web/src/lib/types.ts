@@ -1,6 +1,8 @@
 // ── Mirrors apps/mobile/src/api/client.ts & stores/auth.store.ts ───────────
 // Keep in sync with the backend DTO definitions.
 
+export type UserTag = 'FINANCE';
+
 export interface UserResponse {
   id: string;
   name: string;
@@ -11,7 +13,7 @@ export interface UserResponse {
   isActive: boolean;
   createdAt: string;
   title: string;
-  tags: string[];
+  tags: UserTag[];
 }
 
 export interface TokenPair {
