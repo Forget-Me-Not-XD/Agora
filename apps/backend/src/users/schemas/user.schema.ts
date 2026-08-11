@@ -3,6 +3,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
 import { UserTitle } from '../../common/enums/user-title.enum'
+import { UserTag } from '../../common/enums/user-tag.enum';
 export type UserDocument = HydratedDocument<User>;
 
 /**
@@ -45,6 +46,9 @@ export class User {
 
     @Prop({ type: String, enum: Object.values(UserTitle), default: UserTitle.NONE})
     title!: string;
+
+    @Prop({ type: [String], enum: Object.values(UserTag), default: [] })
+    tags!: UserTag[];
 
     // Timestamps added by Mongoose timestamps: true
     createdAt?: Date;

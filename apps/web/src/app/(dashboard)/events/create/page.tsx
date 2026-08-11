@@ -28,6 +28,8 @@ export default function CreateEventPage() {
                     intendedAttendance: 'GAS',
                     capacity: '',
                     budget: '',
+                    assignedTo: '',
+                    assignedToName: '',
                     studyCenter: user.studyCenter,
                 }}
             />

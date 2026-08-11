@@ -65,6 +65,10 @@ export class UpdateEventDto {
     photographerInstructions?: string;
 
     @IsOptional()
+    @IsMongoId()
+    assignedTo?: string;
+
+    @IsOptional()
     @IsIn(ATTENDANCE_ROLES)
     intendedAttendance?: Role;
 

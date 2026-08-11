@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, ChevronLeft } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
+import { getUsersByIds } from '@/lib/api/users';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { getToken } from '@/lib/session';
 import EventForm from '@/components/EventForm';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +44,11 @@ export default async function EditEventPage({ params }: { params: { id: string }
 
     const { date, time } = toDateTimeInputs(event.date);
 
+    // Los die vertoonnaam van die toegekende Finansies-gebruiker op vir die soekveld
+    const assignee = event.assignedTo
+        ? await getUsersByIds([event.assignedTo], getToken())
+        : [];
+
     return (
         <div className="max-w-5xl space-y-6">
             <Link
@@ -69,6 +76,8 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     intendedAttendance: event.intendedAttendance,
                     capacity: String(event.maxCapacity),
                     budget: String(event.budget),
+                    assignedTo: event.assignedTo ?? '',
+                    assignedToName: assignee[0] ? `${assignee[0].name} ${assignee[0].surname}` : '',
                     studyCenter: user.studyCenter,
                 }}
             />

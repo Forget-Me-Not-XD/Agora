@@ -105,7 +105,7 @@ async function BudgetData() {
 export default function BudgetPage() {
     const user = getCurrentUser();
 
-    if (!canViewBudget(user.role)) {
+    if (!canViewBudget(user.role, user.tags)) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center py-24">
                 <AlertCircle size={48} className="text-[var(--color-red)] mb-4" />
@@ -117,12 +117,16 @@ export default function BudgetPage() {
         );
     }
 
+    const scoped = user.role !== 'ADMIN';
+
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-[var(--color-text)]">Begroting</h1>
                 <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                    Toegekende begroting oor alle geleenthede
+                    {scoped
+                        ? 'Toegekende begroting vir geleenthede waaraan jy toegeken is'
+                        : 'Toegekende begroting oor alle geleenthede'}
                 </p>
             </div>
 

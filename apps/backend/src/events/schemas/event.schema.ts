@@ -36,6 +36,9 @@ export class Event {
     @Prop ({ required: false, trim: true, default: '' })
     photographerInstructions!: string;
 
+    @Prop ({ required: false, type: Types.ObjectId, ref: 'User', default: null, index: true })
+    assignedTo!: Types.ObjectId | null;
+
     @Prop ({ default: 0 })
     confirmedAttendees!: number;
 

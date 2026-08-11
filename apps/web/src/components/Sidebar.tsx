@@ -51,7 +51,7 @@ export default function Sidebar() {
         ...(canViewInsights(role)
             ? [{ href: '/insights', label: 'KI Insigte', icon: BarChart2 }]
             : []),
-        ...(canViewBudget(role)
+        ...(canViewBudget(role, user.tags)
             ? [{ href: '/budget', label: 'Begroting', icon: Wallet }]
             : []),
         ...(canManageUsers(role)
