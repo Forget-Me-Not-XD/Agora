@@ -4,7 +4,6 @@ import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy as OAuth2Strategy } from "passport-oauth2";
 import { SsoProfile, SsoDone } from '../interfaces/sso-profile.interface';
-import { access } from "fs";
 
 interface MicrosoftGraphProfile {
     id: string;
@@ -26,6 +25,10 @@ export class MicrosoftStrategy extends PassportStrategy(OAuth2Strategy, 'microso
             callbackURL: config.get<string>('oauth.microsoft.callbackUrl')!,
             scope: ['openid', 'profile', 'email', 'User.Read'],
         });
+    }
+
+    authorizationParams(): Record<string, string> {
+        return { prompt: 'select_account' };
     }
 
     async validate(

@@ -92,6 +92,21 @@ export async function searchUsersByTag(tag: UserTag, q?: string, token?: string)
     return res.json() as Promise<UserResponseDto[]>;
 }
 
+// DELETE /api/v1/users/me -- verwyder jou eie rekening (204 No Content)
+export async function deleteAccount(token?: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/api/v1/users/me`, {
+        method:  'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
+}
+
 // GET /api/v1/users?ids=<id,id> -- gebruikers op ID opgelos, ongeag rol
 export async function getUsersByIds(ids: string[], token?: string): Promise<UserResponseDto[]> {
     if (!ids.length) return [];

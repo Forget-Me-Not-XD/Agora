@@ -43,28 +43,6 @@ export class UsersService {
     return created.save();
   }
 
-  async createSsoUser(data: {
-    name: string;
-    surname: string;
-    email: string;
-    ssoProvider: SsoProvider;
-    ssoId: string;
-  }): Promise<UserDocument> {
-    const existing = await this.findByEmail(data.email);
-    if (existing) throw new ConflictException('Email already registered');
-
-    const created = new this.userModel({
-      name: data.name,
-      surname: data.surname,
-      email: data.email.toLowerCase(),
-      role: Role.GAS,
-      studyCenter: '',
-      ssoProvider: data.ssoProvider,
-      ssoId: data.ssoId,
-    });
-    return created.save();
-  }
-
   async linkSsoProvider(userId: string, provider: SsoProvider, ssoId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: userId },
@@ -156,5 +134,10 @@ export class UsersService {
     async findAll(): Promise<UserResponseDto[]> {
     const users = await this.userModel.find().sort({ name: 1 }).exec();
     return users.map(UserResponseDto.fromDocument);
+  }
+
+  async deleteById(userId: string): Promise<void> {
+    const result = await this.userModel.deleteOne({ _id: userId }).exec();
+    if (result.deletedCount === 0) throw new NotFoundException(`User ${userId} not found`);
   }
 }

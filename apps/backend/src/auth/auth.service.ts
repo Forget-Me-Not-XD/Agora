@@ -21,6 +21,7 @@ import {
   import { JwtPayload } from './strategies/jwt.strategy';
   import { SsoProfile } from './interfaces/sso-profile.interface';
   import { SsoProvider } from '../common/enums/sso-provider.enum';
+  import { SsoAccountNotFoundException } from './exceptions/sso-account-not-found.exception';
   import { RabbitMQService } from '../messaging/rabbitmq.service';
   import { Role } from '../common/enums/role.enums';
   import {
@@ -166,33 +167,20 @@ import {
     }
 
     /**
-     * Authenticate (or provision) a user via Google/Microsoft SSO.
-     * First login for an unseen email creates a new GAS-role account.
-     * If a password account already exists with that email, it is linked
-     * to the SSO provider rather than duplicated.
+     * Authenticate a user via Google/Microsoft SSO.
+     * SSO never auto-creates an account — the email must already belong to an
+     * existing user (self-registered or admin-created). If a password account
+     * already exists with that email, it is linked to the SSO provider on
+     * first use rather than duplicated.
      */
     async loginWithSso(profile: SsoProfile, provider: SsoProvider): Promise<TokenPairDto> {
-      let user = await this.usersService.findByEmail(profile.email);
+      const user = await this.usersService.findByEmail(profile.email);
 
       if (!user) {
-        user = await this.usersService.createSsoUser({
-          name: profile.name,
-          surname: profile.surname || profile.name,
-          email: profile.email,
-          ssoProvider: provider,
-          ssoId: profile.ssoId,
-        });
+        throw new SsoAccountNotFoundException(profile.email);
+      }
 
-        const event: UserRegisteredEvent = {
-          userId: user._id.toString(),
-          email: user.email,
-          name: `${user.name} ${user.surname}`,
-          role: user.role,
-          timestamp: new Date().toISOString(),
-        };
-        await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED, event);
-        this.logger.log(`-- SSO user registered: ${user.email} via ${provider}`);
-      } else if (!user.ssoProvider) {
+      if (!user.ssoProvider) {
         await this.usersService.linkSsoProvider(user._id.toString(), provider, profile.ssoId);
       }
 

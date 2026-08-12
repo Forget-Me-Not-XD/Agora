@@ -11,9 +11,13 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         super ({
             clientID: config.get<string>('oauth.google.clientId')!,
             clientSecret: config.get<string>('oauth.google.clientSecret')!,
-            callBackURL: config.get<string>('oauth.google.callBackUrl')!,
+            callbackURL: config.get<string>('oauth.google.callbackUrl')!,
             scope: ['email', 'profile'],
         });
+    }
+
+    authorizationParams(): Record<string, string> {
+        return { prompt: 'select_account' };
     }
 
     validate(

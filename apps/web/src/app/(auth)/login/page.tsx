@@ -7,6 +7,7 @@ import { useTheme } from 'next-themes';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { loginAction } from '@/lib/actions/auth.actions';
 import { SnakeFieldBorder, type SnakeFieldBorderHandle } from '@/components/SnakeFieldBorder';
+import NoAccountModal from '@/components/NoAccountModal';
 
 export default function LoginPage() {
   const { resolvedTheme }                     = useTheme();
@@ -18,8 +19,33 @@ export default function LoginPage() {
   const [error, setError]                     = useState<string | null>(null);
   const [isPending, startTransition]          = useTransition();
   const [forgotInfo, setForgotInfo]           = useState(false);
+  const [noAccountOpen, setNoAccountOpen]     = useState(false);
+  const [noAccountEmail, setNoAccountEmail]   = useState<string | null>(null);
+  const [deletedNotice, setDeletedNotice]     = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('error') === 'sso_no_account') {
+      setNoAccountEmail(params.get('email'));
+      setNoAccountOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
+    if (params.get('error') === 'sso_failed') {
+      setError('Aanmelding met Google/Microsoft het misluk. Probeer weer, of meld aan met jou wagwoord.');
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
+    if (params.get('deleted') === 'true') {
+      setDeletedNotice(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
 
   const formRef                               = useRef<HTMLFormElement>(null);
   const emailInputRef                         = useRef<HTMLInputElement>(null);
@@ -89,6 +115,20 @@ export default function LoginPage() {
 
         {/* Skeidings lyn */}
         <div className="h-px w-full mb-5" style={{ background: 'var(--color-border)' }} />
+
+        {/* Rekening verwyder bevestiging */}
+        {deletedNotice && (
+          <div
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+            style={{
+              background:  'var(--color-bg)',
+              borderColor: 'var(--color-primary)',
+              color:       'var(--color-text)',
+            }}
+          >
+            Jou rekening is suksesvol verwyder.
+          </div>
+        )}
 
         {/* Wagwoord vergeet info */}
         {forgotInfo && (
@@ -223,6 +263,51 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+
+        {/* Skeiding: OF */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+          <span className="text-[11px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>OF</span>
+          <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
+        </div>
+
+        {/* SSO knoppies */}
+        <div className="space-y-2.5">
+          <a
+            href="/api/v1/auth/google"
+            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
+            style={{
+              background: 'var(--color-bg)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text)',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" />
+              <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" />
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z" />
+            </svg>
+            Meld aan met Google
+          </a>
+          <a
+            href="/api/v1/auth/microsoft"
+            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
+            style={{
+              background: 'var(--color-bg)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text)',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+              <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+              <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+              <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+            </svg>
+            Meld aan met Microsoft
+          </a>
+        </div>
       </div>
 
       {/* Registreer skakel */}
@@ -251,7 +336,13 @@ export default function LoginPage() {
           <span className="block h-2" />
           Kontak die Agora stelseladministrateur vir &apos;n rekening.
           </p>
+
+      <NoAccountModal
+        open={noAccountOpen}
+        email={noAccountEmail}
+        onClose={() => setNoAccountOpen(false)}
+      />
     </div>
-    
+
   );
 }

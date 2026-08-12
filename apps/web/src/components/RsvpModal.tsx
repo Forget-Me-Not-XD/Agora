@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Ticket, X, Calendar, Clock, Users } from 'lucide-react';
+import { Ticket, X, Calendar, Clock, Users, CalendarCheck } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import { eventDateKey, eventTime } from '@/lib/event-view';
 import { rsvpToEventAction } from '@/lib/actions/rsvp.actions';
@@ -18,10 +18,12 @@ interface RsvpModalProps {
 }
 
 export default function RsvpModal({ event }: RsvpModalProps) {
-    const [open, setOpen]           = useState(false);
-    const [loading, setLoading]     = useState(false);
-    const [qrDataUri, setQrDataUri] = useState<string | null>(null);
-    const [error, setError]         = useState<string | null>(null);
+    const [open, setOpen]                   = useState(false);
+    const [loading, setLoading]             = useState(false);
+    const [qrDataUri, setQrDataUri]         = useState<string | null>(null);
+    const [error, setError]                 = useState<string | null>(null);
+    const [syncedToGoogle, setSyncedGoogle]   = useState(false);
+    const [syncedToOutlook, setSyncedOutlook] = useState(false);
 
     const isFull = event.confirmedAttendees >= event.maxCapacity;
     const availableSpots = Math.max(event.maxCapacity - event.confirmedAttendees, 0);
@@ -32,6 +34,8 @@ export default function RsvpModal({ event }: RsvpModalProps) {
         setLoading(false);
         setQrDataUri(null);
         setError(null);
+        setSyncedGoogle(false);
+        setSyncedOutlook(false);
     }
 
     async function handleConfirm() {
@@ -42,6 +46,8 @@ export default function RsvpModal({ event }: RsvpModalProps) {
             setError(results.error);
         } else {
             setQrDataUri(results.qrDataUri ?? null);
+            setSyncedGoogle(results.syncedToGoogle ?? false);
+            setSyncedOutlook(results.syncedToOutlook ?? false);
         }
         setLoading(false);
     }
@@ -94,6 +100,24 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={qrDataUri} alt="RSVP QR-kode" className="w-44 h-44 rounded-lg border border-[var(--color-border)]" />
                                     <p className="text-sm font-medium text-[var(--color-text)]">Wys hierdie QR-kode by die deur</p>
+
+                                    {(syncedToGoogle || syncedToOutlook) && (
+                                        <div className="w-full space-y-1.5">
+                                            {syncedToGoogle && (
+                                                <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <CalendarCheck size={13} className="shrink-0" />
+                                                    Bygevoeg by Google Kalender
+                                                </div>
+                                            )}
+                                            {syncedToOutlook && (
+                                                <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <CalendarCheck size={13} className="shrink-0" />
+                                                    Bygevoeg by Outlook Kalender
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <button
                                         onClick={close}
                                         className="w-full px-4 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"

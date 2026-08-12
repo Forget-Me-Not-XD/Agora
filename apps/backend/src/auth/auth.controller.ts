@@ -1,4 +1,7 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Headers, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Headers, Res, UseFilters, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -10,12 +13,18 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { SsoProfile } from './interfaces/sso-profile.interface';
+import { SsoProvider } from '../common/enums/sso-provider.enum';
+import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @UseGuards(ThrottlerGuard)
   @Post('register')
@@ -46,10 +55,51 @@ export class AuthController {
     return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
   }
 
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @UseFilters(SsoExceptionFilter)
+  googleLogin(): void {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @UseFilters(SsoExceptionFilter)
+  async googleCallback(
+    @CurrentUser() profile: SsoProfile,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tokens = await this.authService.loginWithSso(profile, SsoProvider.GOOGLE);
+    this.redirectWithTokens(res, tokens);
+  }
+
+  @Get('microsoft')
+  @UseGuards(AuthGuard('microsoft'))
+  @UseFilters(SsoExceptionFilter)
+  microsoftLogin(): void {}
+
+  @Get('microsoft/callback')
+  @UseGuards(AuthGuard('microsoft'))
+  @UseFilters(SsoExceptionFilter)
+  async microsoftCallback(
+    @CurrentUser() profile: SsoProfile,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tokens = await this.authService.loginWithSso(profile, SsoProvider.MICROSOFT);
+    this.redirectWithTokens(res, tokens);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   me(@CurrentUser() user: JwtPayload): { ok: boolean; sub: string; role: string } {
     return { ok: true, sub: user.sub, role: user.role };
+  }
+
+  private redirectWithTokens(res: Response, tokens: TokenPairDto): void {
+    const frontendUrl = this.config.get<string>('frontendUrl');
+    const params = new URLSearchParams({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+    res.redirect(`${frontendUrl}/api/auth/sso-callback?${params.toString()}`);
   }
 }

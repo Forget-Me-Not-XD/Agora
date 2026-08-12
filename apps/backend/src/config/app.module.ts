@@ -15,6 +15,8 @@ import { RsvpModule } from '../rsvp/rsvp.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
 import { ExportModule } from '../export/export.module';
+import { CalendarModule } from '../calendar/calendar.module';
+import { AccountModule } from '../account/account.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from '../health/health.module';
 
@@ -59,6 +61,8 @@ import { HealthModule } from '../health/health.module';
     AnalyticsModule,
     PhotographersModule,
     ExportModule,
+    CalendarModule,
+    AccountModule,
     ],
 })
 export class AppModule {}

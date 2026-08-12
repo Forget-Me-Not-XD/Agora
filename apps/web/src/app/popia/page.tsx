@@ -148,13 +148,19 @@ Geverifieer teen:         web.use-agora.com:443 en api.use-agora.com:443`}
         <ul className="list-disc pl-5 space-y-1">
           <li>Toegang tot jou eie data — sigbaar in jou profiel</li>
           <li>Regstelling — jy (of 'n admin) kan jou profiel wysig</li>
+          <li>
+            Uitwissing (reg om vergete te word) — jy kan jou rekening en persoonlike data self
+            en permanent verwyder via jou profielbladsy onder &ldquo;Verwyder my rekening&rdquo;.
+            Aktiewe RSVP&apos;s word outomaties gekanselleer (geleentheidkapasiteit vrygestel)
+            en verwyder van enige gekoppelde Google/Outlook-kalender voordat jou rekening
+            self verwyder word.
+          </li>
           <li>Beswaar teen verwerking — kontak ons (sien punt 9)</li>
         </ul>
       </Section>
 
       <Section title="8. Bekende gapings — opvolgpunte">
         {[
-          'Geen self-diens "verwyder my rekening"-funksie nie (reg op uitwissing) — die backend het tans slegs GET/PATCH op gebruikers, geen DELETE nie.',
           'Geen outomatiese bewaartermyn of vervalbeleid vir oudit-logs of onaktiewe rekeninge nie.',
           'Geen geregistreerde Inligtingsbeampte by die Inligting-Regulator nie — akademiese prototipe, nie \'n geregistreerde regspersoon nie.',
           'Die "welkoms-e-pos" ná registrasie bestaan tans net as \'n bediener-loglêer — daar word nog geen werklike e-pos gestuur nie.',
