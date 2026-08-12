@@ -35,6 +35,12 @@ export class Rsvp {
     @Prop ({ type: Date, default: null })
     checkedInAt!: Date | null;
 
+    @Prop ({ type: String, default: null })
+    googleCalendarEventId!: string | null;
+
+    @Prop ({ type: String, default: null })
+    outlookCalendarEventId!: string | null;
+
     createdAt?: Date;
     updatedAt?: Date;
 }

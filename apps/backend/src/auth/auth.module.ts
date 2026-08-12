@@ -7,6 +7,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { MicrosoftStrategy } from './strategies/microsoft.strategy';
+import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { UsersModule } from '../users/users.module';
 
 @Module({
@@ -24,7 +27,7 @@ import { UsersModule } from '../users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, MicrosoftStrategy, SsoExceptionFilter],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -6,15 +6,17 @@ export type RsvpStatus = 'BEVESTIG' | 'HANGENDE' | 'GEKANSELLEER';
 
 // Rou RSVP-dokument soos die backend teruggee
 export interface RsvpResponse {
-    _id:         string;
-    event:       string;
-    user:        string;
-    status:      RsvpStatus;
-    qrPayload:   string;
-    checkedIn:   boolean;
-    checkedInAt: string | null;
-    createdAt:   string;
-    updatedAt:   string;
+    _id:                     string;
+    event:                   string;
+    user:                    string;
+    status:                  RsvpStatus;
+    qrPayload:               string;
+    checkedIn:               boolean;
+    checkedInAt:             string | null;
+    googleCalendarEventId:   string | null;
+    outlookCalendarEventId:  string | null;
+    createdAt:               string;
+    updatedAt:               string;
 }
 
 // Soos GET /api/v1/rsvp/my dit terugstuur: 'n rou, gepopuleerde Mongoose-dokument (nie 'n DTO nie)

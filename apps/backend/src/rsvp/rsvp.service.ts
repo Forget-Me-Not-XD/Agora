@@ -8,6 +8,8 @@ import { Rsvp, RsvpDocument, RsvpStatus } from './schemas/rsvp.schema';
 import { CreateRsvpDto } from "./dto/create-rsvp.dto";
 import { CreateWalkInDto } from "./dto/create-walk-in.dto";
 import { EventsService } from "../events/events.service";
+import { UsersService } from "../users/users.service";
+import { CalendarSyncService } from "../calendar/calendar-sync.service";
 import { Role } from '../common/enums/role.enums';
 import { User } from '../users/schemas/user.schema';
 
@@ -22,10 +24,12 @@ export class RsvpService {
     constructor(
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
         private readonly eventsService: EventsService,
+        private readonly usersService: UsersService,
+        private readonly calendarSyncService: CalendarSyncService,
     ) {}
 
     async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
-        await this.eventsService.findById(dto.eventId);
+        const event = await this.eventsService.findById(dto.eventId);
 
         const existing = await this.rsvpModel
         .findOne({ event: dto.eventId, user: userId })
@@ -41,8 +45,18 @@ export class RsvpService {
             user: userId,
             qrPayload: uuidv4(),
         });
+        await rsvp.save();
 
-        return rsvp.save();
+        const user = await this.usersService.findById(userId);
+        const syncResult = await this.calendarSyncService.syncRsvpCreated(user, event);
+
+        if (syncResult.googleCalendarEventId || syncResult.outlookCalendarEventId) {
+            rsvp.googleCalendarEventId = syncResult.googleCalendarEventId;
+            rsvp.outlookCalendarEventId = syncResult.outlookCalendarEventId;
+            await rsvp.save();
+        }
+
+        return rsvp;
     }
 
     async findMyRsvps(userId: string): Promise<RsvpDocument[]> {
@@ -85,6 +99,28 @@ export class RsvpService {
 
         event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
         await event.save();
+
+        if (rsvp.user && (rsvp.googleCalendarEventId || rsvp.outlookCalendarEventId)) {
+            const user = await this.usersService.findById(rsvp.user.toString());
+            await this.calendarSyncService.syncRsvpCancelled(
+                user,
+                rsvp.googleCalendarEventId,
+                rsvp.outlookCalendarEventId,
+            );
+        }
+    }
+
+    // Gebruik wanneer 'n gebruiker sy rekening verwyder: kanselleer al sy aktiewe RSVP's
+    // sodat geleentheidkapasiteit en gekoppelde kalender-inskrywings korrek vrygestel word,
+    // eerder as om weeskop-RSVP's met 'n verwysing na 'n nie-bestaande gebruiker agter te laat.
+    async cancelAllForUser(userId: string): Promise<void> {
+        const activeRsvps = await this.rsvpModel
+            .find({ user: userId, status: { $ne: RsvpStatus.GEKANSELLEER } })
+            .exec();
+
+        for (const rsvp of activeRsvps) {
+            await this.cancelRsvp(rsvp._id.toString(), userId, Role.GAS);
+        }
     }
 
     async checkInRsvp(rsvpId: string, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {

@@ -3,12 +3,11 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { createUser, type CreateUserPayload } from '@/lib/api/auth';
-import type { TokenPair, LoginPayload } from '@/lib/types';
+import { deleteAccount } from '@/lib/api/users';
+import type { TokenPair, LoginPayload, UserResponse } from '@/lib/types';
+import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME } from '@/lib/auth-cookies';
 
-const COOKIE_NAME         = 'akademia_token';
-const COOKIE_REFRESH_NAME = 'akademia_refresh_token';
-const COOKIE_USER_NAME    = 'akademia_user';
-const API_URL             = process.env.API_URL ?? 'http://localhost:3000';
+const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 
 /**
  * Shared helper: stel beide access en refresh tokens as HttpOnly cookies.
@@ -144,6 +143,41 @@ export async function adminCreateUserAction(
 }
 
 /**
+ * SSO callback server action.
+ *
+ * Die backend het reeds 'n token-pare uitgereik na 'n suksesvolle Google/Microsoft
+ * aanmelding en die blaaier hierheen herlei met accessToken + refreshToken.
+ * Ons haal die volledige gebruikersprofiel op (GET /api/v1/users/me) sodat die
+ * akademia_user cookie presies dieselfde vorm het as 'n gewone wagwoord-aanmelding.
+ */
+export async function completeSsoLoginAction(
+  accessToken: string,
+  refreshToken: string,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/users/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache:   'no-store',
+  });
+
+  if (!res.ok) {
+    redirect('/login?error=sso_failed');
+  }
+
+  const user: UserResponse = await res.json();
+
+  const tokenPair: TokenPair = {
+    accessToken,
+    refreshToken,
+    expiresIn: 60 * 15,
+    tokenType: 'Bearer',
+    user,
+  };
+
+  setAuthCookies(cookies(), tokenPair, true);
+  redirect('/dashboard');
+}
+
+/**
  * Logout server action.
  * Verwyder die cookies en stuur gebruiker terug na login skerm.
  */
@@ -153,4 +187,29 @@ export async function logoutAction(): Promise<void> {
   cookieStore.delete(COOKIE_REFRESH_NAME);
   cookieStore.delete(COOKIE_USER_NAME);
   redirect('/login');
+}
+
+/**
+ * Delete-account server action.
+ *
+ * Roep NestJS DELETE /api/v1/users/me — die backend kanselleer eers al die
+ * gebruiker se aktiewe RSVP's (gee kapasiteit vry, verwyder gesinkroniseerde
+ * kalender-inskrywings) en verwyder dan die rekening self uit die databasis.
+ * Verwyder daarna dieselfde cookies as logoutAction, aangesien die sessie
+ * sowieso nie meer geldig is nie.
+ */
+export async function deleteAccountAction(): Promise<{ error?: string }> {
+  const token = cookies().get(COOKIE_NAME)?.value;
+
+  try {
+    await deleteAccount(token);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Kon nie rekening verwyder nie.' };
+  }
+
+  const cookieStore = cookies();
+  cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(COOKIE_REFRESH_NAME);
+  cookieStore.delete(COOKIE_USER_NAME);
+  redirect('/login?deleted=true');
 }

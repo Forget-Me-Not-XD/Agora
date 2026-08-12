@@ -1,3 +1,4 @@
+// ========== Imports: ==========
 import {
     Injectable,
     UnauthorizedException,
@@ -18,6 +19,9 @@ import {
   import { LoginDto } from './dto/login.dto';
   import { TokenPairDto } from './dto/token-pair.dto';
   import { JwtPayload } from './strategies/jwt.strategy';
+  import { SsoProfile } from './interfaces/sso-profile.interface';
+  import { SsoProvider } from '../common/enums/sso-provider.enum';
+  import { SsoAccountNotFoundException } from './exceptions/sso-account-not-found.exception';
   import { RabbitMQService } from '../messaging/rabbitmq.service';
   import { Role } from '../common/enums/role.enums';
   import {
@@ -128,6 +132,11 @@ import {
         await this.publishFailedLogin(dto.email, ip, 'account_locked');
         throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
       }
+
+      if (!user.passwordHash) {
+        await this.publishFailedLogin(dto.email, ip, 'sso_only_account');
+        throw new UnauthorizedException('This account uses SSO login. Sign in with Google or Microsoft instead.');
+      }
   
       const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
       if (!passwordValid) {
@@ -154,6 +163,41 @@ import {
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_LOGIN, event);
   
       this.logger.log(`-- User logged in: ${user.email}`);
+      return this.issueTokenPair(user);
+    }
+
+    /**
+     * Authenticate a user via Google/Microsoft SSO.
+     * SSO never auto-creates an account — the email must already belong to an
+     * existing user (self-registered or admin-created). If a password account
+     * already exists with that email, it is linked to the SSO provider on
+     * first use rather than duplicated.
+     */
+    async loginWithSso(profile: SsoProfile, provider: SsoProvider): Promise<TokenPairDto> {
+      const user = await this.usersService.findByEmail(profile.email);
+
+      if (!user) {
+        throw new SsoAccountNotFoundException(profile.email);
+      }
+
+      if (!user.ssoProvider) {
+        await this.usersService.linkSsoProvider(user._id.toString(), provider, profile.ssoId);
+      }
+
+      if (!user.isActive) {
+        throw new ForbiddenException('Account is deactivated');
+      }
+
+      const event: UserLoginEvent = {
+        userId: user._id.toString(),
+        email: user.email,
+        ipAddress: 'sso',
+        userAgent: provider,
+        timestamp: new Date().toISOString(),
+      };
+      await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_LOGIN, event);
+
+      this.logger.log(`-- SSO login: ${user.email} via ${provider}`);
       return this.issueTokenPair(user);
     }
   

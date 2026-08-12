@@ -80,6 +80,15 @@ export default function RegisterPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const prefillEmail = params.get('email');
+    if (prefillEmail) {
+      setForm((prev) => ({ ...prev, email: prefillEmail }));
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formComplete) return;

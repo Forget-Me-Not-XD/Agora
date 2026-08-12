@@ -14,6 +14,11 @@ export interface UserResponse {
   createdAt: string;
   title: string;
   tags: UserTag[];
+  ssoProvider: 'GOOGLE' | 'MICROSOFT' | null;
+  calendars: {
+    google: boolean;
+    microsoft: boolean;
+  };
 }
 
 export interface TokenPair {
