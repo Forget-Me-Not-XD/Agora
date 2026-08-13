@@ -440,7 +440,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     searchInput: {
       flex: 1,
-      fontSize: 14,
+      fontSize: 16,
       color: colors.text,
       fontWeight: '600',
       paddingVertical: 0,
@@ -470,10 +470,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    filterBadgeText: { fontSize: 8, fontWeight: '900', color: colors.primary },
+    filterBadgeText: { fontSize: 16, fontWeight: '900', color: colors.primary },
 
     resultCount: {
-      fontSize: 11,
+      fontSize: 16,
       fontWeight: '700',
       color: colors.textSubtle,
       paddingHorizontal: 16,
@@ -490,7 +490,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    emptySubtitle: { fontSize: 13, color: colors.textSubtle, textAlign: 'center', lineHeight: 18 },
+    emptySubtitle: { fontSize: 16, color: colors.textSubtle, textAlign: 'center', lineHeight: 18 },
 
     // Event card
     eventCard: {
@@ -513,20 +513,20 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 6,
     },
     dateDay: { fontSize: 20, fontWeight: '900', color: '#0369A1', lineHeight: 24 },
-    dateMonth: { fontSize: 11, fontWeight: '800', color: '#0369A1', marginTop: 1 },
+    dateMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1', marginTop: 1 },
     cardContent: { flex: 1 },
-    cardTitle: { fontSize: 15, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    cardMeta: { fontSize: 12, color: colors.textSubtle, fontWeight: '600', marginBottom: 6 },
+    cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
+    cardMeta: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 6 },
     cardStats: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    rsvpCount: { fontSize: 12, fontWeight: '900', color: colors.primary },
-    forecastCount: { fontSize: 12, fontWeight: '700', color: colors.textSubtle },
+    rsvpCount: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    forecastCount: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     cardFooter: { flexDirection: 'row', alignItems: 'center' },
     statusPill: {
       borderRadius: 999,
       paddingHorizontal: 8,
       paddingVertical: 2,
     },
-    statusPillText: { fontSize: 11, fontWeight: '700' },
+    statusPillText: { fontSize: 16, fontWeight: '700' },
     menuBtn: {
       paddingTop: 2,
       paddingLeft: 4,
@@ -559,9 +559,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       marginBottom: 16,
     },
     sheetTitle: { fontSize: 17, fontWeight: '900' },
-    clearFilters: { fontSize: 13, fontWeight: '700' },
+    clearFilters: { fontSize: 16, fontWeight: '700' },
     filterLabel: {
-      fontSize: 10,
+      fontSize: 16,
       fontWeight: '900',
       letterSpacing: 0.6,
       marginBottom: 8,
@@ -574,7 +574,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    chipText: { fontSize: 13, fontWeight: '700' },
+    chipText: { fontSize: 16, fontWeight: '700' },
     applyBtn: {
       marginTop: 24,
       borderRadius: 14,
@@ -582,7 +582,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    applyBtnText: { fontSize: 15, fontWeight: '900' },
+    applyBtnText: { fontSize: 16, fontWeight: '900' },
 
     // Context menu
     menuBackdrop: {
@@ -600,7 +600,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       overflow: 'hidden',
     },
     menuEventTitle: {
-      fontSize: 11,
+      fontSize: 16,
       fontWeight: '700',
       paddingHorizontal: 16,
       paddingTop: 12,
@@ -618,6 +618,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    menuItemText: { fontSize: 15, fontWeight: '700' },
+    menuItemText: { fontSize: 16, fontWeight: '700' },
   });
 }

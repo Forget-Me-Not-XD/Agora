@@ -117,7 +117,7 @@ export default function RegisterPage() {
   const onBlur = (e: React.FocusEvent<HTMLInputElement>) =>
     (e.currentTarget.style.boxShadow = '');
   const inputClass =
-    'w-full rounded-[10px] px-[14px] py-3 text-[15px] border focus:outline-none transition disabled:opacity-60';
+    'w-full rounded-[10px] px-[14px] py-3 text-[16px] border focus:outline-none transition disabled:opacity-60';
 
   return (
     <div className="w-full max-w-sm">
@@ -127,7 +127,7 @@ export default function RegisterPage() {
         <h1 className="text-[28px] font-black tracking-tight" style={{ color: 'var(--color-text)' }}>
           Nuwe Registrasie
         </h1>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
+        <p className="text-[16px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
           Slegs deur &apos;n administrateur voltooi
         </p>
       </div>
@@ -144,7 +144,7 @@ export default function RegisterPage() {
         {/* Error banner */}
         {error && (
           <div
-            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold space-y-1"
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[16px] font-semibold space-y-1"
             style={{
               background:  'var(--color-bg)',
               borderColor: 'var(--color-red)',
@@ -165,7 +165,7 @@ export default function RegisterPage() {
           <div className="flex gap-2 mb-3">
             <div className="flex-1">
               <label className="block mb-1">
-                <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
                   Naam <span style={{ color: 'var(--color-primary)' }}>*</span>
                 </span>
               </label>
@@ -182,7 +182,7 @@ export default function RegisterPage() {
             </div>
             <div className="flex-1">
               <label className="block mb-1">
-                <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+                <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
                   Van <span style={{ color: 'var(--color-primary)' }}>*</span>
                 </span>
               </label>
@@ -201,7 +201,7 @@ export default function RegisterPage() {
 
           {/* E-pos */}
           <label className="block mb-3">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               E-pos adres <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <input
@@ -220,7 +220,7 @@ export default function RegisterPage() {
 
           {/* Wagwoord */}
           <label className="block mb-0">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               Wagwoord <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <div className="relative mt-1">
@@ -277,7 +277,7 @@ export default function RegisterPage() {
                     : <Circle      size={13} style={{ color: 'var(--color-text-subtle)' }} />
                   }
                   <span
-                    className="text-[12px]"
+                    className="text-[16px]"
                     style={{
                       color:      rule.ok ? 'var(--color-green)' : 'var(--color-text-subtle)',
                       fontWeight: rule.ok ? 700 : 500,
@@ -292,7 +292,7 @@ export default function RegisterPage() {
 
           {/* Bevestig Wagwoord */}
           <label className="block mt-3 mb-3">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               Bevestig Wagwoord <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <div className="relative mt-1">
@@ -326,7 +326,7 @@ export default function RegisterPage() {
               </button>
             </div>
             {confirmPassword.length > 0 && !passwordsMatch && (
-              <p className="flex items-center gap-1.5 mt-1.5 text-[12px] font-semibold" style={{ color: 'var(--color-red)' }}>
+              <p className="flex items-center gap-1.5 mt-1.5 text-[16px] font-semibold" style={{ color: 'var(--color-red)' }}>
                 <AlertCircle size={12} className="shrink-0" />
                 Wagwoorde stem nie ooreen nie.
               </p>
@@ -335,7 +335,7 @@ export default function RegisterPage() {
 
           {/* Ek is 'n: dropdown */}
           <label className="block mb-3">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               Ek is 'n: <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <div className="relative mt-1" ref={roleRef}>
@@ -343,7 +343,7 @@ export default function RegisterPage() {
                 type="button"
                 disabled={isPending}
                 onClick={() => setRoleOpen((o) => !o)}
-                className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[15px] transition disabled:opacity-60 focus:outline-none"
+                className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[16px] transition disabled:opacity-60 focus:outline-none"
                 style={{
                   background:  'var(--color-bg)',
                   borderColor: 'var(--color-border)',
@@ -372,7 +372,7 @@ export default function RegisterPage() {
                     className="flex items-center justify-between px-4 py-3 border-b"
                     style={{ borderColor: 'var(--color-border)' }}
                   >
-                    <span className="text-[15px] font-black" style={{ color: 'var(--color-text)' }}>
+                    <span className="text-[16px] font-black" style={{ color: 'var(--color-text)' }}>
                       Kies rol
                     </span>
                     <button
@@ -392,7 +392,7 @@ export default function RegisterPage() {
                         if (r.value === 'GAS') update('studyCenter', '');
                         setRoleOpen(false);
                       }}
-                      className="w-full text-left px-4 py-3 text-[14px] transition border-b last:border-b-0"
+                      className="w-full text-left px-4 py-3 text-[16px] transition border-b last:border-b-0"
                       style={{
                         borderColor: 'var(--color-border)',
                         background:  uiRole === r.value ? 'var(--color-primary)' : 'transparent',
@@ -411,7 +411,7 @@ export default function RegisterPage() {
           {/* Studiesentrum dropdown */}
           {showStudyCenter && (
             <label className="block mb-3">
-              <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+              <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
                 Studiesentrum <span style={{ color: 'var(--color-primary)' }}>*</span>
               </span>
               <div className="relative mt-1" ref={centerRef}>
@@ -419,7 +419,7 @@ export default function RegisterPage() {
                   type="button"
                   disabled={isPending}
                   onClick={() => setCenterOpen((o) => !o)}
-                  className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[15px] transition disabled:opacity-60 focus:outline-none"
+                  className="w-full flex items-center justify-between rounded-[10px] px-[14px] py-3 border text-[16px] transition disabled:opacity-60 focus:outline-none"
                   style={{
                     background:  'var(--color-bg)',
                     borderColor: 'var(--color-border)',
@@ -447,7 +447,7 @@ export default function RegisterPage() {
                       className="flex items-center justify-between px-4 py-3 border-b"
                       style={{ borderColor: 'var(--color-border)' }}
                     >
-                      <span className="text-[15px] font-black" style={{ color: 'var(--color-text)' }}>
+                      <span className="text-[16px] font-black" style={{ color: 'var(--color-text)' }}>
                         Kies studiesentrum
                       </span>
                       <button
@@ -463,7 +463,7 @@ export default function RegisterPage() {
                         type="button"
                         key={c}
                         onClick={() => { update('studyCenter', c); setCenterOpen(false); }}
-                        className="w-full text-left px-4 py-3 text-[14px] transition border-b last:border-b-0"
+                        className="w-full text-left px-4 py-3 text-[16px] transition border-b last:border-b-0"
                         style={{
                           borderColor: 'var(--color-border)',
                           background:  form.studyCenter === c ? 'var(--color-primary)' : 'transparent',
@@ -488,10 +488,10 @@ export default function RegisterPage() {
               borderColor: 'var(--color-primary)',
             }}
           >
-            <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-primary)' }}>
+            <p className="text-[16px] font-black mb-1.5" style={{ color: 'var(--color-primary)' }}>
               POPIA Kennisgewing
             </p>
-            <p className="text-[11px] mb-3" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
+            <p className="text-[16px] mb-3" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
               Persoonlike data word verwerk ooreenkomstig die Protection of Personal
               Information Act (POPIA). Data word slegs gebruik vir stelseltoegangsbeheer
               en sal NIE met derde partye gedeel word nie.
@@ -521,7 +521,7 @@ export default function RegisterPage() {
                   </svg>
                 )}
               </button>
-              <span className="text-[12px] font-bold cursor-pointer" style={{ color: 'var(--color-text-subtle)' }} onClick={() => setPopiaAccepted((v) => !v)}>
+              <span className="text-[16px] font-bold cursor-pointer" style={{ color: 'var(--color-text-subtle)' }} onClick={() => setPopiaAccepted((v) => !v)}>
                 Ek stem saam met die{' '}
                 <Link
                   href="/popia"
@@ -543,7 +543,7 @@ export default function RegisterPage() {
               type="button"
               onClick={() => router.push('/login')}
               disabled={isPending}
-              className="flex-1 rounded-[12px] py-[14px] text-[15px] font-black tracking-wide border transition disabled:opacity-60"
+              className="flex-1 rounded-[12px] py-[14px] text-[16px] font-black tracking-wide border transition disabled:opacity-60"
               style={{
                 background:  'var(--color-surface)',
                 borderColor: 'var(--color-border)',
@@ -555,7 +555,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isPending || !formComplete}
-              className="flex-1 rounded-[12px] py-[14px] text-[15px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
+              className="flex-1 rounded-[12px] py-[14px] text-[16px] font-black tracking-wide flex items-center justify-center gap-2 transition disabled:opacity-60"
               style={{
                 background: 'var(--color-primary)',
                 color:      'var(--color-primary-text)',

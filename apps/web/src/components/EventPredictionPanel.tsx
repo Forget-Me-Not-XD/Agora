@@ -133,7 +133,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
 function Stat({ label, value }: { label: string; value: string }) {
     return (
         <div className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl p-3">
-            <p className="text-[11px] text-[var(--color-text-subtle)]">{label}</p>
+            <p className="text-[16px] text-[var(--color-text-subtle)]">{label}</p>
             <p className="text-sm font-bold text-[var(--color-text)] mt-1">{value}</p>
         </div>
     );

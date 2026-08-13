@@ -400,7 +400,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingBottom: 8,
     },
     pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    pageSubtitle: { fontSize: 12, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
+    pageSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
 
     filterRow: {
       flexDirection: 'row',
@@ -418,7 +418,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
     },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { fontSize: 12, fontWeight: '700', color: colors.textSubtle },
+    chipText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     chipTextActive: { color: colors.surface },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 12 },
@@ -429,7 +429,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    emptySubtitle: { fontSize: 13, color: colors.textSubtle, textAlign: 'center', lineHeight: 18 },
+    emptySubtitle: { fontSize: 16, color: colors.textSubtle, textAlign: 'center', lineHeight: 18 },
 
     // Student RSVP card
     rsvpCard: {
@@ -450,10 +450,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
     rsvpDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    rsvpMonth: { fontSize: 10, fontWeight: '800', color: '#0369A1' },
+    rsvpMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
     rsvpInfo: { flex: 1 },
-    rsvpTitle: { fontSize: 14, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    rsvpMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle },
+    rsvpTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
+    rsvpMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
     rsvpBadge: {
       width: 30,
       height: 30,
@@ -468,8 +468,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 6,
     },
     rsvpDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    rsvpDetailLabel: { fontSize: 12, fontWeight: '700', color: colors.textSubtle },
-    rsvpDetailValue: { fontSize: 12, fontWeight: '800', color: colors.text },
+    rsvpDetailLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
+    rsvpDetailValue: { fontSize: 16, fontWeight: '800', color: colors.text },
     cancelBtn: {
       alignSelf: 'flex-start',
       borderWidth: 1,
@@ -478,7 +478,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    cancelBtnText: { fontSize: 12, fontWeight: '700', color: colors.textSubtle },
+    cancelBtnText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
 
     rsvpActions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
     qrBtn: {
@@ -491,7 +491,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 12,
       paddingVertical: 6,
     },
-    qrBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary },
+    qrBtnText: { fontSize: 16, fontWeight: '800', color: colors.primary },
     qrBox: {
       alignSelf: 'center',
       width: 200,
@@ -525,17 +525,17 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
     managerDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    managerMonth: { fontSize: 10, fontWeight: '800', color: '#0369A1' },
+    managerMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
     managerInfo: { flex: 1 },
-    managerTitle: { fontSize: 14, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    managerMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle },
+    managerTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
+    managerMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
     statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-    statusPillText: { fontSize: 10, fontWeight: '800' },
+    statusPillText: { fontSize: 16, fontWeight: '800' },
 
     managerStats: { flexDirection: 'row', gap: 4 },
     managerStat: { flex: 1, alignItems: 'center' },
     managerStatVal: { fontSize: 16, fontWeight: '900', color: colors.text },
-    managerStatLbl: { fontSize: 10, fontWeight: '700', color: colors.textSubtle, marginTop: 1 },
+    managerStatLbl: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 1 },
 
     progressTrack: {
       height: 6,
@@ -558,6 +558,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 10,
       paddingVertical: 8,
     },
-    actionBtnText: { fontSize: 12, fontWeight: '800', color: colors.primary },
+    actionBtnText: { fontSize: 16, fontWeight: '800', color: colors.primary },
   });
 }

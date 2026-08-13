@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Users } from 'lucide-react';
 import { canManageUsers } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
@@ -60,12 +60,13 @@ async function UsersTable() {
 
     return (
         <div className="space-y-3">
-            <p className="text-sm text-[var(--color-text-subtle)]">
+            <p className="flex items-center gap-1.5 text-sm text-[var(--color-text-subtle)]">
+                <Users size={14} className="shrink-0" />
                 {users.length} geregistreerde gebruikers
             </p>
 
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
-                <div className="hidden md:grid md:grid-cols-5 gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+                <div className="hidden md:grid md:grid-cols-[1.2fr_1.6fr_1fr_1.2fr_0.8fr] gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
                     {['Naam', 'E-pos', 'Rol', 'Studiesentrum', 'Status'].map((h) => (
                         <p
                             key={h}
@@ -98,7 +99,7 @@ function UsersTableSkeleton() {
         <div className="space-y-3">
             <div className="h-4 w-40 rounded bg-[var(--color-border)] animate-pulse" />
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
-                <div className="hidden md:grid md:grid-cols-5 gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+                <div className="hidden md:grid md:grid-cols-[1.2fr_1.6fr_1fr_1.2fr_0.8fr] gap-4 px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
                     {['Naam', 'E-pos', 'Rol', 'Studiesentrum', 'Status'].map((h) => (
                         <p key={h} className="text-xs font-semibold text-[var(--color-text-subtle)] uppercase tracking-wide">
                             {h}
@@ -107,7 +108,7 @@ function UsersTableSkeleton() {
                 </div>
                 <div className="divide-y divide-[var(--color-border)]">
                     {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center animate-pulse">
+                        <div key={i} className="grid grid-cols-1 md:grid-cols-[1.2fr_1.6fr_1fr_1.2fr_0.8fr] gap-2 md:gap-4 px-5 py-4 items-center animate-pulse">
                             <div className="h-4 w-32 rounded bg-[var(--color-border)]" />
                             <div className="h-4 w-40 rounded bg-[var(--color-border)]" />
                             <div className="h-5 w-20 rounded-full bg-[var(--color-border)]" />

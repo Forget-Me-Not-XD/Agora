@@ -1,5 +1,7 @@
 'use client';
 
+import { Pill, type Tone } from '@/components/ui/Pill';
+
 export interface AttendanceItem {
     label: string;
     rate: number;
@@ -7,10 +9,10 @@ export interface AttendanceItem {
     registered: number;
 }
 
-function rateColors(rate: number) {
-    if (rate >= 80) return { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' };
-    if (rate >= 50) return { bar: 'bg-amber-400', text: 'text-amber-600 dark:text-amber-400', pill: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' };
-    return { bar: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', pill: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' };
+function rateColors(rate: number): { bar: string; text: string; tone: Tone } {
+    if (rate >= 80) return { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', tone: 'green' };
+    if (rate >= 50) return { bar: 'bg-amber-400', text: 'text-amber-600 dark:text-amber-400', tone: 'yellow' };
+    return { bar: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400', tone: 'red' };
 }
 
 export default function AttendanceChart({ data }: { data: AttendanceItem[] }) {
@@ -49,9 +51,7 @@ export default function AttendanceChart({ data }: { data: AttendanceItem[] }) {
                                 <span className="text-xs text-[var(--color-text-subtle)]">
                                     {item.attended}/{item.registered}
                                 </span>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.pill}`}>
-                                    {item.rate}%
-                                </span>
+                                <Pill tone={c.tone} className="font-bold">{item.rate}%</Pill>
                             </div>
                         </div>
                         <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
@@ -71,7 +71,7 @@ export default function AttendanceChart({ data }: { data: AttendanceItem[] }) {
                     { color: 'bg-amber-400', label: '50–79% Redelik' },
                     { color: 'bg-rose-500', label: '<50% Lae opkoms' },
                 ].map((item) => (
-                    <span key={item.label} className="flex items-center gap-1.5 text-[10px] text-[var(--color-text-subtle)]">
+                    <span key={item.label} className="flex items-center gap-1.5 text-[16px] text-[var(--color-text-subtle)]">
                         <span className={`w-2.5 h-2.5 rounded-full ${item.color} shrink-0`} />
                         {item.label}
                     </span>

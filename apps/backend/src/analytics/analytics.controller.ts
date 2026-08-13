@@ -7,7 +7,7 @@ import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { LstmService, TrainingDataItem, PredictionResult } from './lstm.service';
+import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth } from './analytics.service';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
@@ -135,5 +135,18 @@ export class AnalyticsController {
         @Body() dto: PredictDraftEventDto,
     ): Promise<PredictionResult> {
         return this.lstmService.predictDraft(dto);
+    }
+
+    // Report-card view: for a set of completed events, how close was the model's
+    // forward-looking guess to what actually happened.
+    @Get('prediction-accuracy')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async getPredictionAccuracy(
+        @Query('eventIds') eventIds?: string,
+    ): Promise<PredictionAccuracyItem[]> {
+        const ids = (eventIds ?? '').split(',').map((id) => id.trim()).filter(Boolean);
+        if (ids.length === 0) return [];
+        return this.lstmService.getPredictionAccuracy(ids);
     }
 }

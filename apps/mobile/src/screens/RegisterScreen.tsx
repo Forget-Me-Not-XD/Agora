@@ -373,7 +373,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     scroll: { flexGrow: 1, padding: 24, justifyContent: 'center' },
     formWrap: { width: '100%', maxWidth: 520, alignSelf: 'center' },
     heading: { fontSize: 28, fontWeight: '700', color: colors.text, marginTop: 16 },
-    helper: { fontSize: 14, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
+    helper: { fontSize: 16, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
 
     errorBox: {
       backgroundColor: colors.surface,
@@ -389,7 +389,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 6,
       marginBottom: 4,
     },
-    errorText: { color: colors.red, fontSize: 13, fontWeight: '600' },
+    errorText: { color: colors.red, fontSize: 16, fontWeight: '600' },
 
     row: { flexDirection: 'row', gap: 8 },
     halfInput: { flex: 1 },
@@ -397,7 +397,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderRadius: 10,
       padding: 14,
-      fontSize: 15,
+      fontSize: 16,
       marginBottom: 12,
       borderWidth: 1,
       borderColor: colors.border,
@@ -433,7 +433,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 4,
     },
     ruleText: {
-      fontSize: 12,
+      fontSize: 16,
       color: colors.textSubtle,
       fontWeight: '500',
     },
@@ -449,7 +449,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       marginTop: -8,
       marginBottom: 12,
     },
-    matchErrorText: { color: colors.red, fontSize: 12, fontWeight: '600' as const },
+    matchErrorText: { color: colors.red, fontSize: 16, fontWeight: '600' as const },
 
     dropdown: {
       flexDirection: 'row',
@@ -463,10 +463,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    dropdownText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    dropdownText: { color: colors.text, fontSize: 16, fontWeight: '600' },
     dropdownPlaceholder: { color: colors.textSubtle, fontWeight: '500' },
     dropdownChevron: { color: colors.textSubtle, fontSize: 16, marginLeft: 10 },
-    label: { fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 8 },
+    label: { fontSize: 16, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 8 },
     roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
     roleCard: {
       width: '48%',
@@ -482,9 +482,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
-    roleCardTitle: { color: colors.text, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+    roleCardTitle: { color: colors.text, fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
     roleCardTitleActive: { color: colors.primaryText },
-    roleCardSub: { color: colors.textSubtle, fontSize: 12, fontWeight: '700', marginTop: 4 },
+    roleCardSub: { color: colors.textSubtle, fontSize: 16, fontWeight: '700', marginTop: 4 },
     roleCardSubActive: { color: colors.primaryText },
     popiaBox: {
       backgroundColor: colors.surface,
@@ -494,8 +494,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 12,
       marginBottom: 16,
     },
-    popiaTitle: { color: colors.primary, fontSize: 12, fontWeight: '800', marginBottom: 4 },
-    popiaText: { color: colors.textSubtle, fontSize: 11, lineHeight: 16, marginBottom: 10 },
+    popiaTitle: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 4 },
+    popiaText: { color: colors.textSubtle, fontSize: 16, lineHeight: 16, marginBottom: 10 },
     popiaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     checkbox: {
       width: 18,
@@ -507,7 +507,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
     checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-    popiaLabel: { flex: 1, color: colors.textSubtle, fontSize: 12, fontWeight: '700' },
+    popiaLabel: { flex: 1, color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
     popiaLink: { color: colors.primary, textDecorationLine: 'underline' },
     button: {
       backgroundColor: colors.primary,
@@ -517,9 +517,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       marginTop: 8,
     },
     buttonDisabled: { opacity: 0.7 },
-    buttonText: { color: colors.primaryText, fontSize: 15, fontWeight: '800' },
+    buttonText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
     linkButton: { marginTop: 20, alignItems: 'center' },
-    linkText: { color: colors.textSubtle, fontSize: 14 },
+    linkText: { color: colors.textSubtle, fontSize: 16 },
     linkBold: { color: colors.primary, fontWeight: '800' },
 
     modalBackdrop: {
@@ -547,6 +547,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderColor: colors.border,
       marginBottom: 10,
     },
-    modalRowText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    modalRowText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   });
 }

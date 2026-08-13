@@ -344,7 +344,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 4,
     },
     activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#10B981' },
-    activeText: { fontSize: 10, fontWeight: '700', color: colors.text },
+    activeText: { fontSize: 16, fontWeight: '700', color: colors.text },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
@@ -384,7 +384,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     scanHint: {
       position: 'absolute',
       bottom: 12,
-      fontSize: 11,
+      fontSize: 16,
       color: 'rgba(255,255,255,0.6)',
       fontWeight: '600',
     },
@@ -400,7 +400,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     statItem: { flex: 1, alignItems: 'center' },
     statValue: { fontSize: 22, fontWeight: '900', color: colors.text },
-    statLabel: { fontSize: 11, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
     // Last scanned
@@ -423,8 +423,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
     scannedInfo: { flex: 1 },
-    scannedName: { fontSize: 15, fontWeight: '900', color: colors.text },
-    scannedMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    scannedName: { fontSize: 16, fontWeight: '900', color: colors.text },
+    scannedMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
 
     // Controls
     controlRow: { flexDirection: 'row', gap: 12 },
@@ -444,7 +444,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
-    controlBtnText: { fontSize: 14, fontWeight: '800', color: colors.text },
+    controlBtnText: { fontSize: 16, fontWeight: '800', color: colors.text },
 
     // Walk-in
     walkInCard: {
@@ -454,8 +454,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    walkInTitle: { fontSize: 15, fontWeight: '900', color: colors.text, marginBottom: 4 },
-    walkInSubtitle: { fontSize: 12, color: colors.textSubtle, fontWeight: '600', marginBottom: 12 },
+    walkInTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
+    walkInSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 12 },
     walkInRow: { flexDirection: 'row', gap: 10 },
     walkInInput: {
       flex: 1,
@@ -465,7 +465,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 12,
       paddingHorizontal: 12,
       height: 44,
-      fontSize: 14,
+      fontSize: 16,
       color: colors.text,
       fontWeight: '600',
     },
@@ -487,7 +487,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    recentTitle: { fontSize: 13, fontWeight: '900', color: colors.text, marginBottom: 10 },
+    recentTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 10 },
     recentRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -497,8 +497,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderTopColor: colors.border,
     },
     recentDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
-    recentName: { fontSize: 13, fontWeight: '800', color: colors.text },
-    recentMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 1 },
-    moreText: { fontSize: 11, fontWeight: '700', color: colors.textSubtle, marginTop: 8 },
+    recentName: { fontSize: 16, fontWeight: '800', color: colors.text },
+    recentMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 1 },
+    moreText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 8 },
   });
 }

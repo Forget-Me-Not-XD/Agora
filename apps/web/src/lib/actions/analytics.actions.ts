@@ -1,8 +1,8 @@
 'use server';
 
 // ========== Imports: ==========
-import { getAttendancePrediction, getDraftAttendancePrediction, PredictionUnavailableError } from '@/lib/api/analytics';
-import type { PredictionResult, PredictDraftPayload } from '@/lib/api/analytics';
+import { getAttendancePrediction, getDraftAttendancePrediction, getPredictionAccuracy, PredictionUnavailableError } from '@/lib/api/analytics';
+import type { PredictionResult, PredictDraftPayload, PredictionAccuracyItem } from '@/lib/api/analytics';
 
 export interface AttendancePredictionResult {
     prediction?:  PredictionResult;
@@ -35,5 +35,21 @@ export async function getDraftAttendancePredictionAction(
             return { unavailable: true };
         }
         return { error: err instanceof Error ? err.message : 'Kon nie voorspelling laai nie.' };
+    }
+}
+
+export interface PredictionAccuracyResult {
+    items?: PredictionAccuracyItem[];
+    error?: string;
+}
+
+export async function getPredictionAccuracyAction(
+    eventIds: string[],
+): Promise<PredictionAccuracyResult> {
+    try {
+        const items = await getPredictionAccuracy(eventIds);
+        return { items };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie akkuraatheid laai nie.' };
     }
 }

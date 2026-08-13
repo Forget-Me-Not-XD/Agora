@@ -105,7 +105,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     emptyTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
     emptySubtitle: {
-      fontSize: 13,
+      fontSize: 16,
       color: colors.textSubtle,
       textAlign: 'center',
       lineHeight: 18,
@@ -124,8 +124,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
     cardContent: { flex: 1 },
-    message: { fontSize: 14, color: colors.textSubtle, lineHeight: 20, fontWeight: '600' },
+    message: { fontSize: 16, color: colors.textSubtle, lineHeight: 20, fontWeight: '600' },
     messageUnread: { color: colors.text, fontWeight: '800' },
-    date: { fontSize: 11, color: colors.textSubtle, fontWeight: '700', marginTop: 6 },
+    date: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 6 },
   });
 }

@@ -431,7 +431,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 10,
     },
     toggleBtnActive: { backgroundColor: colors.primary },
-    toggleBtnText: { fontSize: 13, fontWeight: '800', color: colors.textSubtle },
+    toggleBtnText: { fontSize: 16, fontWeight: '800', color: colors.textSubtle },
     toggleBtnTextActive: { color: colors.surface },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 12 },
@@ -467,7 +467,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderBottomColor: colors.border,
     },
     weekCell: { flex: 1, alignItems: 'center', paddingVertical: 8 },
-    weekDayLabel: { fontSize: 11, fontWeight: '800', color: colors.textSubtle },
+    weekDayLabel: { fontSize: 16, fontWeight: '800', color: colors.textSubtle },
 
     gridWrap: { flexDirection: 'row', flexWrap: 'wrap' },
     dayCell: {
@@ -486,7 +486,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     dayNumberToday: { backgroundColor: colors.primary },
     dayNumberSelected: { backgroundColor: colors.navy },
-    dayNumberText: { fontSize: 13, fontWeight: '700', color: colors.textSubtle },
+    dayNumberText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     dayNumberTextToday: { color: '#FFFFFF', fontWeight: '900' },
     dayNumberTextSelected: { color: '#FFFFFF', fontWeight: '900' },
 
@@ -502,7 +502,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
       alignItems: 'center',
     },
-    noDayEventsText: { color: colors.textSubtle, fontSize: 13, fontWeight: '600' },
+    noDayEventsText: { color: colors.textSubtle, fontSize: 16, fontWeight: '600' },
 
     dayEventCard: {
       flexDirection: 'row',
@@ -514,8 +514,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     dayEventAccent: { width: 5 },
     dayEventContent: { flex: 1, padding: 14 },
-    dayEventTitle: { fontSize: 15, fontWeight: '900', color: colors.text, marginBottom: 4 },
-    dayEventMeta: { fontSize: 12, color: colors.textSubtle, fontWeight: '600', marginBottom: 10 },
+    dayEventTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
+    dayEventMeta: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 10 },
     openBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -526,16 +526,16 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 14,
       paddingVertical: 7,
     },
-    openBtnText: { fontSize: 13, fontWeight: '900', color: colors.surface },
+    openBtnText: { fontSize: 16, fontWeight: '900', color: colors.surface },
 
     legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
     legendDot: { width: 8, height: 8, borderRadius: 4 },
-    legendText: { fontSize: 11, fontWeight: '700', color: colors.textSubtle },
+    legendText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
 
     // Agenda
     agendaCount: {
-      fontSize: 12,
+      fontSize: 16,
       fontWeight: '700',
       color: colors.textSubtle,
     },
@@ -548,7 +548,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       gap: 10,
     },
-    emptyAgendaText: { color: colors.textSubtle, fontSize: 13, fontWeight: '600' },
+    emptyAgendaText: { color: colors.textSubtle, fontSize: 16, fontWeight: '600' },
 
     agendaCard: {
       flexDirection: 'row',
@@ -562,15 +562,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     agendaDateCol: { width: 36, alignItems: 'center' },
     agendaDay: { fontSize: 20, fontWeight: '900', color: colors.text, lineHeight: 24 },
-    agendaMonth: { fontSize: 10, fontWeight: '800', color: colors.textSubtle },
+    agendaMonth: { fontSize: 16, fontWeight: '800', color: colors.textSubtle },
     agendaAccent: { width: 3, alignSelf: 'stretch', borderRadius: 2 },
     agendaInfo: { flex: 1 },
-    agendaTitle: { fontSize: 14, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    agendaMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginBottom: 4 },
+    agendaTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
+    agendaMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginBottom: 4 },
     agendaStatsRow: { flexDirection: 'row' },
-    agendaRsvp: { fontSize: 11, fontWeight: '900', color: colors.primary },
-    agendaForecast: { fontSize: 11, fontWeight: '700', color: colors.textSubtle },
+    agendaRsvp: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    agendaForecast: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     agendaBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-    agendaBadgeText: { fontSize: 10, fontWeight: '800' },
+    agendaBadgeText: { fontSize: 16, fontWeight: '800' },
   });
 }

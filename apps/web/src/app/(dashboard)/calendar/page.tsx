@@ -6,14 +6,17 @@ import { listEventsAction } from '@/lib/actions/event.actions';
 import type { Event } from '@/lib/api/events';
 import {
     TYPE_COLORS,
+    TYPE_TONE,
     TYPE_LABELS,
     STATUS_COLORS,
+    STATUS_TONE,
     STATUS_LABELS,
     deriveStatus,
     eventDateKey,
     eventTime,
     fillPercentage,
 } from '@/lib/event-view';
+import { Pill } from '@/components/ui/Pill';
 
 const MONTHS = [
     'Januarie', 'Februarie', 'Maart', 'April', 'Mei', 'Junie',
@@ -31,6 +34,7 @@ export default function CalendarPage() {
     const [viewYear, setViewYear] = useState(today.getFullYear());
     const [viewMonth, setViewMonth] = useState(today.getMonth());
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+    const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
     // Haal die geleenthede
     useEffect(() => {
@@ -74,6 +78,14 @@ export default function CalendarPage() {
     }
 
     const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const selectedDayEvents = selectedDayKey ? (eventsByDate[selectedDayKey] ?? []) : [];
+    const selectedDayLabel = selectedDayKey
+        ? (() => {
+            const [y, m, d] = selectedDayKey.split('-').map(Number);
+            return `${d} ${MONTHS[m - 1]} ${y}`;
+        })()
+        : '';
 
     return (
         <div className="space-y-6">
@@ -146,12 +158,14 @@ export default function CalendarPage() {
                         return (
                             <div
                                 key={cellIdx}
+                                onClick={() => inMonth && dayEvents.length > 0 && setSelectedDayKey(key)}
                                 className={[
                                     'min-h-[96px] p-2',
                                     'border-r border-b border-[var(--color-border)]',
                                     (cellIdx + 1) % 7 === 0 ? 'border-r-0' : '',
                                     isLastRow ? 'border-b-0' : '',
                                     !inMonth ? 'bg-[var(--color-bg)]/60' : '',
+                                    inMonth && dayEvents.length > 0 ? 'cursor-pointer hover:bg-[var(--color-bg)] transition-colors' : '',
                                 ].join(' ')}
                             >
                                 {inMonth && (
@@ -170,9 +184,9 @@ export default function CalendarPage() {
                                             {dayEvents.slice(0, 3).map((event) => (
                                                 <button
                                                     key={event.id}
-                                                    onClick={() => setSelectedEvent(event)}
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedEvent(event); }}
                                                     className={[
-                                                        'w-full text-left text-[10px] font-semibold px-1.5 py-0.5 rounded truncate block',
+                                                        'w-full text-left text-[16px] font-semibold px-1.5 py-0.5 rounded truncate block',
                                                         TYPE_COLORS[event.type],
                                                         'hover:opacity-80 transition-opacity',
                                                     ].join(' ')}
@@ -181,9 +195,12 @@ export default function CalendarPage() {
                                                 </button>
                                             ))}
                                             {dayEvents.length > 3 && (
-                                                <span className="text-[9px] text-[var(--color-text-subtle)] pl-1 block">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setSelectedDayKey(key); }}
+                                                    className="w-full text-left text-[16px] font-semibold text-[var(--color-primary)] hover:underline pl-1.5 block"
+                                                >
                                                     +{dayEvents.length - 3} meer
-                                                </span>
+                                                </button>
                                             )}
                                         </div>
                                     </>
@@ -208,6 +225,50 @@ export default function CalendarPage() {
                     </span>
                 ))}
             </div>
+
+            {/* Day popup — full list of events for a clicked day */}
+            {selectedDayKey && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setSelectedDayKey(null)}
+                >
+                    <div
+                        className="bg-[var(--color-surface)] rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[var(--color-border)] shrink-0">
+                            <h3 className="text-base font-bold text-[var(--color-text)]">{selectedDayLabel}</h3>
+                            <button
+                                onClick={() => setSelectedDayKey(null)}
+                                className="p-1.5 rounded-lg hover:bg-[var(--color-border)] text-[var(--color-text-subtle)] shrink-0 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 space-y-2 overflow-y-auto">
+                            {selectedDayEvents.map((event) => (
+                                <button
+                                    key={event.id}
+                                    onClick={() => { setSelectedDayKey(null); setSelectedEvent(event); }}
+                                    className="w-full text-left bg-[var(--color-bg)] hover:bg-[var(--color-border)] rounded-xl p-3 transition-colors flex items-start justify-between gap-3"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-[var(--color-text)] truncate">{event.title}</p>
+                                        <div className="flex items-center gap-2 mt-1 text-xs text-[var(--color-text-subtle)]">
+                                            <Clock size={12} className="shrink-0" />
+                                            {eventTime(event)}
+                                            <MapPin size={12} className="ml-1 shrink-0" />
+                                            <span className="truncate">{event.location}</span>
+                                        </div>
+                                    </div>
+                                    <Pill tone={TYPE_TONE[event.type]} className="shrink-0">{TYPE_LABELS[event.type]}</Pill>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Event detail popup */}
             {selectedEvent && (
@@ -237,12 +298,12 @@ export default function CalendarPage() {
 
                             {/* Status + type badges */}
                             <div className="flex gap-2 mb-4">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[deriveStatus(selectedEvent)]}`}>
+                                <Pill tone={STATUS_TONE[deriveStatus(selectedEvent)]}>
                                     {STATUS_LABELS[deriveStatus(selectedEvent)]}
-                                </span>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[selectedEvent.type]}`}>
+                                </Pill>
+                                <Pill tone={TYPE_TONE[selectedEvent.type]}>
                                     {TYPE_LABELS[selectedEvent.type]}
-                                </span>
+                                </Pill>
                             </div>
 
                             {/* Description */}

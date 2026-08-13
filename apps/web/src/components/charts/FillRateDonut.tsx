@@ -1,3 +1,5 @@
+import { Pill } from '@/components/ui/Pill';
+
 function healthOf(percent: number): { color: string; label: string } {
     if (percent >= 70) return { color: 'var(--color-green)', label: 'Uitstekend' };
     if (percent >= 40) return { color: 'var(--color-orange)', label: 'Gemiddeld' };
@@ -28,13 +30,8 @@ export default function FillRateDonut({ percent }: { percent: number }) {
                     <span className="text-xs text-[var(--color-text-subtle)]">Vulkoers</span>
                 </div>
             </div>
-            <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ color, backgroundColor: `color-mix(in srgb, ${color} 15%, transparent)` }}
-            >
-                {label}
-            </span>
-            <p className="text-[11px] text-[var(--color-text-subtle)] mt-2 text-center">
+            <Pill color={color}>{label}</Pill>
+            <p className="text-[16px] text-[var(--color-text-subtle)] mt-2 text-center">
                 Gemiddelde kapasiteit gevul oor alle geleenthede
             </p>
         </div>

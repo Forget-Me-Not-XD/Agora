@@ -65,7 +65,7 @@ export default function IncomeExpenseChart({ data }: { data: IncomeExpenseItem[]
                                     style={{ height: `${barH(item.income)}px` }}
                                 />
                                 {item.income > 0 && (
-                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[16px] font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                                         {fmt(item.income)}
                                     </span>
                                 )}
@@ -78,7 +78,7 @@ export default function IncomeExpenseChart({ data }: { data: IncomeExpenseItem[]
                                     style={{ height: `${barH(item.expense)}px` }}
                                 />
                                 {item.expense > 0 && (
-                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[16px] font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                                         {fmt(item.expense)}
                                     </span>
                                 )}
@@ -86,7 +86,7 @@ export default function IncomeExpenseChart({ data }: { data: IncomeExpenseItem[]
                         </div>
 
                         {/* X-axis label */}
-                        <span className="text-[10px] text-[var(--color-text-subtle)] text-center truncate w-full leading-tight">
+                        <span className="text-[16px] text-[var(--color-text-subtle)] text-center truncate w-full leading-tight">
                             {item.label.length > 14 ? item.label.slice(0, 12) + '…' : item.label}
                         </span>
                     </div>
@@ -96,15 +96,15 @@ export default function IncomeExpenseChart({ data }: { data: IncomeExpenseItem[]
             {/* Totals row */}
             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-[var(--color-border)]">
                 <div className="text-center">
-                    <p className="text-[10px] text-[var(--color-text-subtle)]">Totale Inkomste</p>
+                    <p className="text-[16px] text-[var(--color-text-subtle)]">Totale Inkomste</p>
                     <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{fmt(totalIncome)}</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-[10px] text-[var(--color-text-subtle)]">Totale Uitgawes</p>
+                    <p className="text-[16px] text-[var(--color-text-subtle)]">Totale Uitgawes</p>
                     <p className="text-sm font-bold text-rose-600 dark:text-rose-400">{fmt(totalExpense)}</p>
                 </div>
                 <div className="text-center">
-                    <p className="text-[10px] text-[var(--color-text-subtle)]">Netto Balans</p>
+                    <p className="text-[16px] text-[var(--color-text-subtle)]">Netto Balans</p>
                     <p className={`text-sm font-bold ${net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                         {net >= 0 ? '+' : ''}{fmt(net)}
                     </p>

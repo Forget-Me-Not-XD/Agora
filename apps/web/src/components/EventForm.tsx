@@ -311,7 +311,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
 
                 {apiError && (
                     <div
-                        className="px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+                        className="px-4 py-3 rounded-[12px] border text-[16px] font-semibold"
                         style={{
                             background:  'var(--color-bg)',
                             borderColor: 'var(--color-red)',

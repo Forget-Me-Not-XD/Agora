@@ -45,7 +45,7 @@ export default function TopEventsBarChart({ data }: { data: RsvpPerEvent[] }) {
                         <LabelList
                             dataKey="totalRsvps"
                             position="top"
-                            className="fill-[var(--color-text)] text-[11px] font-semibold"
+                            className="fill-[var(--color-text)] text-[16px] font-semibold"
                         />
                     </Bar>
                 </BarChart>
@@ -58,7 +58,7 @@ export default function TopEventsBarChart({ data }: { data: RsvpPerEvent[] }) {
                         <span className="w-4 shrink-0 text-[var(--color-text-subtle)] font-medium">{i + 1}.</span>
                         <span className="flex-1 truncate text-[var(--color-text)]">{d.eventTitle}</span>
                         <span className="shrink-0 text-[var(--color-text-subtle)]">
-                            {d.totalRsvps} RSVPs <span className="text-[10px]">({Math.round((d.totalRsvps / total) * 100)}% van top 5)</span>
+                            {d.totalRsvps} RSVPs <span className="text-[16px]">({Math.round((d.totalRsvps / total) * 100)}% van top 5)</span>
                         </span>
                     </li>
                 ))}

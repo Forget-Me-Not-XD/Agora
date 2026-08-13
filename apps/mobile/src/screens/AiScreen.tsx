@@ -236,8 +236,8 @@ function HowRow({
         <Feather name={icon as any} size={14} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text, marginBottom: 2 }}>{title}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textSubtle, lineHeight: 17 }}>{body}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 }}>{title}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textSubtle, lineHeight: 17 }}>{body}</Text>
       </View>
     </View>
   );
@@ -253,7 +253,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingBottom: 8,
     },
     pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    pageSubtitle: { fontSize: 12, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
+    pageSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
@@ -268,7 +268,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     noAccessTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    noAccessSubtitle: { fontSize: 13, color: colors.textSubtle, textAlign: 'center', lineHeight: 18, fontWeight: '600' },
+    noAccessSubtitle: { fontSize: 16, color: colors.textSubtle, textAlign: 'center', lineHeight: 18, fontWeight: '600' },
 
     modelCard: {
       backgroundColor: colors.surface,
@@ -283,8 +283,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'flex-start',
       marginBottom: 14,
     },
-    modelCardTitle: { fontSize: 15, fontWeight: '900', color: colors.text },
-    modelCardSub: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    modelCardTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
+    modelCardSub: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
     modelActivePill: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -297,12 +297,12 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 4,
     },
     activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#10B981' },
-    modelActiveText: { fontSize: 11, fontWeight: '800', color: colors.text },
+    modelActiveText: { fontSize: 16, fontWeight: '800', color: colors.text },
     modelInactivePill: { borderColor: colors.textSubtle },
     inactiveDot: { backgroundColor: colors.textSubtle },
 
     sectionTitle: {
-      fontSize: 10,
+      fontSize: 16,
       fontWeight: '900',
       color: colors.textSubtle,
       letterSpacing: 0.6,
@@ -316,7 +316,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 20,
       alignItems: 'center',
     },
-    emptyText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
+    emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
 
     forecastCard: {
       backgroundColor: colors.surface,
@@ -331,8 +331,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'flex-start',
       gap: 10,
     },
-    forecastTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
-    forecastMeta: { fontSize: 11, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    forecastTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
+    forecastMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
 
     forecastNumbers: {
       flexDirection: 'row',
@@ -340,7 +340,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     forecastNum: { flex: 1, alignItems: 'center' },
     forecastNumVal: { fontSize: 20, fontWeight: '900', color: colors.text },
-    forecastNumLbl: { fontSize: 10, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    forecastNumLbl: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
 
     progressTrack: {
       height: 8,
@@ -363,7 +363,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 1,
       backgroundColor: colors.primary,
     },
-    progressCaption: { fontSize: 10, fontWeight: '600', color: colors.textSubtle },
+    progressCaption: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
 
     howCard: {
       backgroundColor: colors.surface,
@@ -372,6 +372,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    howTitle: { fontSize: 14, fontWeight: '900', color: colors.text, marginBottom: 4 },
+    howTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
   });
 }

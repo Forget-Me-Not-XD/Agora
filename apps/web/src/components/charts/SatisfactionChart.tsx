@@ -55,7 +55,7 @@ export default function SatisfactionChart({ data }: { data: SatisfactionItem[] }
                         <span className="text-lg font-black text-[var(--color-text)] leading-none">
                             {avg.toFixed(1)}
                         </span>
-                        <span className="text-[9px] text-[var(--color-text-subtle)]">uit 5</span>
+                        <span className="text-[16px] text-[var(--color-text-subtle)]">uit 5</span>
                     </div>
                 </div>
                 <div>

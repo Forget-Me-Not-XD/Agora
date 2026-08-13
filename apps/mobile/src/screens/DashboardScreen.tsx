@@ -394,11 +394,11 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
 
     greeting: { fontSize: 20, fontWeight: '900', color: colors.text },
-    subGreeting: { fontSize: 12, color: colors.textSubtle, marginTop: 6, fontWeight: '600' },
+    subGreeting: { fontSize: 16, color: colors.textSubtle, marginTop: 6, fontWeight: '600' },
 
     sectionTitle: {
       color: colors.textSubtle,
-      fontSize: 12,
+      fontSize: 16,
       fontWeight: '900',
       letterSpacing: 0.5,
       marginBottom: 10,
@@ -419,9 +419,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       marginBottom: 10,
     },
-    cardTitle: { fontSize: 15, fontWeight: '900', color: colors.text },
+    cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
     linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    linkText: { color: colors.primary, fontWeight: '800', fontSize: 12 },
+    linkText: { color: colors.primary, fontWeight: '800', fontSize: 16 },
 
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
     statCard: {
@@ -432,9 +432,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 14,
     },
-    statLabel: { color: colors.textSubtle, fontSize: 11, fontWeight: '700' },
+    statLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
     statValue: { color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 6 },
-    statDelta: { color: colors.textSubtle, fontSize: 11, fontWeight: '700', marginTop: 4 },
+    statDelta: { color: colors.textSubtle, fontSize: 16, fontWeight: '700', marginTop: 4 },
 
     iconBtnSm: {
       width: 32,
@@ -454,14 +454,14 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 14,
       padding: 12,
     },
-    highlightTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
-    highlightMeta: { color: colors.textSubtle, fontSize: 11, marginTop: 4, fontWeight: '600' },
+    highlightTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    highlightMeta: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
     progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-    progressLabel: { color: colors.text, fontSize: 12, fontWeight: '900' },
-    progressSub: { color: colors.textSubtle, fontSize: 12, fontWeight: '700' },
+    progressLabel: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    progressSub: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
     progressTrack: { height: 8, borderRadius: 999, backgroundColor: colors.border, marginTop: 8, overflow: 'hidden' },
     progressFill: { height: 8, borderRadius: 999, backgroundColor: colors.primary },
-    progressFoot: { color: colors.textSubtle, fontSize: 11, marginTop: 8, fontWeight: '600' },
+    progressFoot: { color: colors.textSubtle, fontSize: 16, marginTop: 8, fontWeight: '600' },
 
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6 },
     kpiBox: {
@@ -472,7 +472,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 14,
       padding: 12,
     },
-    kpiLabel: { color: colors.textSubtle, fontSize: 11, fontWeight: '800' },
+    kpiLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '800' },
     kpiValueLarge: { color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 6 },
     modelPill: {
       marginTop: 12,
@@ -488,7 +488,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 6,
     },
     dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#22C55E' },
-    modelText: { color: colors.text, fontSize: 11, fontWeight: '800' },
+    modelText: { color: colors.text, fontSize: 16, fontWeight: '800' },
 
     upcomingRow: {
       flexDirection: 'row',
@@ -499,12 +499,12 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     upcomingLeft: { flex: 1 },
-    upcomingTitle: { color: colors.text, fontSize: 13, fontWeight: '900' },
-    upcomingMeta: { color: colors.textSubtle, fontSize: 11, marginTop: 4, fontWeight: '600' },
+    upcomingTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    upcomingMeta: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
     upcomingRight: { width: 62, alignItems: 'flex-end' },
-    upcomingNum: { color: colors.primary, fontSize: 13, fontWeight: '900' },
-    upcomingNumMuted: { color: colors.textSubtle, fontSize: 13, fontWeight: '900' },
-    upcomingSub: { color: colors.textSubtle, fontSize: 10, marginTop: 2, fontWeight: '700' },
+    upcomingNum: { color: colors.primary, fontSize: 16, fontWeight: '900' },
+    upcomingNumMuted: { color: colors.textSubtle, fontSize: 16, fontWeight: '900' },
+    upcomingSub: { color: colors.textSubtle, fontSize: 16, marginTop: 2, fontWeight: '700' },
 
     modalBackdrop: {
       flex: 1,
@@ -525,13 +525,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     modalTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
     infoRow: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    infoTitle: { color: colors.text, fontSize: 13, fontWeight: '900' },
-    infoBody: { color: colors.textSubtle, fontSize: 12, marginTop: 6, lineHeight: 18, fontWeight: '600' },
-    modalFoot: { color: colors.textSubtle, fontSize: 11, marginTop: 12, fontWeight: '600' },
+    infoTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
+    infoBody: { color: colors.textSubtle, fontSize: 16, marginTop: 6, lineHeight: 18, fontWeight: '600' },
+    modalFoot: { color: colors.textSubtle, fontSize: 16, marginTop: 12, fontWeight: '600' },
 
     versionText: {
       textAlign: 'center',
-      fontSize: 12,
+      fontSize: 16,
       color: colors.textSubtle,
       marginTop: 16,
       marginBottom: 8,

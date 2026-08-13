@@ -236,7 +236,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     topBarTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: colors.text },
 
     centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
-    errorText: { fontSize: 14, fontWeight: '700', color: colors.textSubtle, textAlign: 'center' },
+    errorText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, textAlign: 'center' },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 12 },
 
@@ -250,10 +250,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     statItem: { flex: 1, alignItems: 'center' },
     statValue: { fontSize: 20, fontWeight: '900', color: colors.text },
-    statLabel: { fontSize: 11, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
-    emptyText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle, textAlign: 'center', marginTop: 24 },
+    emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, textAlign: 'center', marginTop: 24 },
 
     row: {
       flexDirection: 'row',
@@ -266,8 +266,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     rowInfo: { flex: 1 },
-    rowName: { fontSize: 14, fontWeight: '800', color: colors.text },
-    rowMeta: { fontSize: 12, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    rowName: { fontSize: 16, fontWeight: '800', color: colors.text },
+    rowMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
     badgeRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
     badge: {
       flexDirection: 'row',
@@ -277,7 +277,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 8,
       paddingVertical: 3,
     },
-    badgeText: { fontSize: 10, fontWeight: '800' },
+    badgeText: { fontSize: 16, fontWeight: '800' },
 
     rowActions: { flexDirection: 'row', gap: 8 },
     actionBtn: {

@@ -2,9 +2,10 @@
 
 // ========== Imports: ==========
 import { useState } from 'react';
-import { X, Plus } from 'lucide-react';
-import { getRoleLabel, getRoleBadgeColor, ALL_USER_TAGS, getTagLabel, getTagBadgeColor } from '@/lib/rbac';
+import { X, Plus, ChevronRight } from 'lucide-react';
+import { getRoleLabel, getRoleTone, ALL_USER_TAGS, getTagLabel, getTagTone } from '@/lib/rbac';
 import { updateUserTagsAction } from '@/lib/actions/user.actions';
+import { Pill } from '@/components/ui/Pill';
 import type { UserResponseDto, UserTag } from '@/lib/api/users';
 import type { UserRole } from '@/lib/mock-data';
 
@@ -46,34 +47,28 @@ export default function UserRow({ user }: UserRowProps) {
         <>
             <button
                 onClick={() => setOpen(true)}
-                className="w-full grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-4 px-5 py-4 items-center hover:bg-[var(--color-bg)] transition-colors text-left"
+                className="w-full grid grid-cols-1 md:grid-cols-[1.2fr_1.6fr_1fr_1.2fr_0.8fr] gap-2 md:gap-4 px-5 py-4 items-center hover:bg-[var(--color-bg)] transition-colors text-left group"
             >
-                <p className="text-sm font-medium text-[var(--color-text)]">
+                <p className="text-sm font-medium text-[var(--color-text)] truncate">
                     {user.name} {user.surname}
                 </p>
                 <p className="text-sm text-[var(--color-text-subtle)] truncate">
                     {user.email}
                 </p>
                 <div>
-                    <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(user.role as UserRole)}`}
-                    >
-                        {getRoleLabel(user.role as UserRole)}
-                    </span>
+                    <Pill tone={getRoleTone(user.role as UserRole)}>{getRoleLabel(user.role as UserRole)}</Pill>
                 </div>
-                <p className="text-sm text-[var(--color-text-subtle)]">
-                    {user.studyCenter}
+                <p className="text-sm text-[var(--color-text-subtle)] truncate">
+                    {user.studyCenter || '—'}
                 </p>
-                <div>
-                    <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            user.isActive
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                        }`}
-                    >
+                <div className="flex items-center justify-between gap-2">
+                    <Pill tone={user.isActive ? 'green' : 'neutral'} dot>
                         {user.isActive ? 'Aktief' : 'Onaktief'}
-                    </span>
+                    </Pill>
+                    <ChevronRight
+                        size={16}
+                        className="hidden md:block shrink-0 text-[var(--color-text-subtle)] opacity-0 group-hover:opacity-100 transition-opacity"
+                    />
                 </div>
             </button>
 
@@ -104,10 +99,7 @@ export default function UserRow({ user }: UserRowProps) {
                                 <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">Tags</p>
                                 <div className="flex flex-wrap items-center gap-2">
                                     {tags.map((tag) => (
-                                        <span
-                                            key={tag}
-                                            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${getTagBadgeColor(tag)}`}
-                                        >
+                                        <Pill key={tag} tone={getTagTone(tag)}>
                                             {getTagLabel(tag)}
                                             <button
                                                 onClick={() => removeTag(tag)}
@@ -116,7 +108,7 @@ export default function UserRow({ user }: UserRowProps) {
                                             >
                                                 <X size={11} />
                                             </button>
-                                        </span>
+                                        </Pill>
                                     ))}
 
                                     <div className="relative">
@@ -155,9 +147,7 @@ export default function UserRow({ user }: UserRowProps) {
                                 </div>
                                 <div className="flex justify-between text-sm items-center">
                                     <span className="text-[var(--color-text-subtle)]">Rol</span>
-                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(user.role as UserRole)}`}>
-                                        {getRoleLabel(user.role as UserRole)}
-                                    </span>
+                                    <Pill tone={getRoleTone(user.role as UserRole)}>{getRoleLabel(user.role as UserRole)}</Pill>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-[var(--color-text-subtle)]">Studiesentrum</span>
@@ -165,15 +155,9 @@ export default function UserRow({ user }: UserRowProps) {
                                 </div>
                                 <div className="flex justify-between text-sm items-center">
                                     <span className="text-[var(--color-text-subtle)]">Status</span>
-                                    <span
-                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                            user.isActive
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                                        }`}
-                                    >
+                                    <Pill tone={user.isActive ? 'green' : 'neutral'} dot>
                                         {user.isActive ? 'Aktief' : 'Onaktief'}
-                                    </span>
+                                    </Pill>
                                 </div>
                             </div>
                         </div>

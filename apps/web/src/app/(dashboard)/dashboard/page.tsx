@@ -114,13 +114,15 @@ async function AdminDashboard() {
             </div>
 
             {/* Main chart row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                    <div className="mb-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-col">
+                    <div className="mb-2 shrink-0">
                         <h2 className="text-sm font-semibold text-[var(--color-text)]">Geleenthede vs RSVPs</h2>
                         <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">Afgelope 12 maande</p>
                     </div>
-                    <EventsRsvpsAreaChart data={monthly} />
+                    <div className="flex-1 min-h-[300px]">
+                        <EventsRsvpsAreaChart data={monthly} />
+                    </div>
                 </div>
 
                 <div className="flex flex-col gap-4">

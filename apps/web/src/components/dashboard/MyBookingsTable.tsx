@@ -2,18 +2,8 @@ import Link from 'next/link';
 import type { MyRsvp } from '@/lib/api/rsvp';
 import { formatDateShort } from '@/lib/format-date';
 import RsvpQrButton from '@/components/RsvpQrButton';
-
-const STATUS_STYLE: Record<string, string> = {
-    BEVESTIG: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    HANGENDE: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    GEKANSELLEER: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-    BEVESTIG: 'Bevestig',
-    HANGENDE: 'Hangende',
-    GEKANSELLEER: 'Gekanselleer',
-};
+import { Pill } from '@/components/ui/Pill';
+import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
 
 export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
     if (data.length === 0) {
@@ -61,9 +51,9 @@ export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
                                 {r.event?.location ?? '—'}
                             </td>
                             <td className="py-2.5">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[r.status] ?? ''}`}>
-                                    {STATUS_LABEL[r.status] ?? r.status}
-                                </span>
+                                <Pill tone={RSVP_STATUS_TONE[r.status]}>
+                                    {RSVP_STATUS_LABEL[r.status]}
+                                </Pill>
                             </td>
                             <td className="py-2.5 text-right">
                                 <RsvpQrButton

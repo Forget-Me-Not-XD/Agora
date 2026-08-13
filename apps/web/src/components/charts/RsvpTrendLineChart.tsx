@@ -43,7 +43,7 @@ export default function RsvpTrendLineChart({ data }: { data: MonthlyPoint[] }) {
                 </LineChart>
             </ResponsiveContainer>
 
-            <p className="text-[11px] text-[var(--color-text-subtle)] mt-1">
+            <p className="text-[16px] text-[var(--color-text-subtle)] mt-1">
                 Beste maand: <span className="font-medium text-[var(--color-text)]">{best.label}</span> ({best.b} RSVPs)
                 {' · '}Gemiddeld <span className="font-medium text-[var(--color-text)]">{avg}</span> per maand
             </p>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Event } from '@/lib/api/events';
 import { formatDateShort } from '@/lib/format-date';
+import { Pill } from '@/components/ui/Pill';
 
 export default function MyEventsTable({ events }: { events: Event[] }) {
     if (events.length === 0) {
@@ -56,15 +57,9 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                                     </div>
                                 </td>
                                 <td className="py-2.5 text-right">
-                                    <span
-                                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                            isUpcoming
-                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                : 'bg-[var(--color-border)] text-[var(--color-text-subtle)]'
-                                        }`}
-                                    >
+                                    <Pill tone={isUpcoming ? 'green' : 'neutral'}>
                                         {isUpcoming ? 'Opkomend' : 'Verby'}
-                                    </span>
+                                    </Pill>
                                 </td>
                             </tr>
                         );

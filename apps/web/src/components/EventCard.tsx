@@ -3,14 +3,16 @@ import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import {
     TYPE_LABELS,
-    TYPE_COLORS,
+    TYPE_TONE,
     STATUS_LABELS,
+    STATUS_TONE,
     STATUS_COLORS,
     deriveStatus,
     eventDateKey,
     eventTime,
     fillPercentage,
 } from '@/lib/event-view';
+import { Pill } from '@/components/ui/Pill';
 import RsvpModal from './RsvpModal';
 
 interface EventCardProps {
@@ -36,12 +38,8 @@ export default function EventCard({ event }: EventCardProps) {
                         {event.title}
                     </h3>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[status]}`}>
-                            {STATUS_LABELS[status]}
-                        </span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_COLORS[event.type]}`}>
-                            {TYPE_LABELS[event.type]}
-                        </span>
+                        <Pill tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>
+                        <Pill tone={TYPE_TONE[event.type]}>{TYPE_LABELS[event.type]}</Pill>
                     </div>
                 </div>
 

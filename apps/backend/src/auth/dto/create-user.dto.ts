@@ -28,8 +28,8 @@ export class CreateUserDto {
     @IsEnum(Role)
     role!: Role;
 
-    //Required for all roles except GAS(guests have no study center)
-    @ValidateIf((dto: CreateUserDto) => dto.role != Role.GAS)
+    //Required for ADMIN, DOSENT and STUDENT — GAS and PHOTOGRAPHER have no study center
+    @ValidateIf((dto: CreateUserDto) => dto.role !== Role.GAS && dto.role !== Role.PHOTOGRAPHER)
     @IsString()
     @IsNotEmpty()
     @MaxLength(80)

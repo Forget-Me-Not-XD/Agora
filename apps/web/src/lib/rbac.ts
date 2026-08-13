@@ -1,4 +1,5 @@
 import type { UserRole, UserTag } from './mock-data';
+import type { Tone } from '@/components/ui/Pill';
 
 export function canCreateEvents(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
@@ -31,15 +32,15 @@ export function getRoleLabel(role: UserRole): string {
     return labels[role] ?? role;
 }
 
-export function getRoleBadgeColor(role: UserRole): string {
-    const colors: Record<UserRole, string> = {
-    ADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    DOSENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    STUDENT: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    GAS: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    PHOTOGRAPHER: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+export function getRoleTone(role: UserRole): Tone {
+    const tones: Record<UserRole, Tone> = {
+        ADMIN: 'red',
+        DOSENT: 'blue',
+        STUDENT: 'green',
+        GAS: 'yellow',
+        PHOTOGRAPHER: 'purple',
     };
-    return colors[role] ?? '';
+    return tones[role] ?? 'neutral';
 }
 
 export const ALL_USER_TAGS: { value: UserTag; label: string }[] = [
@@ -50,9 +51,9 @@ export function getTagLabel(tag: UserTag): string {
     return ALL_USER_TAGS.find((t) => t.value === tag)?.label ?? tag;
 }
 
-export function getTagBadgeColor(tag: UserTag): string {
-    const colors: Record<UserTag, string> = {
-        FINANCE: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+export function getTagTone(tag: UserTag): Tone {
+    const tones: Record<UserTag, Tone> = {
+        FINANCE: 'purple',
     };
-    return colors[tag] ?? '';
+    return tones[tag] ?? 'neutral';
 }
