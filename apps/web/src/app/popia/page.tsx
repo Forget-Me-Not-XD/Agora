@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ShieldCheck, AlertTriangle, Lock, Server } from 'lucide-react';
+import { getSession } from '@/lib/session';
 
 export const metadata: Metadata = {
   title: 'POPIA & Privaatheid — AGORA',
@@ -14,10 +15,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       className="rounded-[16px] border p-6 mb-4"
       style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
     >
-      <h2 className="text-[15px] font-black mb-3" style={{ color: 'var(--color-primary)' }}>
+      <h2 className="text-[16px] font-black mb-3" style={{ color: 'var(--color-primary)' }}>
         {title}
       </h2>
-      <div className="text-[13px] space-y-2" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.7' }}>
+      <div className="text-[16px] space-y-2" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.7' }}>
         {children}
       </div>
     </section>
@@ -25,6 +26,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function PopiaPage() {
+  const isLoggedIn = getSession() !== null;
+
   return (
     <div className="w-full max-w-3xl mx-auto px-4 py-10">
 
@@ -33,7 +36,7 @@ export default function PopiaPage() {
         <h1 className="text-[28px] font-black tracking-tight" style={{ color: 'var(--color-text)' }}>
           POPIA-kennisgewing &amp; Privaatheidsbeleid
         </h1>
-        <p className="text-[13px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
+        <p className="text-[16px] mt-1" style={{ color: 'var(--color-text-subtle)' }}>
           Laas opgedateer: 4 Augustus 2026
         </p>
       </div>
@@ -43,10 +46,10 @@ export default function PopiaPage() {
         className="rounded-[12px] border px-4 py-3 mb-6"
         style={{ background: 'var(--color-jwt-bg)', borderColor: 'var(--color-primary)' }}
       >
-        <p className="text-[12px] font-black mb-1.5" style={{ color: 'var(--color-primary)' }}>
+        <p className="text-[16px] font-black mb-1.5" style={{ color: 'var(--color-primary)' }}>
           Belangrike konteks
         </p>
-        <p className="text-[12px]" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
+        <p className="text-[16px]" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
           AGORA is 'n universiteits-kapstoneprojek (studente-bouwerk), nie 'n geregistreerde
           maatskappy nie. Ons pas POPIA se beginsels toe waar tegnies moontlik, maar sekere
           formele vereistes (soos 'n geregistreerde Inligtingsbeampte by die Inligting-Regulator)
@@ -111,7 +114,7 @@ export default function PopiaPage() {
           <p>Ons het dit self geverifieer teen die publieke domein (4 Augustus 2026):</p>
         </div>
         <pre
-          className="rounded-[10px] border p-3 text-[11px] overflow-x-auto"
+          className="rounded-[10px] border p-3 text-[16px] overflow-x-auto"
           style={{ background: 'var(--color-bg)', borderColor: 'var(--color-border)' }}
         >
 {`Uitreiker (issuer):      Google Trust Services (WE1) — via Cloudflare Universal SSL
@@ -181,11 +184,11 @@ Geverifieer teen:         web.use-agora.com:443 en api.use-agora.com:443`}
       </Section>
 
       <Link
-        href="/register"
-        className="inline-block text-[13px] font-bold mt-2"
+        href={isLoggedIn ? '/dashboard' : '/register'}
+        className="inline-block text-[16px] font-bold mt-2"
         style={{ color: 'var(--color-primary)' }}
       >
-        ← Terug na registrasie
+        ← {isLoggedIn ? 'Terug na Webtuiste' : 'Terug na registrasie'}
       </Link>
     </div>
   );

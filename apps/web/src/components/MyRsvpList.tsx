@@ -7,18 +7,8 @@ import type { MyRsvp, RsvpStatus } from '@/lib/api/rsvp';
 import { formatDateLong } from '@/lib/format-date';
 import { cancelRsvpAction } from '@/lib/actions/rsvp.actions';
 import RsvpQrButton from '@/components/RsvpQrButton';
-
-const STATUS_STYLE: Record<RsvpStatus, string> = {
-    BEVESTIG: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    HANGENDE: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    GEKANSELLEER: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
-
-const STATUS_LABEL: Record<RsvpStatus, string> = {
-    BEVESTIG: 'Bevestig',
-    HANGENDE: 'Hangende',
-    GEKANSELLEER: 'Gekanselleer',
-};
+import { Pill } from '@/components/ui/Pill';
+import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
 
 const FILTERS: { value: RsvpStatus | 'alles'; label: string }[] = [
     { value: 'alles', label: 'Alles' },
@@ -115,9 +105,9 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                                             </span>
                                         )}
                                     </div>
-                                    <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[r.status]}`}>
-                                        {STATUS_LABEL[r.status]}
-                                    </span>
+                                    <Pill tone={RSVP_STATUS_TONE[r.status]} className="shrink-0">
+                                        {RSVP_STATUS_LABEL[r.status]}
+                                    </Pill>
                                 </div>
 
                                 {r.event && (

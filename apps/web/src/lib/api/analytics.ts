@@ -140,6 +140,22 @@ export async function getAttendancePrediction(eventId: string): Promise<Predicti
     return res.json() as Promise<PredictionResult>;
 }
 
+export interface PredictionAccuracyItem {
+    eventId:            string;
+    title:              string;
+    date:               string;
+    maxCapacity:        number;
+    predictedFillRate:  number;
+    actualFillRate:     number;
+    predictedAttendees: number;
+    actualAttendees:    number;
+}
+
+export async function getPredictionAccuracy(eventIds: string[]): Promise<PredictionAccuracyItem[]> {
+    if (eventIds.length === 0) return [];
+    return apiFetch<PredictionAccuracyItem[]>(`/api/v1/analytics/prediction-accuracy?eventIds=${eventIds.map(encodeURIComponent).join(',')}`);
+}
+
 export interface PredictDraftPayload {
     date:        string;
     maxCapacity: number;

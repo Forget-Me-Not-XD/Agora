@@ -130,7 +130,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             width: 60,
             alignItems: 'center',
         },
-        backText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+        backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
         title: { color: colors.text, fontSize: 18, fontWeight: '800' },
 
         card: {
@@ -155,8 +155,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             borderTopWidth: 1,
             borderTopColor: colors.border,
         },
-        readLabel: { color: colors.textSubtle, fontSize: 12, marginBottom: 2 },
-        readValue: { color: colors.text, fontSize: 15, fontWeight: '600' },
+        readLabel: { color: colors.textSubtle, fontSize: 16, marginBottom: 2 },
+        readValue: { color: colors.text, fontSize: 16, fontWeight: '600' },
 
         row: {
             flexDirection: 'row',
@@ -168,7 +168,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             borderTopColor: colors.border,
         },
         rowActive: { backgroundColor: colors.background },
-        rowLabel: { color: colors.text, fontSize: 15, fontWeight: '700' },
+        rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700' },
 
         radio: {
             width: 22,
@@ -183,8 +183,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         radioDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: 'transparent' },
         radioDotActive: { backgroundColor: colors.primary },
 
-        errorText: { color: colors.red, fontSize: 13, fontWeight: '600', marginTop: 12, textAlign: 'center' },
-        successText: { color: '#16A34A', fontSize: 13, fontWeight: '600', marginTop: 12, textAlign: 'center' },
+        errorText: { color: colors.red, fontSize: 16, fontWeight: '600', marginTop: 12, textAlign: 'center' },
+        successText: { color: '#16A34A', fontSize: 16, fontWeight: '600', marginTop: 12, textAlign: 'center' },
 
         saveBtn: {
             backgroundColor: colors.primary,
@@ -193,7 +193,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             alignItems: 'center',
             marginTop: 16,
         },
-        saveText: { color: colors.primaryText, fontSize: 15, fontWeight: '800' },
+        saveText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
         buttonDisabled: { opacity: 0.7 },
     });
 }

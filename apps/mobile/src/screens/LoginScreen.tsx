@@ -159,7 +159,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     wordmarkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 8 },
     wordmark: { fontSize: 40, fontWeight: '900', color: colors.text, letterSpacing: -0.5 },
     wordmarkDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
-    tagline: { fontSize: 13, color: colors.textSubtle, marginTop: 6, letterSpacing: 0.3 },
+    tagline: { fontSize: 16, color: colors.textSubtle, marginTop: 6, letterSpacing: 0.3 },
 
     form: {
       backgroundColor: colors.background,
@@ -176,15 +176,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderColor: colors.red,
       marginBottom: 12,
     },
-    errorText: { color: colors.red, fontSize: 13, fontWeight: '600' },
+    errorText: { color: colors.red, fontSize: 16, fontWeight: '600' },
 
-    label: { fontSize: 12, color: colors.textSubtle, marginBottom: 6 },
+    label: { fontSize: 16, color: colors.textSubtle, marginBottom: 6 },
     input: {
       backgroundColor: colors.surface,
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 15,
+      fontSize: 16,
       borderWidth: 1,
       borderColor: colors.border,
       color: colors.text,
@@ -208,19 +208,19 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       marginTop: 16,
     },
-    primaryText: { color: colors.primaryText, fontSize: 15, fontWeight: '800' },
+    primaryText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
     buttonDisabled: { opacity: 0.7 },
 
     forgotBtn: { marginTop: 20, alignItems: 'center' },
-    forgotText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+    forgotText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 
-    footer: { marginTop: 14, textAlign: 'center', color: colors.textSubtle, fontSize: 11 },
+    footer: { marginTop: 14, textAlign: 'center', color: colors.textSubtle, fontSize: 16 },
 
     registerHelper: {
       marginTop: 20,
       textAlign: 'center',
       color: colors.textSubtle,
-      fontSize: 13,
+      fontSize: 16,
     },
     registerBtn: {
       marginTop: 10,
@@ -231,6 +231,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderColor: colors.border,
       backgroundColor: colors.surface,
     },
-    registerBtnText: { color: colors.textSubtle, fontSize: 14, fontWeight: '700' },
+    registerBtnText: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
   });
 }

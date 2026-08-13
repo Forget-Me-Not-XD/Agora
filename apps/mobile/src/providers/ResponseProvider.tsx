@@ -168,7 +168,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       zIndex: 2,
     },
     name: { fontSize: 20, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: 4 },
-    detail: { fontSize: 14, fontWeight: '600', color: colors.textSubtle, textAlign: 'center', marginTop: 2 },
+    detail: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, textAlign: 'center', marginTop: 2 },
     message: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
     nextBtn: {
       marginTop: 22,
@@ -179,6 +179,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignSelf: 'stretch',
       alignItems: 'center',
     },
-    nextBtnText: { fontSize: 15, fontWeight: '900', color: colors.primaryText },
+    nextBtnText: { fontSize: 16, fontWeight: '900', color: colors.primaryText },
   });
 }

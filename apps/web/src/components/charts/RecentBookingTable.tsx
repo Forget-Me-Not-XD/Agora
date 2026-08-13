@@ -1,10 +1,7 @@
 import type { RecentRsvp } from '@/lib/api/analytics';
-
-const STATUS_STYLE: Record<string, string> = {
-    BEVESTIG: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    HANGENDE: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    GEKANSELLEER: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
+import type { RsvpStatus } from '@/lib/api/rsvp';
+import { Pill } from '@/components/ui/Pill';
+import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
 
 export default function RecentBookingsTable({ data }: { data: RecentRsvp[] }) {
     if (data.length === 0) {
@@ -35,9 +32,9 @@ export default function RecentBookingsTable({ data }: { data: RecentRsvp[] }) {
                                 {new Date(r.createdAt).toLocaleDateString('af-ZA')}
                             </td>
                             <td className="py-2.5">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[r.status] ?? ''}`}>
-                                    {r.status}
-                                </span>
+                                <Pill tone={RSVP_STATUS_TONE[r.status as RsvpStatus] ?? 'neutral'}>
+                                    {RSVP_STATUS_LABEL[r.status as RsvpStatus] ?? r.status}
+                                </Pill>
                             </td>
                         </tr>
                     ))}

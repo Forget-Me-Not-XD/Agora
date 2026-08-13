@@ -1,30 +1,20 @@
-import { AlertCircle, Users, TrendingUp, CheckCircle, Calendar } from 'lucide-react';
+import { AlertCircle, Users, TrendingUp, TrendingDown, CheckCircle, Trophy } from 'lucide-react';
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
-import { getEvents, type Event } from '@/lib/api/events';
+import { getEvents, type Event, type EventType } from '@/lib/api/events';
 import { formatDateShort } from '@/lib/format-date';
+import { TYPE_LABELS, TYPE_TONE } from '@/lib/event-view';
+import { Pill, type Tone } from '@/components/ui/Pill';
+import { IconChip } from '@/components/ui/IconChip';
 import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
+import PredictionAccuracyPanel from '@/components/PredictionAccuracyPanel';
 
-const TYPE_LABELS: Record<string, string> = {
-    public: 'Publiek',
-    internal_student: 'Intern - Student',
-    private: 'Privaat',
-    department: 'Departement',
-};
-
-const TYPE_COLORS: Record<string, string> = {
-    public: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-    internal_student: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    private: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    department: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-};
-
-function attendanceColors(rate: number) {
-    if (rate >= 80) return { pill: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', bar: 'bg-green-500' };
-    if (rate >= 50) return { pill: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', bar: 'bg-orange-400' };
-    return { pill: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', bar: 'bg-red-500' };
+function attendanceColors(rate: number): { tone: Tone; bar: string } {
+    if (rate >= 80) return { tone: 'green', bar: 'bg-green-500' };
+    if (rate >= 50) return { tone: 'orange', bar: 'bg-orange-400' };
+    return { tone: 'red', bar: 'bg-red-500' };
 }
 
 // 'n Geleentheid is "verby" sodra sy einde (of, as daar geen einde is nie, sy begin) reeds verby is
@@ -33,6 +23,10 @@ function isEventPast(event: Event): boolean {
     const start = new Date(event.date).getTime();
     const end = event.endDate ? new Date(event.endDate).getTime() : start;
     return now > end;
+}
+
+function fillRateOf(event: Event): number {
+    return event.maxCapacity > 0 ? event.confirmedAttendees / event.maxCapacity : 0;
 }
 
 export default async function InsightsPage() {
@@ -59,6 +53,28 @@ export default async function InsightsPage() {
     const totalAttended = completedEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0);
     const totalCapacity = completedEvents.reduce((sum, e) => sum + e.maxCapacity, 0);
     const overallRate = totalCapacity > 0 ? Math.round((totalAttended / totalCapacity) * 100) : 0;
+
+    // Slegs geleenthede met 'n kapasiteit gee 'n betekenisvolle bywoningskoers
+    const rankedEvents = completedEvents
+        .filter((e) => e.maxCapacity > 0)
+        .slice()
+        .sort((a, b) => fillRateOf(b) - fillRateOf(a));
+    const topPerformers    = rankedEvents.slice(0, 3);
+    const bottomPerformers = rankedEvents.length > 3
+        ? rankedEvents.slice(-3).reverse()
+        : [];
+
+    // Gemiddelde bywoning per tipe geleentheid — wys watter soort geleenthede werklik trek
+    const typeBreakdown = (Object.keys(TYPE_LABELS) as EventType[])
+        .map((type) => {
+            const events = completedEvents.filter((e) => e.type === type && e.maxCapacity > 0);
+            const avgRate = events.length > 0
+                ? Math.round((events.reduce((sum, e) => sum + fillRateOf(e), 0) / events.length) * 100)
+                : null;
+            return { type, count: events.length, avgRate };
+        })
+        .filter((t) => t.count > 0)
+        .sort((a, b) => (b.avgRate ?? 0) - (a.avgRate ?? 0));
 
     return (
         <div className="space-y-6">
@@ -114,120 +130,146 @@ export default async function InsightsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <KpiCard
                     icon={<Users size={20} />}
-                    iconBg="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                    tone="blue"
                     label="Totaal Bygewoon"
                     value={String(totalAttended)}
                     sub={`oor ${completedEvents.length} voltooide geleentheid${completedEvents.length !== 1 ? 'e' : ''}`}
                 />
                 <KpiCard
                     icon={<TrendingUp size={20} />}
-                    iconBg="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    tone="green"
                     label="Gem. Bywoning"
                     value={`${overallRate}%`}
                     sub="teenoor kapasiteit"
                 />
                 <KpiCard
                     icon={<CheckCircle size={20} />}
-                    iconBg="bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                    tone="orange"
                     label="Geleenthede Voltooi"
                     value={String(completedEvents.length)}
                     sub={`van ${relevantEvents.length} in totaal`}
                 />
             </div>
 
-            {/* ── Per-event cards (slegs voltooide geleenthede) ── */}
-            <div className="space-y-3">
-                <h2 className="text-base font-semibold text-[var(--color-text)]">
-                    Per Geleentheid
-                </h2>
+            {/* ── Modelakkuraatheid: kies geleenthede, vergelyk voorspelling teenoor werklikheid ── */}
+            <PredictionAccuracyPanel events={completedEvents.map((e) => ({ id: e.id, title: e.title, date: e.date }))} />
 
-                {completedEvents.length === 0 ? (
-                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
-                        <p className="text-[var(--color-text-subtle)] text-sm">
-                            Geen voltooide geleenthede om insigte oor te wys nie.
-                        </p>
-                    </div>
-                ) : (
-                    completedEvents.map((event) => {
-                        const attendanceRate = event.maxCapacity > 0
-                            ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
-                            : 0;
-                        const colors = attendanceColors(attendanceRate);
+            {/* ── Beste & swakste presterende geleenthede ── */}
+            {rankedEvents.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <PerformerList
+                        title="Beste presterende geleenthede"
+                        icon={<Trophy size={16} />}
+                        tone="green"
+                        events={topPerformers}
+                    />
+                    {bottomPerformers.length > 0 && (
+                        <PerformerList
+                            title="Swakste presterende geleenthede"
+                            icon={<TrendingDown size={16} />}
+                            tone="red"
+                            events={bottomPerformers}
+                        />
+                    )}
+                </div>
+            )}
 
-                        return (
-                            <div
-                                key={event.id}
-                                className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden"
-                            >
-                                {/* Card header */}
-                                <div className="px-5 pt-4 pb-3 border-b border-[var(--color-border)] flex flex-wrap items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="text-sm font-semibold text-[var(--color-text)] truncate">
-                                            {event.title}
-                                        </h3>
-                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[event.type]}`}>
-                                                {TYPE_LABELS[event.type]}
-                                            </span>
-                                            <span className="flex items-center gap-1 text-xs text-[var(--color-text-subtle)]">
-                                                <Calendar size={11} />
-                                                {formatDateShort(event.date)}
-                                            </span>
-                                        </div>
+            {/* ── Gemiddelde bywoning per tipe geleentheid ── */}
+            {typeBreakdown.length > 0 && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                    <h2 className="text-base font-semibold text-[var(--color-text)] mb-3">
+                        Bywoning per Tipe Geleentheid
+                    </h2>
+                    <div className="space-y-3">
+                        {typeBreakdown.map(({ type, count, avgRate }) => (
+                            <div key={type} className="space-y-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Pill tone={TYPE_TONE[type]}>{TYPE_LABELS[type]}</Pill>
+                                        <span className="text-xs text-[var(--color-text-subtle)]">
+                                            {count} geleentheid{count !== 1 ? 'e' : ''}
+                                        </span>
                                     </div>
+                                    <span className="text-sm font-bold text-[var(--color-text)]">{avgRate}%</span>
                                 </div>
-
-                                {/* Card body */}
-                                <div className="px-5 py-4">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs font-medium text-[var(--color-text-subtle)]">
-                                                Bywoning
-                                            </span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-[var(--color-text-subtle)]">
-                                                    {event.confirmedAttendees} / {event.maxCapacity}
-                                                </span>
-                                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.pill}`}>
-                                                    {attendanceRate}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full transition-all ${colors.bar}`}
-                                                style={{ width: `${attendanceRate}%` }}
-                                            />
-                                        </div>
-                                    </div>
+                                <div className="h-1.5 bg-[var(--color-border)] rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all ${attendanceColors(avgRate ?? 0).bar}`}
+                                        style={{ width: `${avgRate}%` }}
+                                    />
                                 </div>
                             </div>
-                        );
-                    })
-                )}
-            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {completedEvents.length === 0 && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-10 text-center">
+                    <p className="text-[var(--color-text-subtle)] text-sm">
+                        Geen voltooide geleenthede om insigte oor te wys nie.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
 
 /* ── Small sub-components ── */
 
+function PerformerList({
+    title,
+    icon,
+    tone,
+    events,
+}: {
+    title: string;
+    icon: React.ReactNode;
+    tone: Tone;
+    events: Event[];
+}) {
+    return (
+        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+                <IconChip tone={tone} size="sm">{icon}</IconChip>
+                <h2 className="text-sm font-semibold text-[var(--color-text)]">{title}</h2>
+            </div>
+            <div className="space-y-3">
+                {events.map((event) => {
+                    const rate = Math.round(fillRateOf(event) * 100);
+                    return (
+                        <div key={event.id} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium text-[var(--color-text)] truncate">{event.title}</p>
+                                <p className="text-xs text-[var(--color-text-subtle)]">
+                                    {formatDateShort(event.date)} · {event.confirmedAttendees} / {event.maxCapacity}
+                                </p>
+                            </div>
+                            <Pill tone={attendanceColors(rate).tone} className="shrink-0 font-bold">{rate}%</Pill>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function KpiCard({
     icon,
-    iconBg,
+    tone,
     label,
     value,
     sub,
 }: {
     icon: React.ReactNode;
-    iconBg: string;
+    tone: Tone;
     label: string;
     value: string;
     sub: string;
 }) {
     return (
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-start gap-4">
-            <div className={`p-3 rounded-xl shrink-0 ${iconBg}`}>{icon}</div>
+            <IconChip tone={tone}>{icon}</IconChip>
             <div className="min-w-0">
                 <p className="text-xs text-[var(--color-text-subtle)] mb-0.5">{label}</p>
                 <p className="text-2xl font-bold text-[var(--color-text)] leading-none">{value}</p>

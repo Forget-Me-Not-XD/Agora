@@ -16,13 +16,14 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useCurrentUser } from './UserContext';
+import { Pill } from '@/components/ui/Pill';
 import {
     canCreateEvents,
     canViewInsights,
     canViewBudget,
     canManageUsers,
     getRoleLabel,
-    getRoleBadgeColor,
+    getRoleTone,
 } from '@/lib/rbac';
 
 interface NavItem {
@@ -152,11 +153,7 @@ export default function Sidebar() {
                     <p className="text-xs text-[var(--color-text-subtle)] truncate mb-1.5">
                         {user.email}
                     </p>
-                    <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getRoleBadgeColor(role)}`}
-                    >
-                        {getRoleLabel(role)}
-                    </span>
+                    <Pill tone={getRoleTone(role)}>{getRoleLabel(role)}</Pill>
                     <Link
                         href="/popia"
                         className="block mt-2 text-xs text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] hover:underline"

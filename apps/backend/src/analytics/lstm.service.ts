@@ -36,6 +36,19 @@ export interface PredictionResult {
     reasoning:           string[];
 }
 
+// Retrospective: the model's forward-looking guess for a now-completed event,
+// laid alongside what actually happened.
+export interface PredictionAccuracyItem {
+    eventId:             string;
+    title:               string;
+    date:                string;
+    maxCapacity:          number;
+    predictedFillRate:   number;
+    actualFillRate:      number;
+    predictedAttendees:  number;
+    actualAttendees:     number;
+}
+
 @Injectable()
 export class LstmService {
     constructor(
@@ -157,6 +170,51 @@ export class LstmService {
                 `Attendance prediction is currently unavailable: ${(err as Error).message}`,
             );
         }
+    }
+
+    // Retrospective accuracy check: re-runs the model's forward-looking guess for
+    // events that have since happened, using the exact same features it would have
+    // seen before the event (capacity/day/month are fixed, and daysInAdvance is
+    // measured from event.createdAt, not from "now" — so there's no leakage of the
+    // real outcome into the input). The result is compared against what actually
+    // happened, which is exactly what "how accurate has the model been" needs —
+    // unlike predictAttendance() above, which intentionally refuses past events
+    // because it's meant as a live forward-looking tool, not a report card.
+    async getPredictionAccuracy(eventIds: string[]): Promise<PredictionAccuracyItem[]> {
+        const results = await Promise.all(eventIds.map(async (eventId) => {
+            let event: EventDocument;
+            try {
+                event = await this.eventsService.findById(eventId);
+            } catch {
+                return null;
+            }
+
+            if (!this.isEventPast(event)) return null;
+
+            const [capacity, dayOfWeek, month, daysInAdvance] = this.computeFeatures(event);
+
+            let prediction: PredictionResult;
+            try {
+                prediction = await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
+            } catch {
+                return null;
+            }
+
+            const actualFillRate = event.maxCapacity > 0 ? event.confirmedAttendees / event.maxCapacity : 0;
+
+            return {
+                eventId: event._id.toString(),
+                title: event.title,
+                date: event.date.toISOString(),
+                maxCapacity: event.maxCapacity,
+                predictedFillRate: prediction.predictedFillRate,
+                actualFillRate,
+                predictedAttendees: prediction.estimatedAttendees,
+                actualAttendees: event.confirmedAttendees,
+            };
+        }));
+
+        return results.filter((item): item is PredictionAccuracyItem => item !== null);
     }
 
     // Same as predictAttendance, but for an event that doesn't exist yet -

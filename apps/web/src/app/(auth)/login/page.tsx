@@ -91,7 +91,7 @@ export default function LoginPage() {
           />
         </p>
         <p
-          className="text-[13px] mt-1 tracking-wide"
+          className="text-[16px] mt-1 tracking-wide"
           style={{ color: 'var(--color-text-subtle)' }}
         >
           vergader · beplan · verbind
@@ -119,7 +119,7 @@ export default function LoginPage() {
         {/* Rekening verwyder bevestiging */}
         {deletedNotice && (
           <div
-            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[16px] font-semibold"
             style={{
               background:  'var(--color-bg)',
               borderColor: 'var(--color-primary)',
@@ -133,7 +133,7 @@ export default function LoginPage() {
         {/* Wagwoord vergeet info */}
         {forgotInfo && (
           <div
-            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[16px] font-semibold"
             style={{
               background:  'var(--color-bg)',
               borderColor: 'var(--color-primary)',
@@ -147,7 +147,7 @@ export default function LoginPage() {
         {/* Error banner */}
         {error && (
           <div
-            className="mb-4 px-4 py-3 rounded-[12px] border text-[13px] font-semibold"
+            className="mb-4 px-4 py-3 rounded-[12px] border text-[16px] font-semibold"
             style={{
               background:  'var(--color-bg)',
               borderColor: 'var(--color-red)',
@@ -169,7 +169,7 @@ export default function LoginPage() {
 
           {/* E-pos */}
           <label className="block mb-1.5">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               E-pos adres
             </span>
             <input
@@ -181,7 +181,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               disabled={isPending}
               required
-              className="mt-1.5 w-full bg-transparent border-0 pb-2 text-[15px] focus:outline-none transition disabled:opacity-60"
+              className="mt-1.5 w-full bg-transparent border-0 pb-2 text-[16px] focus:outline-none transition disabled:opacity-60"
               style={{ color: 'var(--color-text)' }}
               onFocus={() => snakeRef.current?.highlight('email')}
             />
@@ -189,7 +189,7 @@ export default function LoginPage() {
 
           {/* Wagwoord */}
           <label className="block mt-[10px] mb-1.5">
-            <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
+            <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
               Wagwoord
             </span>
             <div className="relative mt-1.5">
@@ -202,7 +202,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isPending}
                 required
-                className="w-full bg-transparent border-0 pb-2 pr-11 text-[15px] focus:outline-none transition disabled:opacity-60"
+                className="w-full bg-transparent border-0 pb-2 pr-11 text-[16px] focus:outline-none transition disabled:opacity-60"
                 style={{ color: 'var(--color-text)' }}
                 onFocus={() => snakeRef.current?.highlight('password')}
               />
@@ -229,13 +229,13 @@ export default function LoginPage() {
                 disabled={isPending}
                 className="w-4 h-4 rounded accent-[var(--color-primary)] disabled:opacity-60"
               />
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--color-text-subtle)' }}>
+              <span className="text-[16px] font-semibold" style={{ color: 'var(--color-text-subtle)' }}>
                 Onthou my
               </span>
             </label>
             <button
               type="button"
-              className="text-[13px] font-bold transition"
+              className="text-[16px] font-bold transition"
               style={{ color: 'var(--color-primary)' }}
               onClick={() => setForgotInfo(true)}
             >
@@ -250,7 +250,7 @@ export default function LoginPage() {
             onMouseEnter={() => snakeRef.current?.highlight('submit')}
             onFocus={() => snakeRef.current?.highlight('submit')}
             disabled={isPending || !email || !password}
-            className="mt-5 mb-5 w-full rounded-[20px] py-[14px] text-[15px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="mt-5 mb-5 w-full rounded-[20px] py-[14px] text-[16px] font-black tracking-wide transition flex items-center justify-center gap-2 disabled:opacity-60"
             style={{
               background: 'var(--color-primary)',
               color: 'var(--color-primary-text)',
@@ -267,7 +267,7 @@ export default function LoginPage() {
         {/* Skeiding: OF */}
         <div className="flex items-center gap-3 mb-5">
           <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
-          <span className="text-[11px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>OF</span>
+          <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>OF</span>
           <div className="h-px flex-1" style={{ background: 'var(--color-border)' }} />
         </div>
 
@@ -275,7 +275,7 @@ export default function LoginPage() {
         <div className="space-y-2.5">
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/auth/google`}
-            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
+            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[16px] font-bold border transition-all duration-200"
             style={{
               background: 'var(--color-bg)',
               borderColor: 'var(--color-border)',
@@ -292,7 +292,7 @@ export default function LoginPage() {
           </a>
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/auth/microsoft`}
-            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
+            className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[16px] font-bold border transition-all duration-200"
             style={{
               background: 'var(--color-bg)',
               borderColor: 'var(--color-border)',
@@ -315,7 +315,7 @@ export default function LoginPage() {
 
         <a
            href="/register"
-           className="block w-full text-center rounded-[12px] py-[13px] text-[14px] font-bold border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all duration-200"
+           className="block w-full text-center rounded-[12px] py-[13px] text-[16px] font-bold border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-all duration-200"
            style={{
             background: 'var(--color-surface)',
             color: 'var(--color-text-subtle)',
@@ -329,7 +329,7 @@ export default function LoginPage() {
 
       {/* Geen rekening onderteks */}
           <p
-            className="mt-3 text-center text-[13px]"
+            className="mt-3 text-center text-[16px]"
             style={{ color: 'var(--color-text-subtle)' }}
           >
           Is jy &apos;n Dosent?

@@ -212,10 +212,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 60,
       alignItems: 'center',
     },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
     title: { color: colors.text, fontSize: 18, fontWeight: '800' },
     scroll: { paddingBottom: 32 },
-    updated: { color: colors.textSubtle, fontSize: 12, marginBottom: 12 },
+    updated: { color: colors.textSubtle, fontSize: 16, marginBottom: 12 },
 
     noticeBox: {
       backgroundColor: colors.surface,
@@ -225,8 +225,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 14,
       marginBottom: 12,
     },
-    noticeTitle: { color: colors.primary, fontSize: 13, fontWeight: '800', marginBottom: 4 },
-    noticeText: { color: colors.textSubtle, fontSize: 12, lineHeight: 18 },
+    noticeTitle: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 4 },
+    noticeText: { color: colors.textSubtle, fontSize: 16, lineHeight: 18 },
 
     card: {
       backgroundColor: colors.surface,
@@ -236,8 +236,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 14,
       marginBottom: 12,
     },
-    cardTitle: { color: colors.primary, fontSize: 14, fontWeight: '800', marginBottom: 8 },
-    p: { color: colors.textSubtle, fontSize: 13, lineHeight: 19 },
+    cardTitle: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 8 },
+    p: { color: colors.textSubtle, fontSize: 16, lineHeight: 19 },
 
     bulletRow: { flexDirection: 'row', gap: 8, paddingVertical: 3 },
     bulletDot: {
@@ -247,10 +247,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.textSubtle,
       marginTop: 7,
     },
-    bulletText: { flex: 1, color: colors.textSubtle, fontSize: 13, lineHeight: 19 },
+    bulletText: { flex: 1, color: colors.textSubtle, fontSize: 16, lineHeight: 19 },
 
     iconRow: { flexDirection: 'row', gap: 8 },
-    iconRowText: { flex: 1, color: colors.textSubtle, fontSize: 13, lineHeight: 19 },
+    iconRowText: { flex: 1, color: colors.textSubtle, fontSize: 16, lineHeight: 19 },
 
     techBox: {
       backgroundColor: colors.background,
@@ -262,12 +262,12 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     techLine: {
       color: colors.textSubtle,
-      fontSize: 11,
+      fontSize: 16,
       lineHeight: 17,
       fontFamily: Platform.select({ ios: 'Courier', android: 'monospace', default: 'monospace' }),
     },
 
     gapRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-    gapText: { flex: 1, color: colors.textSubtle, fontSize: 12, lineHeight: 17 },
+    gapText: { flex: 1, color: colors.textSubtle, fontSize: 16, lineHeight: 17 },
   });
 }

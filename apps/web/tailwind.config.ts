@@ -44,6 +44,13 @@ const config: Config = {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
+      // Accessibility floor: no text anywhere should render below 16px/1rem,
+      // so the two Tailwind scale steps below the default base are raised
+      // to match it rather than left at their default 12px/14px.
+      fontSize: {
+        xs: '1rem',
+        sm: '1rem',
+      },
       borderRadius: {
         card: '16px',
         btn: '12px',

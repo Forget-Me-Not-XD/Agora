@@ -1,4 +1,5 @@
 import type { Event, EventType } from '@/lib/api/events';
+import type { Tone } from '@/components/ui/Pill';
 
 export const TYPE_LABELS: Record<EventType, string> = {
     public:           'Publiek',
@@ -7,11 +8,21 @@ export const TYPE_LABELS: Record<EventType, string> = {
     department:       'Departement',
 };
 
+// Solid fills — used for the tiny calendar day-cell chips, where a full-strength
+// colour is needed for legibility at a very small size.
 export const TYPE_COLORS: Record<EventType, string> = {
     public:           'bg-cyan-600 text-white dark:bg-cyan-500',
     internal_student: 'bg-violet-600 text-white dark:bg-violet-500',
     private:          'bg-amber-500 text-white dark:bg-amber-500',
     department:       'bg-indigo-600 text-white dark:bg-indigo-500',
+};
+
+// Tonal pill colour — used wherever the type appears as a label pill.
+export const TYPE_TONE: Record<EventType, Tone> = {
+    public:           'blue',
+    internal_student: 'purple',
+    private:          'orange',
+    department:       'primary',
 };
 
 export type EventStatus = 'upcoming' | 'ongoing' | 'past' | 'cancelled';
@@ -23,11 +34,20 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
     cancelled: 'Gekanselleer',
 };
 
+// Solid fills — used for accent bars/strips on event cards and the calendar popup.
 export const STATUS_COLORS: Record<EventStatus, string> = {
     upcoming:  'bg-blue-600 text-white dark:bg-blue-500',
     ongoing:   'bg-emerald-600 text-white dark:bg-emerald-500',
     past:      'bg-slate-500 text-white dark:bg-slate-600',
     cancelled: 'bg-red-600 text-white dark:bg-red-500',
+};
+
+// Tonal pill colour — used wherever the status appears as a label pill.
+export const STATUS_TONE: Record<EventStatus, Tone> = {
+    upcoming:  'blue',
+    ongoing:   'green',
+    past:      'neutral',
+    cancelled: 'red',
 };
 
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;

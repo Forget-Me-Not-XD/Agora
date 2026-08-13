@@ -176,7 +176,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
       safe: { flex: 1, backgroundColor: colors.background },
       header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
       title: { fontSize: 22, fontWeight: '900', color: colors.text },
-      subtitle: { fontSize: 12, color: colors.textSubtle, marginTop: 4, fontWeight: '600' },
+      subtitle: { fontSize: 16, color: colors.textSubtle, marginTop: 4, fontWeight: '600' },
 
       centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
       errorCard: {
@@ -188,7 +188,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
         borderRadius: 16,
         padding: 24,
       },
-      errorText: { color: colors.textSubtle, fontSize: 13, fontWeight: '600', textAlign: 'center' },
+      errorText: { color: colors.textSubtle, fontSize: 16, fontWeight: '600', textAlign: 'center' },
 
       scroll: { padding: 16, paddingBottom: 32 },
 
@@ -210,13 +210,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
         justifyContent: 'center',
         marginBottom: 10,
       },
-      statLabel: { color: colors.textSubtle, fontSize: 11, fontWeight: '700' },
+      statLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
       statValue: { color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 6 },
-      statSub: { color: colors.textSubtle, fontSize: 11, marginTop: 4, fontWeight: '600' },
+      statSub: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
 
       sectionTitle: {
         color: colors.textSubtle,
-        fontSize: 12,
+        fontSize: 16,
         fontWeight: '900',
         letterSpacing: 0.5,
         marginTop: 18,
@@ -233,7 +233,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
       },
       emptyText: {
         color: colors.textSubtle,
-        fontSize: 13,
+        fontSize: 16,
         fontWeight: '600',
         textAlign: 'center',
         paddingVertical: 24,
@@ -247,7 +247,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
       },
       rowFirst: { borderTopWidth: 0 },
       rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
-      rowLabel: { color: colors.text, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+      rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700', flexShrink: 1 },
 
       countBadge: {
         backgroundColor: isDark ? '#1E3A5F' : '#DBEAFE',
@@ -255,7 +255,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
         paddingHorizontal: 8,
         paddingVertical: 2,
       },
-      countBadgeText: { color: isDark ? '#93C5FD' : '#1D4ED8', fontSize: 11, fontWeight: '800' },
+      countBadgeText: { color: isDark ? '#93C5FD' : '#1D4ED8', fontSize: 16, fontWeight: '800' },
 
       progressTrack: { height: 6, borderRadius: 999, backgroundColor: colors.border, overflow: 'hidden' },
       progressFill: { height: '100%', borderRadius: 999, backgroundColor: colors.primary },

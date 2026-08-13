@@ -112,7 +112,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 60,
       alignItems: 'center',
     },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
     title: { color: colors.text, fontSize: 18, fontWeight: '800' },
 
     card: {
@@ -144,8 +144,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.background,
     },
     rowText: { flex: 1, paddingRight: 12 },
-    rowLabel: { color: colors.text, fontSize: 15, fontWeight: '700' },
-    rowSubtitle: { color: colors.textSubtle, fontSize: 12, marginTop: 2 },
+    rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700' },
+    rowSubtitle: { color: colors.textSubtle, fontSize: 16, marginTop: 2 },
     radio: {
       width: 22,
       height: 22,

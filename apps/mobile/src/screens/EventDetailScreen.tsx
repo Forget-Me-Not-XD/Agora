@@ -552,7 +552,7 @@ function CreateEventForm({
             onPress={() => setShowDatePicker(true)}
             disabled={isSubmitting}
           >
-            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>
+            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 16 }}>
               {date.toLocaleDateString('af-ZA', { day: '2-digit', month: 'long', year: 'numeric' })}
             </Text>
           </TouchableOpacity>
@@ -761,7 +761,7 @@ function PredictionStat({
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
       <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>{value}</Text>
-      <Text style={{ fontSize: 10, fontWeight: '700', color: colors.textSubtle, marginTop: 2 }}>{label}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 }}>{label}</Text>
     </View>
   );
 }
@@ -790,8 +790,8 @@ function DetailRow({
         },
       ]}
     >
-      <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSubtle }}>{label}</Text>
-      <Text style={{ fontSize: 13, fontWeight: '800', color: colors.text, maxWidth: '60%', textAlign: 'right' }}>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSubtle }}>{label}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, maxWidth: '60%', textAlign: 'right' }}>
         {value}
       </Text>
     </View>
@@ -825,7 +825,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 10,
       paddingVertical: 4,
     },
-    statusPillText: { fontSize: 11, fontWeight: '800' },
+    statusPillText: { fontSize: 16, fontWeight: '800' },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
@@ -837,7 +837,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     eventTitle: { fontSize: 22, fontWeight: '900', color: colors.text, marginBottom: 6 },
-    eventSubtitle: { fontSize: 13, color: colors.textSubtle, fontWeight: '600', lineHeight: 18 },
+    eventSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', lineHeight: 18 },
 
     statsRow: {
       flexDirection: 'row',
@@ -849,7 +849,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     statItem: { flex: 1, alignItems: 'center' },
     statValue: { fontSize: 24, fontWeight: '900', color: colors.primary },
-    statLabel: { fontSize: 11, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
     aiCard: {
@@ -868,7 +868,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     aiNumRow: { flexDirection: 'row', alignItems: 'baseline' },
     aiNum: { fontSize: 36, fontWeight: '900', color: colors.primary },
     aiLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
-    aiSubtitle: { fontSize: 12, color: colors.textSubtle, fontWeight: '600', marginTop: 2 },
+    aiSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginTop: 2 },
     aiBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -880,7 +880,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    aiBadgeText: { fontSize: 11, fontWeight: '800', color: colors.primary },
+    aiBadgeText: { fontSize: 16, fontWeight: '800', color: colors.primary },
     progressTrack: {
       height: 8,
       borderRadius: 999,
@@ -908,8 +908,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    descLabel: { fontSize: 11, fontWeight: '900', color: colors.textSubtle, marginBottom: 8, letterSpacing: 0.5 },
-    descText: { fontSize: 13, color: colors.text, lineHeight: 20, fontWeight: '600' },
+    descLabel: { fontSize: 16, fontWeight: '900', color: colors.textSubtle, marginBottom: 8, letterSpacing: 0.5 },
+    descText: { fontSize: 16, color: colors.text, lineHeight: 20, fontWeight: '600' },
 
     primaryBtn: {
       flexDirection: 'row',
@@ -950,7 +950,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 24,
       paddingVertical: 10,
     },
-    backBtnText: { fontSize: 14, fontWeight: '800', color: colors.surface },
+    backBtnText: { fontSize: 16, fontWeight: '800', color: colors.surface },
 
     btnDisabled: { opacity: 0.7 },
 
@@ -964,7 +964,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 12,
       padding: 12,
     },
-    errorBoxText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.red },
+    errorBoxText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.red },
 
     formCard: {
       backgroundColor: colors.surface,
@@ -974,7 +974,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     fieldLabel: {
-      fontSize: 12,
+      fontSize: 16,
       fontWeight: '800',
       color: colors.textSubtle,
       marginBottom: 6,
@@ -987,7 +987,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 12,
-      fontSize: 14,
+      fontSize: 16,
       color: colors.text,
       fontWeight: '600',
     },
@@ -1024,15 +1024,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 8,
       marginBottom: 12,
     },
-    predictionTitle: { fontSize: 14, fontWeight: '900', color: colors.text },
+    predictionTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
     predictionLoadingRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
     },
-    predictionLoadingText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
-    predictionUnavailableText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
-    predictionErrorDetailText: { fontSize: 11, fontWeight: '500', color: colors.red, marginTop: 4 },
+    predictionLoadingText: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    predictionUnavailableText: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    predictionErrorDetailText: { fontSize: 16, fontWeight: '500', color: colors.red, marginTop: 4 },
     predictionStatsRow: {
       flexDirection: 'row',
       backgroundColor: colors.background,
@@ -1049,9 +1049,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       marginBottom: 14,
     },
-    applyBudgetText: { fontSize: 13, fontWeight: '800', color: colors.surface },
+    applyBudgetText: { fontSize: 16, fontWeight: '800', color: colors.surface },
     reasoningHeading: {
-      fontSize: 11,
+      fontSize: 16,
       fontWeight: '800',
       color: colors.textSubtle,
       marginBottom: 8,
@@ -1062,7 +1062,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 6,
       marginBottom: 4,
     },
-    reasoningBullet: { fontSize: 12, color: colors.primary, fontWeight: '900' },
-    reasoningText: { flex: 1, fontSize: 12, color: colors.text, fontWeight: '600', lineHeight: 17 },
+    reasoningBullet: { fontSize: 16, color: colors.primary, fontWeight: '900' },
+    reasoningText: { flex: 1, fontSize: 16, color: colors.text, fontWeight: '600', lineHeight: 17 },
   });
 }

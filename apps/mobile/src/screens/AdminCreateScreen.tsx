@@ -237,9 +237,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         borderColor: colors.border,
         marginBottom: 12,
     },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 13 },
+    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
     heading: { fontSize: 24, fontWeight: '700', color: colors.text },
-    helper: { fontSize: 14, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
+    helper: { fontSize: 16, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
 
     errorBox: {
         backgroundColor: colors.surface,
@@ -250,7 +250,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         marginBottom: 16,
     },
     errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-    errorText: { color: colors.red, fontSize: 13, fontWeight: '600' },
+    errorText: { color: colors.red, fontSize: 16, fontWeight: '600' },
 
     successBox: {
         backgroundColor: colors.surface,
@@ -260,7 +260,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         borderColor: '#16A34A',
         marginBottom: 16,
     },
-    successText: { color: '#16A34A', fontSize: 13, fontWeight: '600' },
+    successText: { color: '#16A34A', fontSize: 16, fontWeight: '600' },
 
     row: { flexDirection: 'row', gap: 8 },
     halfInput: { flex: 1 },
@@ -268,7 +268,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         backgroundColor: colors.surface,
         borderRadius: 10,
         padding: 14,
-        fontSize: 15,
+        fontSize: 16,
         marginBottom: 12,
         borderWidth: 1,
         borderColor: colors.border,
@@ -287,10 +287,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         borderWidth: 1,
         borderColor: colors.border,
     },
-    dropdownText: { color: colors.text, fontSize: 15, fontWeight: '600' },
+    dropdownText: { color: colors.text, fontSize: 16, fontWeight: '600' },
     dropdownPlaceholder: { color: colors.textSubtle, fontWeight: '500' },
     dropdownChevron: { color: colors.textSubtle, fontSize: 16, marginLeft: 10 },
-    label: { fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 8 },
+    label: { fontSize: 16, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 8 },
     roleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
     roleCard: {
         width: '48%',
@@ -303,9 +303,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         alignItems: 'center',
     },
     roleCardActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    roleCardTitle: { color: colors.text, fontSize: 14, fontWeight: '900', letterSpacing: 0.5 },
+    roleCardTitle: { color: colors.text, fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
     roleCardTitleActive: { color: colors.primaryText },
-    roleCardSub: { color: colors.textSubtle, fontSize: 12, fontWeight: '700', marginTop: 4 },
+    roleCardSub: { color: colors.textSubtle, fontSize: 16, fontWeight: '700', marginTop: 4 },
     roleCardSubActive: { color: colors.primaryText },
 
     button: {
@@ -316,7 +316,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         marginTop: 8,
     },
     buttonDisabled: { opacity: 0.7 },
-    buttonText: { color: colors.primaryText, fontSize: 15, fontWeight: '800' },
+    buttonText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
 
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 18 },
     modalCard: {
@@ -338,6 +338,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         borderColor: colors.border,
         marginBottom: 10,
     },
-    modalRowText: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    modalRowText: { color: colors.text, fontSize: 16, fontWeight: '700' },
     });
 }
