@@ -274,7 +274,7 @@ export default function LoginPage() {
         {/* SSO knoppies */}
         <div className="space-y-2.5">
           <a
-            href="/api/v1/auth/google"
+            href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/auth/google`}
             className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
             style={{
               background: 'var(--color-bg)',
@@ -291,7 +291,7 @@ export default function LoginPage() {
             Meld aan met Google
           </a>
           <a
-            href="/api/v1/auth/microsoft"
+            href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/auth/microsoft`}
             className="w-full flex items-center justify-center gap-2.5 rounded-[12px] py-[13px] text-[14px] font-bold border transition-all duration-200"
             style={{
               background: 'var(--color-bg)',
