@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
-import { CameraView, useCameraPermissions } from 'expo-camera/next';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useResponse } from '../providers/ResponseProvider';
 import { scanQr, getEventRsvps, registerWalkIn, type RsvpWithUser } from '../api/rsvp';
 import { getEvent, type EventResponse } from '../api/events';

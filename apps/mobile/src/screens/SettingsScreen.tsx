@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeStore, ThemeMode } from '../stores/theme.store';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { useEffect, useState } from 'react'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -21,6 +22,33 @@ export function SettingsScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user);
 
   const styles = makeStyles(colors);
+
+  const biometricsAvailable = useAuthStore((s) => s.biometricsAvailable);
+  const biometricsEnabled = useAuthStore((s) => s.biometricsEnabled);
+  const checkBiometricsAvailability = useAuthStore((s) => s.checkBiometricsAvailability);
+  const enableBiometrics = useAuthStore((s) => s.enableBiometrics);
+  const disableBiometrics = useAuthStore((s) => s.disableBiometrics);
+  const [togglingBiometrics, setTogglingBiometrics] = useState(false);
+
+  useEffect(() => {
+    checkBiometricsAvailability();
+  }, [checkBiometricsAvailability]);
+
+  const handleBiometricsToggle = async (value: boolean) => {
+    setTogglingBiometrics(true);
+    try {
+      if (value) {
+        const ok = await enableBiometrics();
+        if (!ok) {
+          Alert.alert('Biometrie', 'Kon nie biometrie aktiveer nie. Probeer weer.');
+        }
+      } else {
+        await disableBiometrics();
+      }
+    } finally {
+      setTogglingBiometrics(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -63,6 +91,26 @@ export function SettingsScreen({ navigation }: Props) {
           );
         })}
       </View>
+
+          {biometricsAvailable && (
+      <View style={[styles.card, { marginTop: 16 }]}>
+        <Text style={styles.cardTitle}>Biometrie</Text>
+        <View style={styles.row}>
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel}>Vingerafdruk / Face ID</Text>
+            <Text style={styles.rowSubtitle}>Meld vinnig aan sonder om jou wagwoord te tik</Text>
+          </View>
+          <Switch
+            value={biometricsEnabled}
+            onValueChange={handleBiometricsToggle}
+            disabled={togglingBiometrics}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={colors.surface}
+          />
+        </View>
+      </View>
+    )}
+
 
       <View style={[styles.card, { marginTop: 16 }]}>
         <Text style={styles.cardTitle}>Wetlik</Text>

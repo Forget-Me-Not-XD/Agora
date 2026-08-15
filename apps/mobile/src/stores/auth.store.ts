@@ -94,9 +94,11 @@ register: async (payload) => {
 },
 
 logout: async () => {
-  await apiClient.clearTokens();
-  await SecureStore.deleteItemAsync(BIOMETRICS_ENABLED_KEY);
-  set({ user: null, error: null, biometricsEnabled: false });
+  const { biometricsEnabled } = get();
+  if (!biometricsEnabled) {
+    await apiClient.clearTokens();
+  }
+  set({ user: null, error: null });
 },
 
 clearError: () => set({ error: null }),
@@ -172,8 +174,11 @@ loginWithBiometrics: async () => {
 
     const user = await apiClient.get<UserResponse>('/users/me');
     set({ user, isLoading: false });
-  } catch (err) {
+  } catch (err: any) {
     set({ isLoading: false });
+    if (err?.response) {
+      throw new Error('Jou sessie het verval. Meld asseblief weer aan met jou wagwoord.');
+    }
     throw err;
   }
 },
