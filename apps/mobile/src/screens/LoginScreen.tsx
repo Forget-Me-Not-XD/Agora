@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
@@ -18,7 +18,11 @@ const agoraIconLight = require('../../assets/agora-icon.png');
 const agoraIconDark = require('../../assets/agora-icon-dark.png');
 
 export function LoginScreen({ navigation }: Props) {
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { 
+    login, isLoading, error, clearError,
+    biometricsAvailable, biometricsEnabled,
+    checkBiometricsAvailability, loginWithBiometrics
+  } = useAuthStore();
   const colors = useThemeColors();
   const styles = makeStyles(colors);
   const mode = useThemeStore((s) => s.mode);
@@ -27,6 +31,10 @@ export function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+
+  useEffect(() => {
+    checkBiometricsAvailability();
+  }, [checkBiometricsAvailability]);
 
   const handleLogin = async () => {
     clearError();
@@ -37,6 +45,19 @@ export function LoginScreen({ navigation }: Props) {
       // Error already in store
     }
   };
+
+  const handleBiometricLogin = async () => {
+    try {
+      await loginWithBiometrics();
+    } catch (err: any) {
+      Alert.alert(
+        'Biometriese aanmelding',
+        err?.message ?? 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord',
+      );
+    }
+  };
+
+  const showBiometricButton = biometricsAvailable && biometricsEnabled;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -118,6 +139,27 @@ export function LoginScreen({ navigation }: Props) {
                 <Text style={styles.primaryText}>Meld Aan</Text>
               )}
             </TouchableOpacity>
+
+            {showBiometricButton && (
+              <>
+              <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OF</Text>
+              <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.biometricBtn, isLoading && styles.buttonDisabled]}
+                onPress={handleBiometricLogin}
+                disabled={isLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Meld aan met vingerafdruk of Face ID"
+              >
+                <MaterialCommunityIcons name="fingerprint" size={20} color={colors.primary} />
+                <Text style={styles.biometricText}>Meld aan met Biometrie</Text>
+              </TouchableOpacity>
+            </>
+            )}
 
             <TouchableOpacity
               style={styles.forgotBtn}
@@ -210,6 +252,25 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     primaryText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
     buttonDisabled: { opacity: 0.7 },
+
+    dividerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 10 },
+    dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+    dividerText: { color: colors.textSubtle, fontSize: 12, fontWeight: '700' },
+      
+    biometricBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 12,
+      paddingVertical: 13,
+      marginTop: 18,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+    },
+    biometricText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
+    
 
     forgotBtn: { marginTop: 20, alignItems: 'center' },
     forgotText: { color: colors.primary, fontSize: 16, fontWeight: '700' },
