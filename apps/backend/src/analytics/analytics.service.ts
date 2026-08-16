@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Injectable, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { execFile } from 'child_process';
@@ -10,6 +10,8 @@ import { stringify } from 'csv-stringify/sync';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Role } from '../common/enums/role.enums';
+import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService } from './lstm.service';
 
 const execFileAsync = promisify(execFile);
@@ -70,6 +72,17 @@ export class AnalyticsService {
         @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
         private readonly lstmService: LstmService,
     ) {}
+
+    async assertInsightAccess(eventId: string, user: JwtPayload): Promise<void> {
+        if (user.role !== Role.DOSENT) return;
+
+        const event = await this.eventModel.findById(eventId).exec();
+        if (!event) throw new NotFoundException(`Geleentheid ${eventId} nie gevind nie`);
+
+        if (event.createdBy.toString() !== user.sub) {
+            throw new ForbiddenException('Dosente mag slegs KI-insigte vir hul eie geleenthede sien.');
+        }
+    }
 
     async getRsvpsPerEvent(): Promise<RsvpPerEvent[]> {
         return this.rsvpModel.aggregate<RsvpPerEvent>([
