@@ -124,7 +124,9 @@ export class AnalyticsController {
     @Get('prediction')
     async getAttendancePrediction(
         @Query('eventId') eventId: string,
+        @CurrentUser() user: JwtPayload,
     ): Promise<PredictionResult> {
+        await this.analyticsService.assertInsightAccess(eventId, user);
         return this.lstmService.predictAttendance(eventId);
     }
 
@@ -143,10 +145,14 @@ export class AnalyticsController {
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
     async getPredictionAccuracy(
-        @Query('eventIds') eventIds?: string,
-    ): Promise<PredictionAccuracyItem[]> {
+        @Query('eventIds') eventIds: string | undefined,
+        @CurrentUser() user: JwtPayload,
+    ): Promise <PredictionAccuracyItem[]> {
         const ids = (eventIds ?? '').split(',').map((id) => id.trim()).filter(Boolean);
         if (ids.length === 0) return [];
+        for (const id of ids) {
+            await this.analyticsService.assertInsightAccess(id, user);
+        }
         return this.lstmService.getPredictionAccuracy(ids);
     }
 }

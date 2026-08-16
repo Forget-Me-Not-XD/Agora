@@ -40,7 +40,11 @@ export function AiScreen() {
     (async () => {
       setLoading(true);
       try {
-        const upcoming = (await listEvents(new Date().toISOString())).slice(0, MAX_FORECASTS);
+        const allUpcoming = await listEvents(new Date().toISOString());
+        const ownUpcoming = role === 'DOSENT'
+          ? allUpcoming.filter((e) => e.createdBy === user?.id)
+          : allUpcoming;
+        const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
         const results = await Promise.allSettled(upcoming.map((e) => getPrediction(e.id)));
         if (!active) return;
         setForecasts(
@@ -54,7 +58,7 @@ export function AiScreen() {
       }
     })();
     return () => { active = false; };
-  }, [canViewAi]);
+  }, [canViewAi, role, user?.id]);
 
   if (!canViewAi) {
     return (
