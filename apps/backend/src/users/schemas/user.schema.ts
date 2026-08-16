@@ -31,6 +31,9 @@ export class User {
     @Prop({ type: Date, default: Date.now })
     passwordChangedAt!: Date;
 
+    @Prop({ default: false })
+    mustCangePassword!: boolean;
+
     @Prop({ required: true, enum: Role, default: Role.GAS, index: true })
     role!: Role;
 
