@@ -38,6 +38,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Account no longer exists');
     }
 
-    return {...payload, mustChangePassword: user.mustCangePassword };
+    return {...payload, mustChangePassword: user.mustChangePassword };
   }
 }

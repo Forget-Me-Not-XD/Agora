@@ -1,3 +1,5 @@
+'use client';
+
 // ========== Imports: ==========
 import { useMemo, useState, useTransition } from 'react';
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle, Circle } from 'lucide-react';
@@ -153,7 +155,7 @@ export default function ChangePasswordPage() {
 
             <div
                 className="overflow-hidden transition-all duration-300 ease-in-out"
-                style={{ maxHeight: showValidation ? '165px' : '0px', opacity: showValidation ? 1 : 0 }}
+                style={{ maxHeight: showValidation ? '220px' : '0px', opacity: showValidation ? 1 : 0 }}
             >
                 <div
                 className="mt-2 rounded-[10px] px-3 py-2 border"

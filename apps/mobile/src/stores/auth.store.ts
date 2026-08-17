@@ -21,6 +21,7 @@ interface AuthState {
     initialize: () => Promise<void>;
     login: (email: string, password: string) => Promise<void>;
     register: (data: RegisterPayload) => Promise<void>;
+    changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
     logout: () => Promise<void>;
     clearError: () => void;
     checkBiometricsAvailability: () => Promise<void>;
@@ -90,6 +91,28 @@ register: async (payload) => {
     const msg = err?.response?.data?.message ?? 'Registration failed';
     set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Registration failed', isLoading: false });
     throw err;
+  }
+},
+
+/**
+ * Called form the change password screen. The user is already logged in
+ * (mustChangePassword just gates which screens the navigator shows) - this swaps the temp password
+ * for a real one and clears the flag so the navigator switches back to the normal authenticated stack
+ */
+changePassword: async (currentPassword, newPassword) => {
+  set({ isLoading: true, error: null });
+  try {
+    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
+    const { user } = get();
+    if (user) {
+      set({ user: { ...user, mustChangePassword: false }, isLoading: false });
+    } else {
+      set({ isLoading: false });
+    }
+    }catch (err: any) {
+      const msg = err?.response?.data?.message ?? 'Password change failed';
+      set ({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Password change failed', isLoading: false});
+      throw err;
   }
 },
 

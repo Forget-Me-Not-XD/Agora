@@ -4,7 +4,6 @@ import { AuthGuard } from "@nestjs/passport";
 import { Reflector } from "@nestjs/core";
 import { SKIP_PASSWORD_CHECK_KEY } from "../../common/decorators/skip-password-check.decorator";
 import { JwtPayload } from "../strategies/jwt.strategy";
-import { Observable } from "rxjs";
 
 // Guard that activates the JWT Passport strategy, then blocks any request from a user that still has the mustChangePassword flag set.
 

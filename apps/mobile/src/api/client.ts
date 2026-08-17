@@ -121,6 +121,7 @@ export interface UserResponse {
     isActive: boolean;
     createdAt: string;
     title: string;
+    mustChangePassword: boolean;
 }
 
 export interface TokenPair {

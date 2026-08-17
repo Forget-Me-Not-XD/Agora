@@ -203,10 +203,12 @@ import {
       return this.issueTokenPair(user);
     }
 
-    //**Change the current user's password. Requeres the current password to be supplied, even though the caller already holds a valid JWT
-    // Defence against a stolen access token being used to lock the real owner out by silently changing their password
-    //  */
-
+    /**
+     * Change the current user's password. Requires the current password
+     * to be supplied, even though the caller already holds a valid JWT —
+     * this defends against a stolen access token being used to lock the
+     * real owner out by silently changing their password.
+     */
     async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
       const user= await this.usersService.findById(userId);
 

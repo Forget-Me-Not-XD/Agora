@@ -41,7 +41,7 @@ export class UserResponseDto {
                 microsoft: user.outlookCalendar?.connected ?? false,
             },
             tags: user.tags ?? [],
-            mustChangePassword: user.mustCangePassword,
+            mustChangePassword: user.mustChangePassword,
         };
     }
 }

@@ -19,7 +19,7 @@ import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
-import { skipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
+import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -59,7 +59,7 @@ export class AuthController {
 
   @Post('change-password')
   @UseGuards(JwtAuthGuard)
-  @skipPasswordCheck()
+  @SkipPasswordCheck()
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @Body() dto: ChangePasswordDto,

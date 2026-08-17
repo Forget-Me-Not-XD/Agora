@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../stores/auth.store';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
@@ -14,6 +15,7 @@ import { MainTabs } from './MainTabs';
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  ChangePassword: undefined;
   Main: undefined;
   Settings: undefined;
   Profile: undefined;
@@ -32,16 +34,20 @@ export function AppNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
-        <>
-          <Stack.Screen name="Main" component={MainTabs} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="EventDetail" component={EventDetailScreen} />
-          <Stack.Screen name="QrScanner" component={QrScannerScreen} />
-          <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
-          <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
-          <Stack.Screen name="Popia" component={PopiaScreen} />
-        </>
+        user.mustChangePassword ? (
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+            <Stack.Screen name="QrScanner" component={QrScannerScreen} />
+            <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
+            <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
+            <Stack.Screen name="Popia" component={PopiaScreen} />
+          </>
+        )
       ) : (
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
