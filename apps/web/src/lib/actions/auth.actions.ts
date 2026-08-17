@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createUser, type CreateUserPayload } from '@/lib/api/auth';
+import { createUser, changePassword, type CreateUserPayload, type ChangePasswordPayload } from '@/lib/api/auth';
 import { deleteAccount } from '@/lib/api/users';
 import type { TokenPair, LoginPayload, UserResponse } from '@/lib/types';
 import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME } from '@/lib/auth-cookies';
@@ -174,6 +174,46 @@ export async function completeSsoLoginAction(
   };
 
   setAuthCookies(cookies(), tokenPair, true);
+  redirect('/dashboard');
+}
+
+/**
+ * Change-password server action.
+ * Roep NestJS POST /api/v1/auth/change-password met die ingetekende gebruiker se token.
+ * Werk daarna die akademia_user cookie se mustChangePassword veld op na false, sodat die 
+ * middleware die gebruiker onmiddelik na /dashboard toelaat sonder om weer aan te meld.
+ * 
+ * Returns null as sukselvol (redirect na /dashboard server-side),
+ * of 'n error string wat in die form gewys word
+ */
+export async function changePasswordAction(
+  payload: ChangePasswordPayload,
+): Promise <string | null> {
+  const cookieStore = cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+
+  try {
+    await changePassword(payload, token);
+  } catch(err) {
+    return err instanceof Error ? err.message : 'Wagwoordverandering het misluk.';
+  }
+
+  const userCookie = cookieStore.get(COOKIE_USER_NAME)?.value;
+  if (userCookie) {
+    try {
+      const user = JSON.parse(userCookie) as UserResponse;
+      cookieStore.set(COOKIE_USER_NAME, JSON.stringify({ ...user, mustChangePassword: false}), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24,
+      });
+    } catch {
+      // Malformed cookie - nothing to patch, next full login will fix the corrupted cookie
+    }
+  }
+
   redirect('/dashboard');
 }
 

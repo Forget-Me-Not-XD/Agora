@@ -19,6 +19,7 @@ export interface UserResponse {
     google: boolean;
     microsoft: boolean;
   };
+  mustChangePassword: boolean;
 }
 
 export interface TokenPair {

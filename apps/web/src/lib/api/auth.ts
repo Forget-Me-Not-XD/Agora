@@ -12,6 +12,11 @@ export interface CreateUserPayload {
     studyCenter:    string;
 }
 
+export interface ChangePasswordPayload {
+    currentPassword: string;
+    newPassword: string;
+}
+
 export async function createUser(payload: CreateUserPayload, token?: string): Promise<UserResponseDto> {
     const res = await fetch(`${BASE_URL}/api/v1/auth/admin/register`, {
         method: 'POST',
@@ -30,4 +35,22 @@ export async function createUser(payload: CreateUserPayload, token?: string): Pr
     }
 
     return res.json() as Promise<UserResponseDto>;
+}
+
+export async function changePassword(payload: ChangePasswordPayload, token?: string): Promise <void> {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/change-password`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
 }
