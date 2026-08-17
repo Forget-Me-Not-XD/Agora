@@ -6,7 +6,7 @@
 :root {
   --font-sans: 'Inter', system-ui, sans-serif;
 
-  --color-primary:      #0779A0;
+  --color-primary:      #06647F;
   --color-primary-text: #FFFFFF;
 
   --color-bg:      #EEF4FB;
@@ -20,13 +20,13 @@
   --color-jwt-bg:  #EDF4FF;
 
   --color-red:    #B91C1C;
-  --color-green:  #15803D;
+  --color-green:  #166534;
   --color-blue:   #1D4ED8;
-  --color-orange: #EA580C;
-  --color-yellow: #A16207;
+  --color-orange: #9A3412;
+  --color-yellow: #854D0E;
   --color-purple: #7E22CE;
 
-  --color-gold: #0779A0;
+  --color-gold: #06647F;
 }
 
 /* dark mode */
