@@ -293,9 +293,7 @@ async function seed(): Promise<void> {
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
     }));
 
-    await usersCol.insertOne(adminDoc);
-    await usersCol.insertMany(dosentDocs);
-    await usersCol.insertMany(studentDocs);
+    await usersCol.insertMany([adminDoc, ...dosentDocs, ...studentDocs]);
     console.log(`✓ Created 1 admin + ${dosentDocs.length} dosents + ${studentDocs.length} students.\n`);
 
     const creators   = [adminDoc, ...dosentDocs];
