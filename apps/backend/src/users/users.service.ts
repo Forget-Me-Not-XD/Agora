@@ -31,6 +31,7 @@ export class UsersService {
     passwordHash: string;
     role: Role;
     studyCenter: string;
+    mustChangePassword?: boolean;
   }): Promise<UserDocument> {
     // Email uniqueness check (defence-in-depth — also enforced by index)
     const existing = await this.findByEmail(data.email);
@@ -71,12 +72,16 @@ export class UsersService {
   }
 
   async updateUser(id: string, updateUserDto: UpdateUserDto): Promise<UserResponseDto> {
-    
     const updated = await this.userModel.findByIdAndUpdate(id, { $set: updateUserDto }, { new: true }).exec();
-
     if (!updated) throw new NotFoundException(`User ${id} not found`);
-
     return UserResponseDto.fromDocument(updated);
+  }
+
+  async changePassword(userId: string, passwordHash: string): Promise <void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() } },
+    ).exec();
   }
 
   async updateGoogleCalendarConnection(userId: string, connection: CalendarConnection): Promise<void> {
