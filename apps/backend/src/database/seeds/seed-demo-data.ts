@@ -584,6 +584,17 @@ async function seed(): Promise<void> {
         }
     }
 
+    // Back-fill confirmedAttendees using the RSVP counts already tallied in
+    // confirmedCountByEvent during in-memory generation above — this happens
+    // before events are inserted (and before RSVPs are inserted), so every
+    // event document is fully correct on its very first write to the DB.
+    
+    for (const event of eventDocs) {
+        event.confirmedAttendees = confirmedCountByEvent.get(event._id.toString()) ?? 0;
+    }
+    await eventsCol.insertMany(eventDocs);
+    console.log(`✓ Inserted ${eventDocs.length} events.\n`);
+
     console.log('Inserting RSVPs…');
     const INSERT_BATCH = 1000;
     for (let i = 0; i < rsvpDocs.length; i += INSERT_BATCH) {
@@ -592,12 +603,7 @@ async function seed(): Promise<void> {
     }
     console.log(`\n✓ Inserted ${rsvpDocs.length} RSVPs.\n`);
 
-    // Back-fill confirmedAttendees now that we know the real RSVP counts per event
-    for (const event of eventDocs) {
-        event.confirmedAttendees = confirmedCountByEvent.get(event._id.toString()) ?? 0;
-    }
-    await eventsCol.insertMany(eventDocs);
-    console.log(`✓ Inserted ${eventDocs.length} events.\n`);
+
 
     // ─── Notifications (photographer assignments) ────────────────────────────
     console.log('Generating notifications…');
