@@ -26,15 +26,15 @@ export type ThemeColors = {
 };
 
 const light: ThemeColors = {
-  primary: '#14B8C7',      // teal button from mock
-  primaryText: '#07131A',
+  primary: '#0E7A88',      // darkened from mock teal for AA contrast on light backgrounds
+  primaryText: '#FFFFFF',
   navy: '#1E3A5F',
 
   background: '#F5F9FC',
   surface: '#FFFFFF',
   border: '#D8E1EA',
   text: '#0F172A',
-  textSubtle: '#64748B',
+  textSubtle: '#475569',
 
   red: '#DC2626',
   blue: '#1E40AF',
