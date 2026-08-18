@@ -22,6 +22,7 @@ export class UserResponseDto {
     ssoProvider!: SsoProvider | null;
     calendars!: { google: boolean; microsoft: boolean };
     tags!: UserTag[];
+    mustChangePassword!: boolean;
 
     static fromDocument(user: UserDocument): UserResponseDto {
         return {
@@ -40,6 +41,7 @@ export class UserResponseDto {
                 microsoft: user.outlookCalendar?.connected ?? false,
             },
             tags: user.tags ?? [],
+            mustChangePassword: user.mustChangePassword,
         };
     }
 }

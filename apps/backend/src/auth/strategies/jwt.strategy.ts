@@ -12,6 +12,7 @@ export interface JwtPayload {
   role: Role;
   iat?: number;
   exp?: number;
+  mustChangePassword?: boolean;
 }
 
 @Injectable()
@@ -37,6 +38,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Account no longer exists');
     }
 
-    return payload;
+    return {...payload, mustChangePassword: user.mustChangePassword };
   }
 }

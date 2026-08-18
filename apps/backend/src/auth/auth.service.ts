@@ -31,6 +31,7 @@ import {
     UserLoginEvent,
     UserFailedLoginEvent,
   } from '../messaging/events.constants';
+  import { ChangePasswordDto } from './dto/change-password.dto';
   
   @Injectable()
   export class AuthService {
@@ -96,6 +97,7 @@ import {
         passwordHash,
         role: dto.role,
         studyCenter: dto.studyCenter ?? '',
+        mustChangePassword: true,
       });
   
       const event: UserRegisteredEvent = {
@@ -199,6 +201,32 @@ import {
 
       this.logger.log(`-- SSO login: ${user.email} via ${provider}`);
       return this.issueTokenPair(user);
+    }
+
+    /**
+     * Change the current user's password. Requires the current password
+     * to be supplied, even though the caller already holds a valid JWT —
+     * this defends against a stolen access token being used to lock the
+     * real owner out by silently changing their password.
+     */
+    async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+      const user= await this.usersService.findById(userId);
+
+      if (!user.passwordHash) {
+        throw new ForbiddenException('This account uses SSO login and has no password to change.');
+      }
+
+      const currentValid = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+      if (!currentValid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+
+      const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS);
+      const newPasswordHash = await bcrypt.hash(dto.newPassword, salt);
+
+      await this.usersService.changePassword(userId, newPasswordHash);
+
+      this.logger.log(`-- Password changed: ${user.email}`);
     }
   
     // ── Helpers ──────────────────────────────────────

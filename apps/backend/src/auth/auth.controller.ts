@@ -18,6 +18,8 @@ import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -53,6 +55,18 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ): Promise<TokenPairDto> {
     return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @SkipPasswordCheck()
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ ok: boolean }> {
+    await this.authService.changePassword(user.sub, dto);
+    return { ok: true};
   }
 
   @Get('google')
