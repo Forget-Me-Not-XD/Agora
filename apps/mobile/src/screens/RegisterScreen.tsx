@@ -166,6 +166,9 @@ export function RegisterScreen({ navigation }: Props) {
                 editable={!isLoading}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                passwordRules="minlength: 8; maxlength: 72; required: upper; required: lower; required: digit; required: special;"
               />
               <TouchableOpacity
                 style={styles.eyeBtn}
@@ -189,7 +192,7 @@ export function RegisterScreen({ navigation }: Props) {
                 opacity: validationAnim,
                 maxHeight: validationAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0, 160],
+                  outputRange: [0, 220],
                 }),
                 overflow: 'hidden',
               },
@@ -228,6 +231,9 @@ export function RegisterScreen({ navigation }: Props) {
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!confirmVisible}
                 editable={!isLoading}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                passwordRules="minlength: 8; maxlength: 72; required: upper; required: lower; required: digit; required: special;"
               />
               <TouchableOpacity
                 style={styles.eyeBtn}

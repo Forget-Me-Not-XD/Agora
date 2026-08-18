@@ -258,7 +258,7 @@ export default function RegisterPage() {
           {/* Wagwoord validasie blok */}
           <div
             className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ maxHeight: showValidation ? '165px' : '0px', opacity: showValidation ? 1 : 0 }}
+            style={{ maxHeight: showValidation ? '220px' : '0px', opacity: showValidation ? 1 : 0 }}
           >
             <div
               className="mt-2 rounded-[10px] px-3 py-2 border"

@@ -77,10 +77,17 @@ export class UsersService {
     return UserResponseDto.fromDocument(updated);
   }
 
-  async changePassword(userId: string, passwordHash: string): Promise <void> {
+  async changePassword( userId: string, passwordHash: string, passwordHistory: string[]): Promise <void> {
     await this.userModel.updateOne(
       { _id: userId },
-      { $set: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() } },
+      { $set: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), passwordHistory } },
+    ).exec();
+  }
+
+  async markPasswordExpired( userId: string ): Promise <void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { mustChangePassword: true } },
     ).exec();
   }
 

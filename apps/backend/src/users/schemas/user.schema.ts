@@ -31,6 +31,9 @@ export class User {
     @Prop({ type: Date, default: Date.now })
     passwordChangedAt!: Date;
 
+    @Prop({ type: [String], default: [] })
+    passwordHistory!: string[];
+
     @Prop({ default: false })
     mustChangePassword!: boolean;
 

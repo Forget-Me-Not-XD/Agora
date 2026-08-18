@@ -119,6 +119,9 @@ export function ChangePasswordScreen(_props: Props) {
                 editable={!isLoading}
                 onFocus={() => setNewFocused(true)}
                 onBlur={() => setNewFocused(false)}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                passwordRules="minlength: 8; maxlength: 72; required: upper; required: lower; required: digit; required: special;"
               />
               <TouchableOpacity
                 style={styles.eyeBtn}
@@ -175,6 +178,9 @@ export function ChangePasswordScreen(_props: Props) {
                 onChangeText={setConfirmPassword}
                 secureTextEntry={!confirmVisible}
                 editable={!isLoading}
+                autoComplete="new-password"
+                textContentType="newPassword"
+                passwordRules="minlength: 8; maxlength: 72; required: upper; required: lower; required: digit; required: special;"
               />
               <TouchableOpacity
                 style={styles.eyeBtn}

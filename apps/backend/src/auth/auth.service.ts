@@ -39,6 +39,7 @@ import {
     private readonly BCRYPT_ROUNDS = 12;
     private readonly SELF_REGISTERABLE_ROLES = [Role.GAS, Role.STUDENT];
     private readonly PASSWORD_EXPIRY_DAYS = 90;
+    private readonly PASSWORD_HISTORY_SIZE = 3;
   
     constructor(
       private readonly usersService: UsersService,
@@ -147,9 +148,10 @@ import {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      if (this.isPasswordExpired(user.passwordChangedAt)) {
-        await this.publishFailedLogin(dto.email, ip, 'password_expired');
-        throw new ForbiddenException('Password has expired. Please reset your password before logging in.');
+      const passwordExpired = this.isPasswordExpired(user.passwordChangedAt);
+      if (passwordExpired && !user.mustChangePassword) {
+        await this.usersService.markPasswordExpired(user._id.toString());
+        user.mustChangePassword = true;
       }
   
       // Successful login — clear lockout state
@@ -221,10 +223,13 @@ import {
         throw new UnauthorizedException('Current password is incorrect');
       }
 
+      await this.assertPasswordNotReused(dto.newPassword, user.passwordHash, user.passwordHistory);
+
       const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS);
       const newPasswordHash = await bcrypt.hash(dto.newPassword, salt);
+      const updatedHistory = [user.passwordHash, ...user.passwordHistory].slice(0, this.PASSWORD_HISTORY_SIZE);
 
-      await this.usersService.changePassword(userId, newPasswordHash);
+      await this.usersService.changePassword(userId, newPasswordHash, updatedHistory);
 
       this.logger.log(`-- Password changed: ${user.email}`);
     }
@@ -281,5 +286,15 @@ import {
       const expiryMs = this.PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
       const ageMs = Date.now() - passwordChangedAt.getTime();
       return ageMs > expiryMs;
+    }
+
+    private async assertPasswordNotReused(canidate: string, currentHash: string, history: string[]): Promise <void> {
+      const hashesToCheck = [currentHash, ...history];
+      for (const hash of hashesToCheck) {
+        const reused = await bcrypt.compare(canidate, hash);
+        if (reused) {
+          throw new ForbiddenException(`New password must be different from your current password and your last ${this.PASSWORD_HISTORY_SIZE} passwords.`);
+        }
+      }
     }
   }
