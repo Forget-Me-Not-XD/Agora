@@ -25,6 +25,7 @@ export class EventsService {
         const start = new Date(dto.date);
         const end   = dto.endDate ? new Date(dto.endDate) : undefined;
         this.assertEndAfterStart(start, end);
+        this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
 
         if (dto.assignedTo) {
             await this.assertValidAssignee(dto.assignedTo);
@@ -121,6 +122,28 @@ export class EventsService {
         throw new ConflictException('Hierdie geleentheid is vol bespreek');
     }
 
+    async decrementTicketsAvailable(id: string): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        // Dieselfde atomiese patroon as incrementConfirmedAttendees hierbo: die
+        // voorwaarde (ticketsAvailable > 0) en die skrywe gebeur in een databasis-
+        // operasie, sodat twee gelyktydige betalings nie dieselfde laaste kaartjie
+        // albei kan wen nie.
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id, ticketsAvailable: { $gt: 0 } },
+            { $inc: { ticketsAvailable: -1 } },
+            { new: true },
+        ).exec();
+
+        if (updated) return updated;
+
+        const event = await this.eventModel.findById(id).exec();
+        if (!event) throw new NotFoundException(`Event ${id} not found`);
+        throw new ConflictException('Geen kaartjies meer beskikbaar nie');
+    }
+
     async updateEvent(
         id: string,
         dto: UpdateEventDto,
@@ -147,6 +170,7 @@ export class EventsService {
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
 
         this.assertEndAfterStart(event.date, event.endDate);
+        this.assertTicketsWithinCapacity(event.sellsTickets, event.ticketsAvailable, event.maxCapacity);
 
         return event.save();
     }
@@ -234,6 +258,16 @@ export class EventsService {
     private assertEndAfterStart(start: Date, end?: Date): void {
         if (end && end.getTime() <= start.getTime()) {
             throw new BadRequestException('Die eind-datum moet ná die begin-datum wees');
+        }
+    }
+
+    private assertTicketsWithinCapacity(
+        sellsTickets: boolean | undefined,
+        ticketsAvailable: number | null | undefined,
+        maxCapacity: number,
+    ): void {
+        if (sellsTickets && ticketsAvailable != null && ticketsAvailable > maxCapacity) {
+            throw new BadRequestException('Kaartjies beskikbaar kan nie die kapasiteit oorskry nie');
         }
     }
 }

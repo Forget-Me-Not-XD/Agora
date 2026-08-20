@@ -8,10 +8,12 @@ import {
     IsOptional,
     IsArray,
     IsMongoId,
+    IsBoolean,
     MaxLength,
     Min,
     IsIn,
     IsEnum,
+    ValidateIf,
 } from 'class-validator';
 import { Role } from '../../common/enums/role.enums';
 import { EventType } from '../../common/enums/event-type.enum';
@@ -70,4 +72,18 @@ export class CreateEventDto {
     @IsOptional()
     @IsEnum(EventType)
     type?: EventType;
+
+    @IsOptional()
+    @IsBoolean()
+    sellsTickets?: boolean;
+
+    @ValidateIf((dto: CreateEventDto) => dto.sellsTickets === true)
+    @IsNumber()
+    @Min(0.01)
+    ticketPrice?: number;
+
+    @ValidateIf((dto: CreateEventDto) => dto.sellsTickets === true)
+    @IsInt()
+    @Min(1)
+    ticketsAvailable?: number;
 }

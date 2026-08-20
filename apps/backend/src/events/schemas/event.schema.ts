@@ -51,6 +51,15 @@ export class Event {
     @Prop ({ type: String, enum: Object.values(EventType), default: EventType.PUBLIC })
     type!: EventType;
 
+    @Prop ({ default: false })
+    sellsTickets!: boolean;
+
+    @Prop ({ type: Number, default: null })
+    ticketPrice!: number | null;
+
+    @Prop ({ type: Number, default: null })
+    ticketsAvailable!: number | null;
+
     createdAt?: Date;
     updatedAt?: Date;
 }

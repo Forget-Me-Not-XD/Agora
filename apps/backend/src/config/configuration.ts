@@ -28,6 +28,15 @@ export interface AppConfig {
             calendarCallbackUrl: string;
         };
     };
+    payfast: {
+        merchantId: string;
+        merchantKey: string;
+        passphrase: string;
+        mode: string;
+        notifyUrl: string;
+        returnUrl: string;
+        cancelUrl: string;
+    }
 }
 
 export default (): AppConfig => {
@@ -61,6 +70,15 @@ export default (): AppConfig => {
                 callbackUrl: process.env.MICROSOFT_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/microsoft/callback',
                 calendarCallbackUrl: process.env.MICROSOFT_CALENDAR_CALLBACK_URL ?? 'http://localhost:3000/api/v1/calendar/microsoft/callback',
             },
+        },
+        payfast: {
+            merchantId: process.env.PAYFAST_MERCHANT_ID ?? '10000100',
+            merchantKey: process.env.PAYFAST_MERCHANT_KEY ?? '46f0cd694581a',
+            passphrase: process.env.PAYFAST_PASSPHRASE ?? '',
+            mode: process.env.PAYFAST_MODE ?? 'simulate',
+            notifyUrl: process.env.PAYFAST_NOTIFY_URL ?? 'http://localhost:3000/api/v1/payments/notify',
+            returnUrl: process.env.PAYFAST_RETURN_URL ?? 'http://localhost:3001/events',
+            cancelUrl: process.env.PAYFAST_CANCEL_URL ?? 'http://localhost:3001/events',
         },
     };
 };
