@@ -1,13 +1,17 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, MapPin, Users, ChevronLeft, Pencil, Wallet } from 'lucide-react';
+import { Calendar, MapPin, Users, ChevronLeft, Pencil, Wallet, CreditCard } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
 import { getUsersByIds } from '@/lib/api/users';
+import { getMyRsvps } from '@/lib/api/rsvp';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
 import { formatDateLong as formatDate } from '@/lib/format-date';
 import PhotographerSection from '@/components/PhotographerSection';
+import { Pill } from '@/components/ui/Pill';
+import PaymentModal from '@/components/PaymentModal';
+import AlreadyRsvpdTag from '@/components/AlreadyRsvpdTag';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +24,9 @@ export default async function EventDetailPage({ params }: { params: { id: string
 
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
+
+    const myRsvps = await getMyRsvps().catch(() => []);
+    const alreadyRsvpd = myRsvps.some((r) => r.status !== 'GEKANSELLEER' && r.event?._id === event.id);
 
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
     const canManageEvent = user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
@@ -60,7 +67,10 @@ export default async function EventDetailPage({ params }: { params: { id: string
 
             {/* Geleentheid-besonderhede */}
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-4">
-                <h1 className="text-2xl font-bold text-[var(--color-text)]">{event.title}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl font-bold text-[var(--color-text)]">{event.title}</h1>
+                    {event.sellsTickets && <Pill tone="yellow">Betaalde Geleentheid</Pill>}
+                </div>
                 <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">{event.description}</p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -75,6 +85,27 @@ export default async function EventDetailPage({ params }: { params: { id: string
                     </div>
                 </div>
             </div>
+
+            {/* Kaartjies — sigbaar vir almal wat die geleentheid kan sien */}
+            {event.sellsTickets && (
+                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <CreditCard size={16} className="text-[var(--color-primary)]" />
+                        <span className="text-sm font-semibold text-[var(--color-text)]">Kaartjies</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--color-text-subtle)]">Prys</span>
+                        <span className="font-medium text-[var(--color-text)]">R{event.ticketPrice}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-[var(--color-text-subtle)]">Beskikbaar</span>
+                        <span className="font-medium text-[var(--color-text)]">{event.ticketsAvailable}</span>
+                    </div>
+                    <div className="pt-1">
+                        {alreadyRsvpd ? <AlreadyRsvpdTag eventId={event.id} /> : <PaymentModal event={event} />}
+                    </div>
+                </div>
+            )}
 
             {/* Finansiële afdeling — bestuurders van die geleentheid, en die toegekende Finansies-gebruiker */}
             {canViewFinance && (

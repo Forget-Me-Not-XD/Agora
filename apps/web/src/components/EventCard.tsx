@@ -15,12 +15,14 @@ import {
 import { Pill } from '@/components/ui/Pill';
 import RsvpModal from './RsvpModal';
 import PaymentModal from './PaymentModal';
+import AlreadyRsvpdTag from './AlreadyRsvpdTag';
 
 interface EventCardProps {
     event: Event;
+    alreadyRsvpd?: boolean;
 }
 
-export default function EventCard({ event }: EventCardProps) {
+export default function EventCard({ event, alreadyRsvpd = false }: EventCardProps) {
     const status  = deriveStatus(event);
     const fillPct = fillPercentage(event);
     const isFull       = fillPct >= 100;
@@ -87,7 +89,13 @@ export default function EventCard({ event }: EventCardProps) {
             </Link>
 
             <div className="p-5 pt-3">
-                {event.sellsTickets ? <PaymentModal event={event} /> : <RsvpModal event={event} />}
+                {alreadyRsvpd ? (
+                    <AlreadyRsvpdTag eventId={event.id} />
+                ) : event.sellsTickets ? (
+                    <PaymentModal event={event} />
+                ) : (
+                    <RsvpModal event={event} />
+                )}
             </div>
         </div>
     );

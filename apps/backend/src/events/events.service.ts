@@ -144,6 +144,24 @@ export class EventsService {
         throw new ConflictException('Geen kaartjies meer beskikbaar nie');
     }
 
+    // Gebruik om 'n voorheen-afgetrekte kaartjie terug te gee wanneer 'n betaling
+    // uiteindelik geen nuwe kaartjie geskep het nie (bv. die gebruiker het reeds
+    // een uit 'n ander, aparte betaling).
+    async incrementTicketsAvailable(id: string): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id },
+            { $inc: { ticketsAvailable: 1 } },
+            { new: true },
+        ).exec();
+
+        if (!updated) throw new NotFoundException(`Event ${id} not found`);
+        return updated;
+    }
+
     async updateEvent(
         id: string,
         dto: UpdateEventDto,

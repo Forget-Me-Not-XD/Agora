@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Payment, PaymentDocument, PaymentStatus } from './schemas/payment.schema';
 import { EventsService } from "../events/events.service";
 import { RsvpService } from "../rsvp/rsvp.service";
+import { UsersService } from "../users/users.service";
 import { PayfastNotifyDto, PayfastNotifyResultDto } from "./dto/payfast-notify.dto";
 import { InitiatePaymentResponseDto } from "./dto/initiate-payment-response.dto";
 
@@ -27,6 +28,7 @@ export class PaymentsService {
         private readonly configService: ConfigService,
         private readonly eventsService: EventsService,
         private readonly rsvpService: RsvpService,
+        private readonly usersService: UsersService,
     ) {}
 
     async initiate(eventId: string, userId: string): Promise<InitiatePaymentResponseDto> {
@@ -44,6 +46,7 @@ export class PaymentsService {
             throw new ConflictException("Jy het reeds 'n kaartjie vir hierdie geleentheid");
         }
 
+        const user = await this.usersService.findById(userId);
         const reference = uuidv4();
         const amount = event.ticketPrice;
 
@@ -73,6 +76,9 @@ export class PaymentsService {
             return_url: returnUrl,
             cancel_url: cancelUrl,
             notify_url: notifyUrl,
+            name_first: user.name,
+            name_last: user.surname,
+            email_address: user.email,
             m_payment_id: reference,
             amount: amountStr,
             item_name: itemName,
@@ -108,10 +114,10 @@ export class PaymentsService {
         }
 
         const passphrase = this.configService.get<string>('payfast.passphrase')!;
-        const fields = this.notifyFields(dto.m_payment_id, dto.pf_payment_id, dto.payment_status, dto.item_name, dto.amount_gross);
+        const { signature, ...fields } = dto as unknown as Record<string, string>;
         const expectedSignature = this.buildSignature(fields, passphrase);
 
-        if (expectedSignature !== dto.signature) {
+        if (expectedSignature !== signature) {
             payment.status = PaymentStatus.MISLUK;
             await payment.save();
             throw new ForbiddenException('Ongeldige betaal-handtekening');
@@ -123,17 +129,43 @@ export class PaymentsService {
             return { status: PaymentStatus.MISLUK };
         }
 
-        await this.eventsService.decrementTicketsAvailable(payment.event.toString());
-        const rsvp = await this.rsvpService.createPaidTicket(
-            payment.event.toString(),
-            payment.user.toString(),
-            payment._id.toString(),
-        );
+        // Atomies "eis" hierdie betaling voordat 'n kaartjie geskep word — PayFast
+        // stuur soms meer as een ITN-oproep vir dieselfde transaksie. Slegs die
+        // versoek wat werklik van HANGENDE na VOLTOOI oorgaan, mag voortgaan; enige
+        // gelyktydige duplikaat kry hier niks terug nie en probeer nie weer 'n
+        // kaartjie skep nie.
+        const claimed = await this.paymentModel.findOneAndUpdate(
+            { _id: payment._id, status: PaymentStatus.HANGENDE },
+            { status: PaymentStatus.VOLTOOI, providerPaymentId: dto.pf_payment_id },
+        ).exec();
 
-        payment.status = PaymentStatus.VOLTOOI;
-        payment.providerPaymentId = dto.pf_payment_id;
-        payment.rsvp = rsvp._id;
-        await payment.save();
+        if (!claimed) {
+            return { status: PaymentStatus.VOLTOOI };
+        }
+
+        await this.eventsService.decrementTicketsAvailable(payment.event.toString());
+
+        let rsvp;
+        try {
+            rsvp = await this.rsvpService.createPaidTicket(
+                payment.event.toString(),
+                payment.user.toString(),
+                payment._id.toString(),
+            );
+        } catch (err) {
+            if (this.isDuplicateTicketError(err)) {
+                // Die gebruiker het reeds 'n kaartjie vir hierdie geleentheid, uit 'n
+                // ander, aparte betaling (bv. 'n PayFast ITN-herhaling vir 'n ou
+                // poging wat eers nou deur handtekening-verifikasie kom). Geen nuwe
+                // kaartjie word geskep nie, so gee die voorraad wat pas afgetrek is
+                // weer terug.
+                await this.eventsService.incrementTicketsAvailable(payment.event.toString());
+                return { status: PaymentStatus.VOLTOOI };
+            }
+            throw err;
+        }
+
+        await this.paymentModel.updateOne({ _id: payment._id }, { rsvp: rsvp._id }).exec();
 
         return { status: PaymentStatus.VOLTOOI };
     }
@@ -167,16 +199,31 @@ export class PaymentsService {
         };
     }
 
-    private buildSignature( fields: Record<string, string>, passphrase: string): string {
+    private buildSignature( fields: Record<string, string>, passphrase: string ): string {
         const parts: string[] = [];
-        for (const [key, value] of Object.entries(fields)) {
-            if (value === undefined || value === null || value === '') continue;
-            parts.push(`${key}=${encodeURIComponent(value.trim()).replace(/%20/g, '+')}`);
+        for ( const [key, value] of Object.entries(fields)) {
+            if (value === undefined || value === null) continue;
+            parts.push(`${key}=${this.phpUrlEncode(value.trim())}`);
         }
         let paramString = parts.join('&');
         if (passphrase) {
-            paramString += `&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}`;
+            paramString += `&passphrase=${this.phpUrlEncode(passphrase.trim())}`;
         }
         return createHash('md5').update(paramString).digest('hex');
+    }
+
+    private isDuplicateTicketError(err: unknown): boolean {
+        return typeof err === 'object' && err !== null && 'code' in err && (err as { code: unknown }).code === 11000;
+    }
+
+    private phpUrlEncode(value: string): string {
+        return encodeURIComponent(value)
+        .replace(/%20/g, '+')
+        .replace(/!/g, '%21')
+        .replace(/'/g, '%27')
+        .replace(/\(/g, '%28')
+        .replace(/\)/g, '%29')
+        .replace(/\*/g, '%2A')
+        .replace(/~/g, '%7E')
     }
 }
