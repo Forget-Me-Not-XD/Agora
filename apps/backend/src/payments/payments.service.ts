@@ -61,6 +61,7 @@ export class PaymentsService {
         const notifyUrl = this.configService.get<string>('payfast.notifyUrl')!;
         const returnUrl = this.configService.get<string>('payfast.returnUrl')!;
         const cancelUrl = this.configService.get<string>('payfast.cancelUrl')!;
+        const checkoutUrl = this.configService.get<string>('payfast.processUrl')!;
         const mode = this.configService.get<string>('payfast.mode');
 
         const itemName = event.title.slice(0, 100);
@@ -91,6 +92,7 @@ export class PaymentsService {
             amount, 
             itemName, 
             checkout: { ...checkoutFields, signature: checkoutSignature },
+            checkoutUrl,
             simulation,
         };
     }

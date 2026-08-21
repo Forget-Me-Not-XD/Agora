@@ -105,9 +105,14 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                                             </span>
                                         )}
                                     </div>
-                                    <Pill tone={RSVP_STATUS_TONE[r.status]} className="shrink-0">
-                                        {RSVP_STATUS_LABEL[r.status]}
-                                    </Pill>
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                        <Pill tone={RSVP_STATUS_TONE[r.status]}>
+                                            {RSVP_STATUS_LABEL[r.status]}
+                                        </Pill>
+                                        {r.paid && (
+                                            <Pill tone="green">Betaal via PayFast</Pill>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {r.event && (

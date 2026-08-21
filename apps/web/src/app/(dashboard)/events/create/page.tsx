@@ -31,6 +31,9 @@ export default function CreateEventPage() {
                     assignedTo: '',
                     assignedToName: '',
                     studyCenter: user.studyCenter,
+                    sellsTickets: false,
+                    ticketPrice: '',
+                    ticketsAvailable: '',
                 }}
             />
         </div>

@@ -14,6 +14,7 @@ import {
 } from '@/lib/event-view';
 import { Pill } from '@/components/ui/Pill';
 import RsvpModal from './RsvpModal';
+import PaymentModal from './PaymentModal';
 
 interface EventCardProps {
     event: Event;
@@ -40,6 +41,7 @@ export default function EventCard({ event }: EventCardProps) {
                     <div className="flex flex-col items-end gap-1 shrink-0">
                         <Pill tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>
                         <Pill tone={TYPE_TONE[event.type]}>{TYPE_LABELS[event.type]}</Pill>
+                        {event.sellsTickets && <Pill tone="yellow">Betaal</Pill>}
                     </div>
                 </div>
 
@@ -85,7 +87,7 @@ export default function EventCard({ event }: EventCardProps) {
             </Link>
 
             <div className="p-5 pt-3">
-                <RsvpModal event={event} />
+                {event.sellsTickets ? <PaymentModal event={event} /> : <RsvpModal event={event} />}
             </div>
         </div>
     );

@@ -33,6 +33,9 @@ export interface EventFormValues {
     assignedTo:         string;
     assignedToName:     string;
     studyCenter:        string;
+    sellsTickets:       boolean;
+    ticketPrice:        string;
+    ticketsAvailable:   string;
 }
 
 interface EventFormProps {
@@ -74,6 +77,12 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
             e.capacity = 'Geldige kapasiteit is verpligtend';
         if (formData.budget === '' || Number(formData.budget) < 0)
             e.budget = 'Geldige begroting is verpligtend';
+        if (formData.sellsTickets) {
+            if (!formData.ticketPrice || Number(formData.ticketPrice) <= 0)
+                e.ticketPrice = 'Geldige kaartjieprys is verpligtend';
+            if (!formData.ticketsAvailable || Number(formData.ticketsAvailable) <= 0)
+                e.ticketsAvailable = 'Geldige aantal kaartjies is verpligtend';
+        }
         return e;
     }
 
@@ -96,6 +105,9 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 intendedAttendance: formData.intendedAttendance,
                 assignedTo:         formData.assignedTo || undefined,
                 type:               formData.type,
+                sellsTickets:       formData.sellsTickets,
+                ticketPrice:        formData.sellsTickets ? Number(formData.ticketPrice) : undefined,
+                ticketsAvailable:   formData.sellsTickets ? Number(formData.ticketsAvailable) : undefined,
             };
             const err =
                 mode === 'create'
@@ -307,6 +319,56 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                             setFormData((prev) => ({ ...prev, assignedTo: id, assignedToName: name }))
                         }
                     />
+                </div>
+
+                <div className="space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
+                        <input
+                            type="checkbox"
+                            checked={formData.sellsTickets}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, sellsTickets: e.target.checked }))}
+                            className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                        />
+                        Hierdie geleentheid verkoop kaartjies
+                    </label>
+
+                    {formData.sellsTickets && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                    Kaartjieprys (R)
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="Prys per kaartjie"
+                                    value={formData.ticketPrice}
+                                    onChange={(e) => handleChange('ticketPrice', e.target.value)}
+                                    min="0.01"
+                                    step="0.01"
+                                    className={inputClass('ticketPrice')}
+                                />
+                                {errors.ticketPrice && (
+                                    <p className="text-xs text-[var(--color-red)] mt-1">{errors.ticketPrice}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                                    Kaartjies Beskikbaar
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="Aantal te koop"
+                                    value={formData.ticketsAvailable}
+                                    onChange={(e) => handleChange('ticketsAvailable', e.target.value)}
+                                    min="1"
+                                    className={inputClass('ticketsAvailable')}
+                                />
+                                {errors.ticketsAvailable && (
+                                    <p className="text-xs text-[var(--color-red)] mt-1">{errors.ticketsAvailable}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {apiError && (

@@ -25,5 +25,6 @@ export class InitiatePaymentResponseDto {
     amount!:        number;
     itemName!:      string;
     checkout!:      PayfastCheckoutFieldsDto;
+    checkoutUrl!:   string;
     simulation!:    { success: SimulatedPayfastNotifyDto; failed: SimulatedPayfastNotifyDto } | null;
 }

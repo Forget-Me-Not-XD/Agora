@@ -36,6 +36,7 @@ export interface AppConfig {
         notifyUrl: string;
         returnUrl: string;
         cancelUrl: string;
+        processUrl: string;
     }
 }
 
@@ -79,6 +80,7 @@ export default (): AppConfig => {
             notifyUrl: process.env.PAYFAST_NOTIFY_URL ?? 'http://localhost:3000/api/v1/payments/notify',
             returnUrl: process.env.PAYFAST_RETURN_URL ?? 'http://localhost:3001/events',
             cancelUrl: process.env.PAYFAST_CANCEL_URL ?? 'http://localhost:3001/events',
+            processUrl: process.env.PAYFAST_PROCESS_URL ?? 'https://sandbox.payfast.co.za/eng/process',
         },
     };
 };
