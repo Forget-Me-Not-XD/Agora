@@ -1,10 +1,10 @@
 import { Suspense } from 'react';
-import { Calendar, Ticket, Users, UserPlus } from 'lucide-react';
+import { Calendar, Ticket, Users, UserPlus, CreditCard } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import EventCard from '@/components/EventCard';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
-import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getRecentRsvps, getBudgetPerMonth } from '@/lib/api/analytics';
+import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getRecentRsvps, getBudgetPerMonth, getTicketRevenueSummary, getRevenuePerEvent, getRevenuePerMonth } from '@/lib/api/analytics';
 import { mergeMonthlySeries, mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import EventsRsvpsAreaChart from '@/components/charts/EventsRsvpsAreaChart';
@@ -12,11 +12,16 @@ import TopEventsBarChart from '@/components/charts/TopEventsBarChart';
 import RsvpTrendLineChart from '@/components/charts/RsvpTrendLineChart';
 import FillRateDonut from '@/components/charts/FillRateDonut';
 import BudgetTrendChart from '@/components/charts/BudgetTrendChart';
+import TicketRevenueTrendChart from '@/components/charts/TicketRevenueTrendChart';
 import RecentBookingsTable from '@/components/charts/RecentBookingTable';
 import DosentDashboard from '@/components/dashboard/DosentDashboard';
 import AttendeeDashboard from '@/components/dashboard/AttendeeDashboard';
 
 export const dynamic = 'force-dynamic';
+
+function fmtRand(v: number): string {
+    return `R${Math.round(v).toLocaleString('af-ZA')}`;
+}
 
 export default function DashboardPage() {
     const user = getCurrentUser();
@@ -83,7 +88,7 @@ function StatCardSkeletons() {
 
 // Haal die admin-KPI's, grafiekdata en onlangse besprekings, en wys die volledige admin-uitleg
 async function AdminDashboard() {
-    const [kpisRes, eventsSummaryRes, rsvpSummaryRes, rsvpsPerMonthRes, recentRsvpsRes, budgetPerMonthRes] =
+    const [kpisRes, eventsSummaryRes, rsvpSummaryRes, rsvpsPerMonthRes, recentRsvpsRes, budgetPerMonthRes, ticketRevenueSummaryRes, revenuePerEventRes, revenuePerMonthRes] =
         await Promise.allSettled([
             getAdminKpis(),
             getEventsSummary(),
@@ -91,6 +96,9 @@ async function AdminDashboard() {
             getRsvpsPerMonth(),
             getRecentRsvps(8),
             getBudgetPerMonth(),
+            getTicketRevenueSummary(),
+            getRevenuePerEvent(),
+            getRevenuePerMonth(),
         ]);
 
     const kpis = kpisRes.status === 'fulfilled' ? kpisRes.value : null;
@@ -99,9 +107,13 @@ async function AdminDashboard() {
     const rsvpsPerMonth = rsvpsPerMonthRes.status === 'fulfilled' ? rsvpsPerMonthRes.value : [];
     const recentRsvps = recentRsvpsRes.status === 'fulfilled' ? recentRsvpsRes.value : [];
     const budgetPerMonth = budgetPerMonthRes.status === 'fulfilled' ? budgetPerMonthRes.value : [];
+    const ticketRevenueSummary = ticketRevenueSummaryRes.status === 'fulfilled' ? ticketRevenueSummaryRes.value : null;
+    const revenuePerEvent = revenuePerEventRes.status === 'fulfilled' ? revenuePerEventRes.value : [];
+    const revenuePerMonth = revenuePerMonthRes.status === 'fulfilled' ? revenuePerMonthRes.value : [];
 
     const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
     const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);
+    const monthlyTicketRevenue = mergeSingleMonthlySeries(revenuePerMonth);
 
     return (
         <div className="space-y-6">
@@ -165,6 +177,61 @@ async function AdminDashboard() {
                     <RecentBookingsTable data={recentRsvps} />
                 </div>
             </div>
+
+            {/* Kaartjie-verkope */}
+            <div>
+                <h2 className="text-base font-semibold text-[var(--color-text)] mb-3">Kaartjie-verkope</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <StatCard
+                        label="Totale Kaartjie-inkomste"
+                        value={fmtRand(ticketRevenueSummary?.totalRevenue ?? 0)}
+                        sub={`${ticketRevenueSummary?.totalTicketsSold ?? 0} kaartjies verkoop`}
+                        icon={CreditCard}
+                        color="green"
+                    />
+                    <StatCard
+                        label="Kaartjies Verkoop"
+                        value={ticketRevenueSummary?.totalTicketsSold ?? 0}
+                        sub="oor alle betaalde geleenthede"
+                        icon={Ticket}
+                        color="orange"
+                    />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                        <div className="mb-2">
+                            <h3 className="text-sm font-semibold text-[var(--color-text)]">Kaartjie-inkomste per Maand</h3>
+                            <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">Afgelope 12 maande</p>
+                        </div>
+                        <TicketRevenueTrendChart data={monthlyTicketRevenue} />
+                    </div>
+                    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden">
+                        <div className="px-5 pt-4 pb-3 border-b border-[var(--color-border)]">
+                            <h3 className="text-sm font-semibold text-[var(--color-text)]">Top Geleenthede volgens Inkomste</h3>
+                        </div>
+                        <div className="divide-y divide-[var(--color-border)]">
+                            {revenuePerEvent.length === 0 ? (
+                                <p className="px-5 py-6 text-xs text-[var(--color-text-subtle)] text-center">
+                                    Nog geen kaartjies verkoop nie.
+                                </p>
+                            ) : (
+                                revenuePerEvent.map((e) => (
+                                    <div key={e.eventTitle} className="px-5 py-3 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-[var(--color-text)] truncate">{e.eventTitle}</p>
+                                            <p className="text-xs text-[var(--color-text-subtle)]">
+                                                {e.ticketsSold} kaartjie{e.ticketsSold !== 1 ? 's' : ''} verkoop
+                                            </p>
+                                        </div>
+                                        <p className="text-sm font-bold text-[var(--color-text)] shrink-0">{fmtRand(e.revenue)}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 }

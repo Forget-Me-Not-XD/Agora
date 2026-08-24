@@ -145,6 +145,23 @@ const PHOTOGRAPHER_BIOS = [
 
 const RSVP_STATUSES = ['BEVESTIG', 'HANGENDE', 'GEKANSELLEER'] as const;
 
+// Slegs geleenthede met hierdie titels (sosiale/vermaaklikheidsgeleenthede) kry ooit
+// 'n kaartjieprys -- 'n akademiese simposium of departementele vergadering sou nie
+// realisties toegangsgeld vra nie.
+const TICKETED_EVENT_TITLES = new Set([
+    'Jaareinde Sportsgala',
+    'Internasionale Kos- en Kultuurfees',
+    'Kwisaand met Studenteraad',
+    'Kampusbraaifees en Sosiale Byeenkoms',
+    'Alumni Terugkoms en Netwerkaand',
+    'Ondernemer Netwerkaand',
+    'Interuniversitêre Kultuuruitruiling',
+    'CV-Skryf en Onderhoudvaardighede Werkswinkel',
+    'Fotografie Werkswinkel: Geleentheidsfotografie 101',
+]);
+
+const TICKET_PRICES = [30, 50, 75, 100, 150, 200, 250];
+
 // ── Utility helpers ───────────────────────────────────────────────────────────
 
 function randInt(min: number, max: number): number {
@@ -310,13 +327,15 @@ async function seed(): Promise<void> {
     const rsvpsCol = mongoose.connection.collection('rsvps');
     const notificationsCol = mongoose.connection.collection('notifications');
     const photographerProfilesCol = mongoose.connection.collection('photographer_profiles');
+    const paymentsCol = mongoose.connection.collection('payments');
 
     // ─── Wipe ─────────────────────────────────────────────────────────────────
-    console.log('Wiping existing users / events / rsvps / notifications / photographer_profiles …');
+    console.log('Wiping existing users / events / rsvps / payments / notifications / photographer_profiles …');
     await Promise.all([
         usersCol.deleteMany({}),
         eventsCol.deleteMany({}),
         rsvpsCol.deleteMany({}),
+        paymentsCol.deleteMany({}),
         notificationsCol.deleteMany({}),
         photographerProfilesCol.deleteMany({}),
     ]);
@@ -452,6 +471,9 @@ async function seed(): Promise<void> {
         confirmedAttendees: number;
         intendedAttendance: string;
         type: string;
+        sellsTickets: boolean;
+        ticketPrice: number | null;
+        ticketsAvailable: number | null;
         createdAt: Date;
         updatedAt: Date;
     }> = [];
@@ -477,9 +499,16 @@ async function seed(): Promise<void> {
         ).length;
         const capacity = isPast ? randomPastCapacity(eligiblePoolSize) : randomCapacity();
 
+        const titleBase = pick(EVENT_TITLES);
+        const sellsTickets = TICKETED_EVENT_TITLES.has(titleBase) && Math.random() < 0.35;
+        const ticketPrice = sellsTickets ? pick(TICKET_PRICES) : null;
+        const ticketsAvailable = sellsTickets
+            ? Math.max(10, Math.round(capacity * (0.6 + Math.random() * 0.4)))
+            : null;
+
         eventDocs.push({
             _id: new Types.ObjectId(),
-            title: `${pick(EVENT_TITLES)} ${date.getFullYear()}`,
+            title: `${titleBase} ${date.getFullYear()}`,
             description: 'Universiteitsgeleentheid geskep vir demonstrasie- en toetsdoeleindes met volledige voorbeelddata.',
             date,
             endDate: Math.random() < 0.5 ? new Date(date.getTime() + randInt(1, 4) * 3_600_000) : undefined,
@@ -492,6 +521,9 @@ async function seed(): Promise<void> {
             confirmedAttendees: 0, // filled in after RSVPs are generated below
             intendedAttendance,
             type: pick(EVENT_TYPES),
+            sellsTickets,
+            ticketPrice,
+            ticketsAvailable,
             createdAt,
             updatedAt: date,
         });
@@ -506,6 +538,7 @@ async function seed(): Promise<void> {
 
     for (let i = 0; i < eventDocs.length; i++) {
         const event = eventDocs[i];
+        if (event.sellsTickets) continue; // Betaalde geleenthede kry kaartjies via die aparte afdeling hieronder, nie gratis RSVP's nie.
         const isPastEvent = event.date.getTime() < now;
         const requiredLevel = ROLE_LEVEL[event.intendedAttendance];
         const eligible = attendeePool.filter((u) => ROLE_LEVEL[u.role] >= requiredLevel);
@@ -555,7 +588,7 @@ async function seed(): Promise<void> {
         );
         const candidateEvents = eventDocs.filter((e) => {
             const requiredLevel = ROLE_LEVEL[e.intendedAttendance];
-            return ROLE_LEVEL[namedUser.role] >= requiredLevel && !alreadyBooked.has(e._id.toString());
+            return ROLE_LEVEL[namedUser.role] >= requiredLevel && !alreadyBooked.has(e._id.toString()) && !e.sellsTickets;
         });
         const extras = pickUniqueIndices(candidateEvents.length, 5).map((idx) => candidateEvents[idx]);
 
@@ -584,6 +617,91 @@ async function seed(): Promise<void> {
         }
     }
 
+    // ─── Kaartjieverkope (Payments) ──────────────────────────────────────────
+    // Loop apart van die gratis-RSVP-afdeling hierbo, presies omdat betaalde
+    // geleenthede glad nie deur daardie afdeling gaan nie (sien die
+    // `if (event.sellsTickets) continue;` verderop). Elke verkoopte kaartjie
+    // kry sy eie VOLTOOI Payment-dokument plus 'n gekoppelde, betaalde Rsvp --
+    // presies die datastruktuur wat die regte /payments/notify-vloei
+    // produseer, sodat die kaartjie-inkomste-paneel op die admin-paneelbord
+    // met werklike, konsekwente data werk.
+    console.log('Generating ticket sales…');
+    const paymentDocs: object[] = [];
+    const ticketedEvents = eventDocs.filter((e) => e.sellsTickets);
+
+    for (const event of ticketedEvents) {
+        // 'n Geleentheid wat (in gesimuleerde tyd) nog nie eens geskep is nie,
+        // kon vanselfsprekend nog geen kaartjies verkoop hê nie.
+        if (event.createdAt.getTime() > now) continue;
+
+        const isPastEvent = event.date.getTime() < now;
+        const requiredLevel = ROLE_LEVEL[event.intendedAttendance];
+        const eligible = attendeePool.filter((u) => ROLE_LEVEL[u.role] >= requiredLevel);
+        if (eligible.length === 0) continue;
+
+        const originalStock = event.ticketsAvailable!;
+        const pool = Math.min(originalStock, eligible.length);
+        // Verlede geleenthede: die meeste beskikbare kaartjies is teen die tyd verkoop
+        // (dieselfde 92%-100%-verspreiding as werklike bywoning). Toekomstige
+        // geleenthede: kaartjieverkope is nog aan die gang, dus net gedeeltelik verkoop.
+        const sellThrough = isPastEvent ? randomPastFillRate() : randomFillRate();
+        const soldCount = Math.max(1, Math.min(pool, Math.round(pool * sellThrough)));
+        const buyers = pickUniqueIndices(eligible.length, soldCount).map((idx) => eligible[idx]);
+
+        const purchaseWindowEnd = Math.min(event.date.getTime(), now);
+
+        let soldForEvent = 0;
+        for (const buyer of buyers) {
+            const purchasedAt = new Date(
+                randInt(event.createdAt.getTime(), Math.max(event.createdAt.getTime(), purchaseWindowEnd)),
+            );
+            const paymentId = new Types.ObjectId();
+            const rsvpId = new Types.ObjectId();
+
+            const status = isPastEvent ? weightedPastRsvpStatus() : weightedRsvpStatus();
+            const confirmed = status === 'BEVESTIG';
+            const checkedIn = confirmed && isPastEvent && Math.random() < 0.85;
+
+            paymentDocs.push({
+                _id: paymentId,
+                event: event._id,
+                user: buyer._id,
+                reference: uuidv4(),
+                amount: event.ticketPrice,
+                status: 'VOLTOOI',
+                providerPaymentId: `SEED-${randInt(1_000_000, 9_999_999)}`,
+                rsvp: rsvpId,
+                createdAt: purchasedAt,
+                updatedAt: purchasedAt,
+            });
+
+            rsvpDocs.push({
+                _id: rsvpId,
+                event: event._id,
+                user: buyer._id,
+                status,
+                qrPayload: uuidv4(),
+                checkedIn,
+                checkedInAt: checkedIn ? event.date : null,
+                paid: true,
+                payment: paymentId,
+                createdAt: purchasedAt,
+                updatedAt: event.date,
+            });
+
+            if (confirmed) {
+                const key = event._id.toString();
+                confirmedCountByEvent.set(key, (confirmedCountByEvent.get(key) ?? 0) + 1);
+            }
+            soldForEvent++;
+        }
+
+        // ticketsAvailable stoor die oorblywende voorraad, nie die oorspronklike
+        // totaal nie -- presies soos die regte aankoopvloei dit atomies aftrek.
+        event.ticketsAvailable = originalStock - soldForEvent;
+    }
+    console.log(`✓ Generated ${paymentDocs.length} completed ticket payments across ${ticketedEvents.length} paid events.\n`);
+
     // Back-fill confirmedAttendees using the RSVP counts already tallied in
     // confirmedCountByEvent during in-memory generation above — this happens
     // before events are inserted (and before RSVPs are inserted), so every
@@ -603,7 +721,11 @@ async function seed(): Promise<void> {
     }
     console.log(`\n✓ Inserted ${rsvpDocs.length} RSVPs.\n`);
 
-
+    console.log('Inserting payments…');
+    for (let i = 0; i < paymentDocs.length; i += INSERT_BATCH) {
+        await paymentsCol.insertMany(paymentDocs.slice(i, i + INSERT_BATCH));
+    }
+    console.log(`✓ Inserted ${paymentDocs.length} payments.\n`);
 
     // ─── Notifications (photographer assignments) ────────────────────────────
     console.log('Generating notifications…');
@@ -635,9 +757,12 @@ async function seed(): Promise<void> {
     console.log('  PHOTOGRAPHER seed-fotograaf@gmail.com');
     console.log('──────────────────────────────────────────────────────────────');
     const futureCount = eventDocs.filter((e) => e.date.getTime() > Date.now()).length;
+    const totalTicketRevenue = paymentDocs.reduce((sum, p) => sum + (p as { amount: number }).amount, 0);
     console.log(`  Total users:         ${allUsers.length}`);
     console.log(`  Events inserted:     ${eventDocs.length} (${futureCount} future / ${eventDocs.length - futureCount} past)`);
     console.log(`  RSVPs inserted:      ${rsvpDocs.length}`);
+    console.log(`  Ticketed events:     ${ticketedEvents.length}`);
+    console.log(`  Payments inserted:   ${paymentDocs.length} (R${totalTicketRevenue.toLocaleString('af-ZA')} total revenue)`);
     console.log(`  Notifications:       ${notificationDocs.length}`);
     console.log(`  Photographer profiles: ${photographerProfiles.length}`);
     console.log('──────────────────────────────────────────────────────────────');
