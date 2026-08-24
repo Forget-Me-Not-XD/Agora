@@ -11,6 +11,7 @@ import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
 import type { EventType } from '@/lib/api/events';
 import EventPredictionPanel from '@/components/EventPredictionPanel';
 import FinanceAssigneeSelect from '@/components/FinanceAssigneeSelect';
+import TimeRangeInput from '@/components/TimeRangeInput';
 
 const STUDY_CENTERS = [
     'Centurion - Leriba',
@@ -25,6 +26,7 @@ export interface EventFormValues {
     description:        string;
     date:               string;
     time:               string;
+    endTime:            string;
     location:           string;
     type:               EventType;
     intendedAttendance: AttendanceRole;
@@ -48,7 +50,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     const router = useRouter();
     const user = useCurrentUser();
 
-    const [formData, setFormData] = useState(initialValues);
+    const [formData, setFormData] = useState({...initialValues, time: initialValues.time || '08:00', endTime: initialValues.endTime || '09:00'});
 
     const [apiError, setApiError]       = useState<string | null>(null);
     const [isPending, startTransition]  = useTransition();
@@ -71,7 +73,12 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
         if (!formData.title.trim()) e.title = 'Titel is verpligtend';
         if (!formData.description.trim()) e.description = 'Beskrywing is verpligtend';
         if (!formData.date) e.date = 'Datum is verpligtend';
-        if (!formData.time) e.time = 'Tyd is verpligtend';
+                if (!formData.time) e.time = 'Begintyd is verpligtend';
+        if (!formData.endTime) e.endTime = 'Eindtyd is verpligtend';
+        if (formData.time && formData.endTime && formData.endTime <= formData.time) 
+        {
+            e.endTime = 'Eindtyd moet na begintyd wees';
+        }
         if (!formData.location.trim()) e.location = 'Ligging is verpligtend';
         if (!formData.capacity || Number(formData.capacity) <= 0)
             e.capacity = 'Geldige kapasiteit is verpligtend';
@@ -99,6 +106,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 title:              formData.title,
                 description:        formData.description,
                 date:               `${formData.date}T${formData.time}`,
+                endDate:            `${formData.date}T${formData.endTime}`,
                 location:           formData.location,
                 maxCapacity:        Number(formData.capacity),
                 budget:             Number(formData.budget),
@@ -178,37 +186,29 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                         <p className="text-xs text-[var(--color-red)] mt-1">{errors.description}</p>
                     )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Datum
-                        </label>
-                        <input
-                            type="date"
-                            value={formData.date}
-                            onChange={(e) => handleChange('date', e.target.value)}
-                            className={inputClass('date')}
-                        />
-                        {errors.date && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.date}</p>
-                        )}
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                            Tyd
-                        </label>
-                        <input
-                            type="time"
-                            value={formData.time}
-                            onChange={(e) => handleChange('time', e.target.value)}
-                            className={inputClass('time')}
-                        />
-                        {errors.time && (
-                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.time}</p>
-                        )}
-                    </div>
+                <div>
+                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
+                        Datum
+                    </label>
+                    <input
+                        type="date"
+                        value={formData.date}
+                        onChange={(e) => handleChange('date', e.target.value)}
+                        className={inputClass('date')}
+                    />
+                    {errors.date && (
+                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.date}</p>
+                    )}
                 </div>
+
+                <TimeRangeInput
+                    startTime={formData.time}
+                    endTime={formData.endTime}
+                    onStartTimeChange={(v) => handleChange('time', v)}
+                    onEndTimeChange={(v) => handleChange('endTime', v)}
+                    startError={errors.time}
+                    endError={errors.endTime}
+                />
 
                 <div>
                     <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
