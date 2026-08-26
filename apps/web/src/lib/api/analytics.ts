@@ -64,6 +64,13 @@ export interface AdminKpis {
     totalRsvps: AdminKpi;
 }
 
+export type TrendDirection = 'up' | 'down' | 'stable';
+
+export interface Trend {
+    deltaPct: number | null;
+    direction: TrendDirection;
+}
+
 export interface RecentRsvp {
     id: string;
     eventTitle: string;
@@ -131,6 +138,22 @@ export interface RevenuePerMonth {
 
 export async function getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
     return apiFetch<RevenuePerMonth[]>('/api/v1/analytics/revenue-per-month');
+}
+
+export async function getEventsTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/events-trend');
+}
+
+export async function getRsvpsTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/rsvps-trend');
+}
+
+export async function getBudgetTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/budget-trend');
+}
+
+export async function getRevenueTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/revenue-trend');
 }
 
 export interface PredictionResult {

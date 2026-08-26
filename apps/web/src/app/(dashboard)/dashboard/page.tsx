@@ -4,7 +4,7 @@ import StatCard from '@/components/StatCard';
 import EventCard from '@/components/EventCard';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
-import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getRecentRsvps, getBudgetPerMonth, getTicketRevenueSummary, getRevenuePerEvent, getRevenuePerMonth } from '@/lib/api/analytics';
+import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getRecentRsvps, getBudgetPerMonth, getTicketRevenueSummary, getRevenuePerEvent, getRevenuePerMonth, getEventsTrend, getRsvpsTrend, getBudgetTrend, getRevenueTrend } from '@/lib/api/analytics';
 import { mergeMonthlySeries, mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import EventsRsvpsAreaChart from '@/components/charts/EventsRsvpsAreaChart';
@@ -99,6 +99,10 @@ async function AdminDashboard() {
             getTicketRevenueSummary(),
             getRevenuePerEvent(),
             getRevenuePerMonth(),
+            getEventsTrend(),
+            getRsvpsTrend(),
+            getBudgetTrend(),
+            getRevenueTrend(),
         ]);
 
     const kpis = kpisRes.status === 'fulfilled' ? kpisRes.value : null;
@@ -110,6 +114,10 @@ async function AdminDashboard() {
     const ticketRevenueSummary = ticketRevenueSummaryRes.status === 'fulfilled' ? ticketRevenueSummaryRes.value : null;
     const revenuePerEvent = revenuePerEventRes.status === 'fulfilled' ? revenuePerEventRes.value : [];
     const revenuePerMonth = revenuePerMonthRes.status === 'fulfilled' ? revenuePerMonthRes.value : [];
+    const eventsTrend = eventsTrendRes.status === 'fulfilled' ? eventsTrendRes.value : null;
+    const rsvpsTrend = rsvpsTrendRes.status === 'fulfilled' ? rsvpsTrendRes.value : null;
+    const budgetTrend = budgetTrendRes.status === 'fulfilled' ? budgetTrendRes.value : null;
+    const revenueTrend = revenueTrendRes.status === 'fulfilled' ? revenueTrendRes.value : null;
 
     const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
     const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);

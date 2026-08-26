@@ -14,6 +14,7 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService } from './lstm.service';
+import { Trend, TrendDirection } from './dto/trend.dto';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,7 +37,8 @@ export interface BudgetPerMonth {
 
 export interface AdminKpi {
     value: number;
-    deltaPct: number | null    //<-- Null - zero comparison possible yet
+    deltaPct: number | null;    //<-- Null - zero comparison possible yet
+    direction: TrendDirection;
 }
 
 export interface AdminKpis {
@@ -242,6 +244,30 @@ export class AnalyticsService {
         return Math.round(((current - previous) / previous) * 1000) / 10;
     }
 
+    private readonly TREND_STABLE_THRESHOLD_PCT = 2;
+
+    private computeTrend(current: number, previous: number): Trend {
+        const deltaPct = this.delta(current, previous);
+        if(deltaPct === null) return {deltaPct: null, direction: 'stable'};
+
+        const direction: TrendDirection = 
+        deltaPct > this.TREND_STABLE_THRESHOLD_PCT ? 'up'
+        : deltaPct < -this.TREND_STABLE_THRESHOLD_PCT ? 'down'
+        : 'stable';
+
+        return { deltaPct, direction };
+    }
+
+    private weekRange(offsetWeeks: number): { start: Date; end: Date } {
+        const now = new Date();
+        const day = now.getDay();
+        const diffToMonday = (day === 0 ? -6 : 1) - day;
+        const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + offsetWeeks * 7);
+        const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate());
+        const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+        return { start, end };
+    }
+
     async getAdminKpis(): Promise <AdminKpis> {
         const thisMonth = this.monthRange(0);
         const lastMonth = this.monthRange(-1);
@@ -264,10 +290,10 @@ export class AnalyticsService {
         ]);
 
         return {
-        totalEvents: { value: totalEvents, deltaPct: this.delta(eventsThisMonth, eventsLastMonth) },
-        activeUsers: { value: totalUsers, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
-        newSignups:  { value: usersThisMonth, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
-        totalRsvps:  { value: totalRsvps, deltaPct: this.delta(rsvpsThisMonth, rsvpsLastMonth) },
+        totalEvents: { value: totalEvents, ...this.computeTrend(eventsThisMonth, eventsLastMonth) },
+        activeUsers: { value: totalUsers, ...this.computeTrend(usersThisMonth, usersLastMonth) },
+        newSignups:  { value: usersThisMonth, ...this.computeTrend(usersThisMonth, usersLastMonth) },
+        totalRsvps:  { value: totalRsvps, ...this.computeTrend(rsvpsThisMonth, rsvpsLastMonth) },
         };
     }
 
@@ -352,6 +378,62 @@ async getRevenuePerMonth(): Promise<RevenuePerMonth[]> {
         { $sort: { '_id.year': 1, '_id.month': 1 } },
         { $project: { _id: 0, year: '$_id.year', month: '$_id.month', total: 1 } },
     ]).exec();
+}
+
+async getEventsTrend(): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+    const [current, previous] = await Promise.all([
+        this.eventModel.countDocuments({ date: { $gte: thisMonth.start, $lt: thisMonth.end } }).exec(),
+        this.eventModel.countDocuments({ date: { $gte: lastMonth.start, $lt: lastMonth.end } }).exec(),
+    ]);
+    return this.computeTrend(current, previous);
+}
+
+// Week-over-week, not month-over-month: RSVPs happen often enough that a weekly view is more useful.
+async getRsvpsTrend(): Promise<Trend> {
+    const thisWeek = this.weekRange(0);
+    const lastWeek = this.weekRange(-1);
+    const [current, previous] = await Promise.all([
+        this.rsvpModel.countDocuments({ createdAt: { $gte: thisWeek.start, $lt: thisWeek.end } }).exec(),
+        this.rsvpModel.countDocuments({ createdAt: { $gte: lastWeek.start, $lt: lastWeek.end } }).exec(),
+    ]);
+    return this.computeTrend(current, previous);
+}
+
+async getBudgetTrend(assignedToUserId?: string): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+    const scopeMatch = assignedToUserId ? { assignedTo: new Types.ObjectId(assignedToUserId) } : {};
+
+    const [current, previous] = await Promise.all([
+        this.eventModel.aggregate<{ total: number }>([
+            { $match: { ...scopeMatch, date: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$budget' } } },
+        ]).exec(),
+        this.eventModel.aggregate<{ total: number }>([
+            { $match: { ...scopeMatch, date: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$budget' } } },
+        ]).exec(),
+    ]);
+    return this.computeTrend(current[0]?.total ?? 0, previous[0]?.total ?? 0);
+}
+
+async getRevenueTrend(): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+
+    const [current, previous] = await Promise.all([
+        this.paymentModel.aggregate<{ total: number }>([
+            { $match: { status: PaymentStatus.VOLTOOI, createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]).exec(),
+        this.paymentModel.aggregate<{ total: number }>([
+            { $match: { status: PaymentStatus.VOLTOOI, createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]).exec(),
+    ]);
+    return this.computeTrend(current[0]?.total ?? 0, previous[0]?.total ?? 0);
 }
 
 
