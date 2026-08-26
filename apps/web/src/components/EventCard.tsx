@@ -20,16 +20,23 @@ import AlreadyRsvpdTag from './AlreadyRsvpdTag';
 interface EventCardProps {
     event: Event;
     alreadyRsvpd?: boolean;
+    isNew?: boolean;
 }
 
-export default function EventCard({ event, alreadyRsvpd = false }: EventCardProps) {
+export default function EventCard({ event, alreadyRsvpd = false, isNew = false }: EventCardProps) {
     const status  = deriveStatus(event);
     const fillPct = fillPercentage(event);
     const isFull       = fillPct >= 100;
     const isAlmostFull = fillPct >= 80 && !isFull;
 
     return (
-        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden flex flex-col hover:shadow-md hover:border-[var(--color-primary)] transition-all duration-200">
+
+        <div
+            className={[
+                'bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl overflow-hidden flex flex-col hover:shadow-md hover:border-[var(--color-primary)] transition-all duration-200',
+                isNew ? 'animate-glow-fade' : '',
+            ].join(' ')}
+        >
 
             {/* Coloured top accent */}
             <div className={`h-1 w-full ${STATUS_COLORS[status]}`} />
@@ -98,5 +105,6 @@ export default function EventCard({ event, alreadyRsvpd = false }: EventCardProp
                 )}
             </div>
         </div>
+
     );
 }

@@ -8,7 +8,17 @@ module.exports = {
     './src/screens/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      keyframes: {
+        'glow-fade': {
+          '0%':   { boxShadow: '0 0 0 3px rgba(0, 80, 239, 0.6), 0 0 24px 4px rgba(0, 80, 239, 0.45)' },
+          '100%': { boxShadow: '0 0 0 0px rgba(0, 80, 239, 0)' },
+        },
+      },
+      animation: {
+        'glow-fade': 'glow-fade 7s ease-out forwards',
+      },
+    },
   },
   plugins: [],
 };
@@ -18,8 +28,6 @@ const config: Config = {
   darkMode: 'class',
   theme: {
     extend: {
-      // Mirrors the mobile theme/colors.ts tokens so both apps
-      // share the same visual language.
       colors: {
         primary: {
           DEFAULT: '#0050EF',
@@ -44,9 +52,6 @@ const config: Config = {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
-      // Accessibility floor: no text anywhere should render below 16px/1rem,
-      // so the two Tailwind scale steps below the default base are raised
-      // to match it rather than left at their default 12px/14px.
       fontSize: {
         xs: '1rem',
         sm: '1rem',

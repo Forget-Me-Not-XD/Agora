@@ -117,15 +117,21 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 ticketPrice:        formData.sellsTickets ? Number(formData.ticketPrice) : undefined,
                 ticketsAvailable:   formData.sellsTickets ? Number(formData.ticketsAvailable) : undefined,
             };
-            const err =
-                mode === 'create'
-                    ? await createEventAction(payload)
-                    : await updateEventAction(eventId!, payload);
 
-            if (err) {
-                setApiError(err);
+            if (mode === 'create') {
+                const result = await createEventAction(payload);
+                if (result.error) {
+                    setApiError(result.error);
+                } else {
+                    router.push(`/events?created=${result.id}`);
+                }
             } else {
-                router.push(mode === 'create' ? '/events' : `/events/${eventId}`);
+                const err = await updateEventAction(eventId!, payload);
+                if (err) {
+                    setApiError(err);
+                } else {
+                    router.push(`/events/${eventId}`);
+                }
             }
         });
     }
