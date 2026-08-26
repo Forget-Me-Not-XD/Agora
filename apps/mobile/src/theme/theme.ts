@@ -23,6 +23,12 @@ export type ThemeColors = {
   roleAdmin: string;
   roleDosent: string;
   roleGas: string;
+
+  success: string;
+  successBg: string;
+  warning: string;
+  warningBg: string;
+  overlay: string;
 };
 
 const light: ThemeColors = {
@@ -42,6 +48,11 @@ const light: ThemeColors = {
   roleAdmin: '#5C77A5',
   roleDosent: '#8AB4F8',
   roleGas: '#F28B82',
+  success: '#16A34A',
+  successBg: '#D1FAE5',
+  warning: '#D97706',
+  warningBg: '#FEF3C7',
+  overlay: 'rgba(15, 23, 42, 0.45)',
 };
 
 const dark: ThemeColors = {
@@ -61,6 +72,13 @@ const dark: ThemeColors = {
   roleAdmin: '#5C77A5',
   roleDosent: '#8AB4F8',
   roleGas: '#F28B82',
+
+  success: '#34D399',
+  successBg: '#064E3B',
+  warning: '#FBBF24',
+  warningBg: '#78350F',
+  overlay: 'rgba(0, 0, 0, 0.6)',
+
 };
 
 export function useThemeColors(): ThemeColors {
@@ -99,5 +117,11 @@ export function useStatusBarStyle(): 'light' | 'dark' {
   const systemScheme = useThemeStore((s) => s.systemScheme);
   const scheme = mode === 'system' ? systemScheme : mode;
   return scheme === 'dark' ? 'light' : 'dark';
+}
+
+export function useIsDark(): boolean {
+  const mode = useThemeStore((s) => s.mode);
+  const systemScheme = useThemeStore((s) => s.systemScheme);
+  return (mode === 'system' ? systemScheme : mode) === 'dark';
 }
 
