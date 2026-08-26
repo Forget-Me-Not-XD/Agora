@@ -1,6 +1,7 @@
 'use server';
 
-import { cancelRsvp, createRsvp, getRsvpQrDataUri } from '@/lib/api/rsvp';
+import { cancelRsvp, createRsvp, getMyRsvps, getRsvpQrDataUri } from '@/lib/api/rsvp';
+import type { MyRsvp } from '@/lib/api/rsvp';
 
 export interface RsvpActionResult {
     qrDataUri?:        string;
@@ -42,5 +43,19 @@ export async function cancelRsvpAction(rsvpId: string): Promise<CancelRsvpResult
         return {};
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Kon nie die RSVP kanselleer nie.' };
+    }
+}
+
+export interface GetMyRsvpsResult {
+    rsvps?: MyRsvp[];
+    error?:  string;
+}
+
+export async function getMyRsvpsAction(): Promise<GetMyRsvpsResult> {
+    try {
+        const rsvps = await getMyRsvps();
+        return { rsvps };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie jou RSVPs laai nie.' };
     }
 }

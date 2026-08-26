@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
 import { EventsModule } from '../events/events.module';
 import { RsvpModule } from '../rsvp/rsvp.module';
+import { PaymentsModule } from '../payments/payments.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PhotographersModule } from '../photographers/photographers.module';
 import { ExportModule } from '../export/export.module';
@@ -58,6 +59,7 @@ import { HealthModule } from '../health/health.module';
     AuditModule,
     EventsModule,
     RsvpModule,
+    PaymentsModule,
     AnalyticsModule,
     PhotographersModule,
     ExportModule,

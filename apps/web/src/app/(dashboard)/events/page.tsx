@@ -9,6 +9,7 @@ import ExportCsvButton from '@/components/ExportCsvButton';
 import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
+import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
 import type { EventStatus } from '@/lib/event-view';
@@ -47,6 +48,7 @@ export default function EventsPage() {
     const [events, setEvents]       = useState<Event[]>([]);
     const [loading, setLoading]     = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [rsvpdEventIds, setRsvpdEventIds] = useState<Set<string>>(new Set());
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
@@ -57,10 +59,19 @@ export default function EventsPage() {
     useEffect(() => {
         let active = true;
         (async () => {
-            const result = await listEventsAction();
+            const [eventsResult, rsvpsResult] = await Promise.all([
+                listEventsAction(),
+                getMyRsvpsAction(),
+            ]);
             if (!active) return;
-            if (result.error) setLoadError(result.error);
-            else setEvents(result.events ?? []);
+            if (eventsResult.error) setLoadError(eventsResult.error);
+            else setEvents(eventsResult.events ?? []);
+
+            const activeEventIds = (rsvpsResult.rsvps ?? [])
+                .filter((r) => r.status !== 'GEKANSELLEER' && r.event)
+                .map((r) => r.event!._id);
+            setRsvpdEventIds(new Set(activeEventIds));
+
             setLoading(false);
         })();
         return () => { active = false; };
@@ -198,7 +209,7 @@ export default function EventsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map((event) => (
-                        <EventCard key={event.id} event={event} />
+                        <EventCard key={event.id} event={event} alreadyRsvpd={rsvpdEventIds.has(event.id)} />
                     ))}
                 </div>
             )}

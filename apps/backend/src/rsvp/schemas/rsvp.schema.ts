@@ -41,6 +41,12 @@ export class Rsvp {
     @Prop ({ type: String, default: null })
     outlookCalendarEventId!: string | null;
 
+    @Prop ({ default: false })
+    paid!: boolean;
+
+    @Prop ({ type: Types.ObjectId, ref: 'Payment', default: null })
+    payment!: Types.ObjectId | null;
+
     createdAt?: Date;
     updatedAt?: Date;
 }

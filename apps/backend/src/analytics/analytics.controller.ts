@@ -8,7 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem } from './lstm.service';
-import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth } from './analytics.service';
+import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth, TicketRevenueSummary, EventRevenue, RevenuePerMonth } from './analytics.service';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 interface EventsSummaryResponse {
@@ -86,6 +86,27 @@ export class AnalyticsController {
     @Roles(Role.ADMIN)
     async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
         return this.analyticsService.getRsvpStatusBreakdown();
+    }
+
+    @Get ('ticket-revenue-summary')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getTicketRevenueSummary(): Promise <TicketRevenueSummary> {
+        return this.analyticsService.getTicketRevenueSummary();
+    }
+
+    @Get('revenue-per-event')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRevenuePerEvent(): Promise <EventRevenue[]> {
+        return this.analyticsService.getRevenuePerEvent();
+    }
+
+    @Get('revenue-per-month')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
+        return this.analyticsService.getRevenuePerMonth();
     }
 
     // ADMIN sien die volle begroting oor alle geleenthede. Enige ander aangemelde

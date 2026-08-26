@@ -9,6 +9,7 @@ import { join } from 'path';
 import { stringify } from 'csv-stringify/sync';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { Payment, PaymentDocument, PaymentStatus } from '../payments/schemas/payment.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -59,6 +60,23 @@ export interface RsvpStatusCount {
     count: number;
 }
 
+export interface TicketRevenueSummary {
+    totalRevenue: number;
+    totalTicketsSold: number;
+}
+
+export interface EventRevenue {
+    eventTitle: string;
+    ticketsSold: number;
+    revenue: number;
+}
+
+export interface RevenuePerMonth {
+    year: number;
+    month: number;
+    total: number;
+}
+
 export interface AttendancePrediction {
     predictedFillRate: number;
     predictedAttendance: number;
@@ -69,6 +87,7 @@ export class AnalyticsService {
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
         @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
         private readonly lstmService: LstmService,
     ) {}
@@ -272,6 +291,69 @@ async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
         { $sort: { count: -1 } },
     ]).exec();
 }
+
+async getTicketRevenueSummary(): Promise<TicketRevenueSummary> {
+    const result = await this.paymentModel.aggregate<TicketRevenueSummary>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: null,
+                totalRevenue: { $sum: '$amount' },
+                totalTicketsSold: { $sum: 1 },
+            },
+        },
+        { $project: { _id: 0, totalRevenue: 1, totalTicketsSold: 1 } },
+    ]).exec();
+
+    return result.length > 0 ? result[0] : { totalRevenue: 0, totalTicketsSold: 0 };
+}
+
+async getRevenuePerEvent(limit = 5): Promise<EventRevenue[]> {
+    return this.paymentModel.aggregate<EventRevenue>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: '$event',
+                ticketsSold: { $sum: 1 },
+                revenue: { $sum: '$amount' },
+            },
+        },
+        {
+            $lookup: {
+                from: 'events',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'eventDoc',
+            },
+        },
+        { $unwind: '$eventDoc' },
+        {
+            $project: {
+                _id: 0,
+                eventTitle: '$eventDoc.title',
+                ticketsSold: 1,
+                revenue: 1,
+            },
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: limit },
+    ]).exec();
+}
+
+async getRevenuePerMonth(): Promise<RevenuePerMonth[]> {
+    return this.paymentModel.aggregate<RevenuePerMonth>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+                total: { $sum: '$amount' },
+            },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+        { $project: { _id: 0, year: '$_id.year', month: '$_id.month', total: 1 } },
+    ]).exec();
+}
+
 
 async getRecentRsvps(limit: number): Promise<RecentRsvp[]> {
     const rsvps = await this.rsvpModel

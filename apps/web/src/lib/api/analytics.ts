@@ -104,6 +104,35 @@ export async function getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
     return apiFetch<BudgetPerMonth[]>('/api/v1/analytics/budget-per-month');
 }
 
+export interface TicketRevenueSummary {
+    totalRevenue: number;
+    totalTicketsSold: number;
+}
+
+export async function getTicketRevenueSummary(): Promise <TicketRevenueSummary> {
+    return apiFetch<TicketRevenueSummary>('/api/v1/analytics/ticket-revenue-summary');
+}
+
+export interface EventRevenue {
+    eventTitle: string;
+    ticketsSold: number;
+    revenue: number;
+}
+
+export async function getRevenuePerEvent(): Promise <EventRevenue[]> {
+    return apiFetch<EventRevenue[]>('/api/v1/analytics/revenue-per-event');
+}
+
+export interface RevenuePerMonth {
+    year: number;
+    month: number;
+    total: number;
+}
+
+export async function getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
+    return apiFetch<RevenuePerMonth[]>('/api/v1/analytics/revenue-per-month');
+}
+
 export interface PredictionResult {
     predictedFillRate:   number;
     estimatedRsvps:      number;

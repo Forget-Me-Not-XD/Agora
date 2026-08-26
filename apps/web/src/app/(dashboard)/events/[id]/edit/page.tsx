@@ -79,6 +79,9 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     assignedTo: event.assignedTo ?? '',
                     assignedToName: assignee[0] ? `${assignee[0].name} ${assignee[0].surname}` : '',
                     studyCenter: user.studyCenter,
+                    sellsTickets: event.sellsTickets,
+                    ticketPrice: event.ticketPrice !== null ? String(event.ticketPrice) : '',
+                    ticketsAvailable: event.ticketsAvailable !== null ? String(event.ticketsAvailable) : '',
                 }}
             />
         </div>
