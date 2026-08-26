@@ -29,6 +29,13 @@ export type ThemeColors = {
   warning: string;
   warningBg: string;
   overlay: string;
+  info: string;
+  infoBg: string;
+
+  eventTypePublic: string;
+  eventTypeInternal: string;
+  eventTypePrivate: string;
+  eventTypeDepartment: string;
 };
 
 const light: ThemeColors = {
@@ -53,6 +60,13 @@ const light: ThemeColors = {
   warning: '#D97706',
   warningBg: '#FEF3C7',
   overlay: 'rgba(15, 23, 42, 0.45)',
+  info: '#0369A1',
+  infoBg: '#E0F2FE',
+
+  eventTypePublic: '#14B8C7',
+  eventTypeInternal: '#8B5CF6',
+  eventTypePrivate: '#F59E0B',
+  eventTypeDepartment: '#6366F1',
 };
 
 const dark: ThemeColors = {
@@ -78,7 +92,13 @@ const dark: ThemeColors = {
   warning: '#FBBF24',
   warningBg: '#78350F',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  info: '#7DD3FC',
+  infoBg: '#0C4A6E',
 
+  eventTypePublic: '#14B8C7',
+  eventTypeInternal: '#8B5CF6',
+  eventTypePrivate: '#F59E0B',
+  eventTypeDepartment: '#6366F1',
 };
 
 export function useThemeColors(): ThemeColors {

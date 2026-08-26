@@ -31,7 +31,7 @@ const STUDY_CENTERS = [
 export function RegisterScreen({ navigation }: Props) {
   const { register, isLoading, error, clearError } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [uiRole, setUiRole] = useState<UiRole>('STUDENT');
   const [centerOpen, setCenterOpen] = useState(false);
@@ -208,7 +208,7 @@ export function RegisterScreen({ navigation }: Props) {
                   <Feather
                     name={rule.ok ? 'check-circle' : 'circle'}
                     size={14}
-                    color={rule.ok ? '#16A34A' : colors.textSubtle}
+                    color={rule.ok ? colors.success : colors.textSubtle}
                   />
                   <Text style={[styles.ruleText, rule.ok && styles.ruleTextOk]}>
                     {rule.label}
@@ -444,7 +444,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontWeight: '500',
     },
     ruleTextOk: {
-      color: '#16A34A',
+      color: colors.success,
       fontWeight: '700',
     },
 
@@ -479,7 +479,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       paddingVertical: 14,
       paddingHorizontal: 12,
       alignItems: 'center',
@@ -530,7 +530,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
 
     modalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
       padding: 18,
     },

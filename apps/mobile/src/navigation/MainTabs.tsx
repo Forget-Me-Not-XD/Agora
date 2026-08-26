@@ -55,7 +55,7 @@ export function MainTabs() {
           paddingBottom: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 16,
+          fontSize: 11,
           fontWeight: '700',
         },
       }}

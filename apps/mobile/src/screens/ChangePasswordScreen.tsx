@@ -16,7 +16,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ChangePassword'>;
 export function ChangePasswordScreen(_props: Props) {
   const { changePassword, isLoading, error, clearError } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -156,7 +156,7 @@ export function ChangePasswordScreen(_props: Props) {
                   <Feather
                     name={rule.ok ? 'check-circle' : 'circle'}
                     size={14}
-                    color={rule.ok ? '#16A34A' : colors.textSubtle}
+                    color={rule.ok ? colors.success : colors.textSubtle}
                   />
                   <Text style={[styles.ruleText, rule.ok && styles.ruleTextOk]}>
                     {rule.label}
@@ -272,7 +272,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
     ruleText: { fontSize: 16, color: colors.textSubtle, fontWeight: '500' },
-    ruleTextOk: { color: '#16A34A', fontWeight: '700' },
+    ruleTextOk: { color: colors.success, fontWeight: '700' },
 
     matchErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -8, marginBottom: 12 },
     matchErrorText: { color: colors.red, fontSize: 16, fontWeight: '600' },

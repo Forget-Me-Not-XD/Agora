@@ -5,7 +5,9 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeStore, ThemeMode } from '../stores/theme.store';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { useEffect, useState } from 'react'
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
+import { useEffect, useMemo, useState } from 'react'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -21,7 +23,7 @@ export function SettingsScreen({ navigation }: Props) {
   const setMode = useThemeStore((s) => s.setMode);
   const user = useAuthStore((s) => s.user);
 
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const biometricsAvailable = useAuthStore((s) => s.biometricsAvailable);
   const biometricsEnabled = useAuthStore((s) => s.biometricsEnabled);
@@ -52,13 +54,7 @@ export function SettingsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Terug</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Instellings</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title="Instellings" onBack={() => navigation.goBack()} />
 
       <View style={[styles.card, { marginBottom: 16 }]}>
         <Text style={styles.cardTitle}>Profiel</Text>
@@ -143,29 +139,9 @@ export function SettingsScreen({ navigation }: Props) {
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background, padding: 16 },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 8,
-      marginBottom: 16,
-    },
-    backBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      width: 60,
-      alignItems: 'center',
-    },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
-    title: { color: colors.text, fontSize: 18, fontWeight: '800' },
-
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
@@ -192,8 +168,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.background,
     },
     rowText: { flex: 1, paddingRight: 12 },
-    rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700' },
-    rowSubtitle: { color: colors.textSubtle, fontSize: 16, marginTop: 2 },
+    rowLabel: { ...typography.body, color: colors.text },
+    rowSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     radio: {
       width: 22,
       height: 22,

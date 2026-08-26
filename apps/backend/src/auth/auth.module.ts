@@ -9,6 +9,8 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MicrosoftStrategy } from './strategies/microsoft.strategy';
+import { GoogleMobileStrategy } from './strategies/google-mobile.strategy';
+import { MicrosoftMobileStrategy } from './strategies/microsoft-mobile.strategy';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { UsersModule } from '../users/users.module';
 
@@ -27,7 +29,15 @@ import { UsersModule } from '../users/users.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, GoogleStrategy, MicrosoftStrategy, SsoExceptionFilter],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    GoogleStrategy,
+    MicrosoftStrategy,
+    GoogleMobileStrategy,
+    MicrosoftMobileStrategy,
+    SsoExceptionFilter,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

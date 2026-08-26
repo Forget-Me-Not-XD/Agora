@@ -17,6 +17,9 @@ export interface EventResponse {
   confirmedAttendees: number;
   intendedAttendance: string;
   type: EventType;
+  sellsTickets: boolean;
+  ticketPrice: number | null;
+  ticketsAvailable: number | null;
   createdAt: string;
   updatedAt: string;
 }

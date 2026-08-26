@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -13,12 +13,14 @@ import { listEvents, type EventResponse } from '../api/events';
 import { getMyRsvps, type RsvpWithEvent } from '../api/rsvp';
 import { getPrediction, type PredictionResult } from '../api/analytics';
 import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from '../lib/event-status';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 export function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user, logout } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [aiInfoOpen, setAiInfoOpen] = useState(false);
 
   const [events, setEvents] = useState<EventResponse[]>([]);
@@ -102,22 +104,21 @@ export function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Goeie dag, {user.name}</Text>
-            <Text style={styles.subGreeting}>{roleLabel}{user.studyCenter ? ` • ${user.studyCenter}` : ''}</Text>
-          </View>
-          <View style={styles.headerActions}>
+      <ScreenHeader
+        title={`Goeie dag, ${user.name}`}
+        subtitle={`${roleLabel}${user.studyCenter ? ` • ${user.studyCenter}` : ''}`}
+        right={
+          <>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Settings')}>
               <Feather name="settings" size={18} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
               <Feather name="log-out" size={18} color={colors.red} />
             </TouchableOpacity>
-          </View>
-        </View>
+          </>
+        }
+      />
+      <ScrollView contentContainerStyle={styles.scroll}>
 
         {loading && (
           <View style={styles.card}>
@@ -133,6 +134,42 @@ export function DashboardScreen() {
 
         {!loading && !loadError && (
           <>
+            {nextEvent ? (
+              <TouchableOpacity
+                style={styles.heroCard}
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('EventDetail', { eventId: nextEvent.id })}
+                accessibilityLabel={`Besigtig ${nextEvent.title}`}
+              >
+                <Text style={styles.heroLabel}>VOLGENDE FUNKSIE</Text>
+                <Text style={styles.heroTitle} numberOfLines={2}>{nextEvent.title}</Text>
+                <Text style={styles.heroMeta}>
+                  {formatFullDate(nextEvent.date)} • {formatEventTime(nextEvent.date)} • {nextEvent.location}
+                </Text>
+
+                <View style={styles.heroProgressTrack}>
+                  <View
+                    style={[
+                      styles.heroProgressFill,
+                      { width: `${nextEvent.maxCapacity > 0 ? Math.min(100, (nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.heroFoot}>
+                  {nextEvent.confirmedAttendees} / {nextEvent.maxCapacity} RSVPs · {nextEvent.maxCapacity > 0 ? Math.round((nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}% gevul
+                </Text>
+
+                <View style={styles.heroCta}>
+                  <Text style={styles.heroCtaText}>Besigtig funksie</Text>
+                  <Feather name="arrow-right" size={16} color={colors.primary} />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.highlightMeta}>Geen aankomende funksies nie.</Text>
+              </View>
+            )}
+
             <Text style={styles.sectionTitle}>Oorsig</Text>
             <View style={styles.statsGrid}>
               {user.role === 'ADMIN' && (
@@ -155,77 +192,30 @@ export function DashboardScreen() {
               )}
             </View>
 
-            <Text style={styles.sectionTitle}>Volgende</Text>
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Volgende funksie</Text>
-                <TouchableOpacity
-                  style={styles.linkBtn}
-                  disabled={!nextEvent}
-                  onPress={() => nextEvent && navigation.navigate('EventDetail', { eventId: nextEvent.id })}
-                >
-                  <Text style={styles.linkText}>Besigtig</Text>
-                  <Feather name="chevron-right" size={16} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-              {nextEvent ? (
-                <View style={styles.highlight}>
-                  <Text style={styles.highlightTitle}>{nextEvent.title}</Text>
-                  <Text style={styles.highlightMeta}>
-                    {formatFullDate(nextEvent.date)} • {formatEventTime(nextEvent.date)} • {nextEvent.location}
-                  </Text>
-                  <View style={styles.progressRow}>
-                    <Text style={styles.progressLabel}>{nextEvent.confirmedAttendees} RSVPs</Text>
-                    <Text style={styles.progressSub}>van {nextEvent.maxCapacity}</Text>
-                  </View>
-                  <View style={styles.progressTrack}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${nextEvent.maxCapacity > 0 ? Math.min(100, (nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressFoot}>
-                    {nextEvent.maxCapacity > 0 ? Math.round((nextEvent.confirmedAttendees / nextEvent.maxCapacity) * 100) : 0}% van kapasiteit gevul
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.highlightMeta}>Geen aankomende funksies nie.</Text>
-              )}
-            </View>
-
             {isStaff && (
-              <>
-                <Text style={styles.sectionTitle}>KI</Text>
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Voorspelling: volgende funksie</Text>
-                    <TouchableOpacity style={styles.iconBtnSm} onPress={() => setAiInfoOpen(true)}>
-                      <Feather name="info" size={16} color={colors.textSubtle} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {prediction ? (
-                    <>
-                      <View style={styles.kpiGrid}>
-                        <Kpi styles={styles} label="Voorspelde vulkoers" value={`${Math.round(prediction.predictedFillRate * 100)}%`} />
-                        <Kpi styles={styles} label="Verwagte RSVPs" value={String(prediction.estimatedRsvps)} />
-                        <Kpi styles={styles} label="Verwagte bywoners" value={String(prediction.estimatedAttendees)} />
-                        <Kpi styles={styles} label="Beraamde begroting" value={`R${Math.round(prediction.estimatedBudgetZAR).toLocaleString('af-ZA')}`} />
-                      </View>
-                      <View style={styles.modelPill}>
-                        <View style={styles.dot} />
-                        <Text style={styles.modelText}>Model aktief</Text>
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={styles.highlightMeta}>
-                      {nextEvent ? 'Voorspelling nie tans beskikbaar nie.' : 'Geen aankomende funksie om te voorspel nie.'}
+              <TouchableOpacity
+                style={styles.aiStrip}
+                onPress={() => setAiInfoOpen(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Wys KI-voorspelling besonderhede"
+              >
+                <View style={styles.aiStripIcon}>
+                  <Feather name="cpu" size={16} color={colors.primary} />
+                </View>
+                <View style={styles.aiStripText}>
+                  <Text style={styles.aiStripTitle} numberOfLines={1}>
+                    {prediction
+                      ? `KI verwag ${Math.round(prediction.predictedFillRate * 100)}% vulkoers`
+                      : 'Geen KI-voorspelling beskikbaar nie'}
+                  </Text>
+                  {prediction && (
+                    <Text style={styles.aiStripSub} numberOfLines={1}>
+                      {prediction.estimatedAttendees} bywoners verwag · R{Math.round(prediction.estimatedBudgetZAR).toLocaleString('af-ZA')}
                     </Text>
                   )}
                 </View>
-              </>
+                <Feather name="chevron-right" size={16} color={colors.textSubtle} />
+              </TouchableOpacity>
             )}
 
             <View style={styles.card}>
@@ -275,11 +265,30 @@ export function DashboardScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => setAiInfoOpen(false)}>
           <Pressable style={styles.modalCard} onPress={() => { /* stop propagation */ }}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>KI / LSTM statistiek</Text>
+              <Text style={styles.modalTitle}>KI-voorspelling: volgende funksie</Text>
               <TouchableOpacity style={styles.iconBtnSm} onPress={() => setAiInfoOpen(false)}>
                 <Feather name="x" size={16} color={colors.textSubtle} />
               </TouchableOpacity>
             </View>
+
+            {prediction ? (
+              <>
+                <View style={styles.kpiGrid}>
+                  <Kpi styles={styles} label="Voorspelde vulkoers" value={`${Math.round(prediction.predictedFillRate * 100)}%`} />
+                  <Kpi styles={styles} label="Verwagte RSVPs" value={String(prediction.estimatedRsvps)} />
+                  <Kpi styles={styles} label="Verwagte bywoners" value={String(prediction.estimatedAttendees)} />
+                  <Kpi styles={styles} label="Beraamde begroting" value={`R${Math.round(prediction.estimatedBudgetZAR).toLocaleString('af-ZA')}`} />
+                </View>
+                <View style={styles.modelPill}>
+                  <View style={styles.dot} />
+                  <Text style={styles.modelText}>Model aktief</Text>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.highlightMeta}>
+                {nextEvent ? 'Voorspelling nie tans beskikbaar nie.' : 'Geen aankomende funksie om te voorspel nie.'}
+              </Text>
+            )}
 
             <InfoRow styles={styles} title="Voorspelde vulkoers" body="Persentasie van kapasiteit wat die model verwag om gevul te word." />
             <InfoRow styles={styles} title="Verwagte RSVPs" body="Aantal RSVPs wat die model verwag teen die funksie se datum." />
@@ -371,17 +380,8 @@ function UpcomingRow({
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    scroll: { padding: 16, paddingBottom: 24 },
+    scroll: { paddingHorizontal: 16, paddingBottom: 24 },
 
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 24,
-      marginTop: 8,
-    },
-    headerLeft: { flex: 1, paddingRight: 10 },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     iconBtn: {
       width: 36,
       height: 36,
@@ -393,17 +393,66 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
 
-    greeting: { fontSize: 20, fontWeight: '900', color: colors.text },
-    subGreeting: { fontSize: 16, color: colors.textSubtle, marginTop: 6, fontWeight: '600' },
-
     sectionTitle: {
+      ...typography.caption,
       color: colors.textSubtle,
-      fontSize: 16,
-      fontWeight: '900',
       letterSpacing: 0.5,
       marginBottom: 10,
       marginTop: 6,
     },
+
+    heroCard: {
+      backgroundColor: colors.primary,
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 18,
+    },
+    heroLabel: { ...typography.micro, color: colors.primaryText, opacity: 0.75 },
+    heroTitle: { ...typography.display, color: colors.primaryText, marginTop: 6 },
+    heroMeta: { ...typography.bodyRegular, color: colors.primaryText, opacity: 0.85, marginTop: 6 },
+    heroProgressTrack: {
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.28)',
+      marginTop: 16,
+      overflow: 'hidden',
+    },
+    heroProgressFill: { height: 8, borderRadius: 999, backgroundColor: colors.primaryText },
+    heroFoot: { ...typography.caption, color: colors.primaryText, opacity: 0.85, marginTop: 8 },
+    heroCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: colors.primaryText,
+      borderRadius: 12,
+      paddingVertical: 12,
+      marginTop: 16,
+    },
+    heroCtaText: { ...typography.body, color: colors.primary, fontWeight: '900' },
+
+    aiStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 14,
+    },
+    aiStripIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    aiStripText: { flex: 1 },
+    aiStripTitle: { ...typography.body, color: colors.text },
+    aiStripSub: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
 
     card: {
       backgroundColor: colors.surface,
@@ -419,7 +468,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       marginBottom: 10,
     },
-    cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
+    cardTitle: { ...typography.subtitle, color: colors.text },
     linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     linkText: { color: colors.primary, fontWeight: '800', fontSize: 16 },
 
@@ -427,14 +476,12 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     statCard: {
       width: '48%',
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 16,
-      padding: 14,
+      borderRadius: 14,
+      padding: 12,
     },
-    statLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
-    statValue: { color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 6 },
-    statDelta: { color: colors.textSubtle, fontSize: 16, fontWeight: '700', marginTop: 4 },
+    statLabel: { ...typography.caption, color: colors.textSubtle },
+    statValue: { ...typography.title, color: colors.text, marginTop: 4 },
+    statDelta: { ...typography.caption, color: colors.textSubtle, marginTop: 4 },
 
     iconBtnSm: {
       width: 32,
@@ -447,21 +494,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
 
-    highlight: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 14,
-      padding: 12,
-    },
-    highlightTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
-    highlightMeta: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
-    progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-    progressLabel: { color: colors.text, fontSize: 16, fontWeight: '900' },
-    progressSub: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
-    progressTrack: { height: 8, borderRadius: 999, backgroundColor: colors.border, marginTop: 8, overflow: 'hidden' },
-    progressFill: { height: 8, borderRadius: 999, backgroundColor: colors.primary },
-    progressFoot: { color: colors.textSubtle, fontSize: 16, marginTop: 8, fontWeight: '600' },
+    highlightMeta: { ...typography.bodyRegular, color: colors.textSubtle, marginTop: 4 },
 
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6 },
     kpiBox: {
@@ -472,8 +505,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 14,
       padding: 12,
     },
-    kpiLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '800' },
-    kpiValueLarge: { color: colors.text, fontSize: 16, fontWeight: '900', marginTop: 6 },
+    kpiLabel: { ...typography.caption, color: colors.textSubtle },
+    kpiValueLarge: { ...typography.title, color: colors.text, marginTop: 6 },
     modelPill: {
       marginTop: 12,
       alignSelf: 'flex-start',
@@ -487,8 +520,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 10,
       paddingVertical: 6,
     },
-    dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: '#22C55E' },
-    modelText: { color: colors.text, fontSize: 16, fontWeight: '800' },
+    dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: colors.success },
+    modelText: { ...typography.caption, color: colors.text },
 
     upcomingRow: {
       flexDirection: 'row',
@@ -499,16 +532,16 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 10,
     },
     upcomingLeft: { flex: 1 },
-    upcomingTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
-    upcomingMeta: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
+    upcomingTitle: { ...typography.body, color: colors.text },
+    upcomingMeta: { ...typography.caption, color: colors.textSubtle, marginTop: 4 },
     upcomingRight: { width: 62, alignItems: 'flex-end' },
-    upcomingNum: { color: colors.primary, fontSize: 16, fontWeight: '900' },
-    upcomingNumMuted: { color: colors.textSubtle, fontSize: 16, fontWeight: '900' },
-    upcomingSub: { color: colors.textSubtle, fontSize: 16, marginTop: 2, fontWeight: '700' },
+    upcomingNum: { ...typography.subtitle, color: colors.primary },
+    upcomingNumMuted: { ...typography.subtitle, color: colors.textSubtle },
+    upcomingSub: { ...typography.micro, color: colors.textSubtle, marginTop: 2 },
 
     modalBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
       padding: 18,
     },
@@ -530,8 +563,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     modalFoot: { color: colors.textSubtle, fontSize: 16, marginTop: 12, fontWeight: '600' },
 
     versionText: {
+      ...typography.micro,
       textAlign: 'center',
-      fontSize: 16,
       color: colors.textSubtle,
       marginTop: 16,
       marginBottom: 8,

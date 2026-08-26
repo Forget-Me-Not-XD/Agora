@@ -1,19 +1,21 @@
 // ========== Imports: ==========
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from "../theme/theme";
+import { typography } from "../theme/typography";
 
 type ScreenHeaderProps = {
     title: string;
     subtitle?: string;
     onBack?: () => void;
+    backDisabled?: boolean;
     right?: ReactNode;
 };
 
-export function ScreenHeader({ title, subtitle, onBack, right }: ScreenHeaderProps ) {
+export function ScreenHeader({ title, subtitle, onBack, backDisabled, right }: ScreenHeaderProps ) {
     const colors = useThemeColors();
-    const styles = makeStyles(colors);
+    const styles = useMemo(() => makeStyles(colors), [colors]);
 
     if (onBack) {
         return (
@@ -21,6 +23,7 @@ export function ScreenHeader({ title, subtitle, onBack, right }: ScreenHeaderPro
                 <TouchableOpacity
                 style={styles.backIconBtn}
                 onPress={onBack}
+                disabled={backDisabled}
                 accessibilityRole="button"
                 accessibilityLabel="Terug"
                 >
@@ -75,7 +78,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         },
         pageHeaderText: { flex: 1 },
         pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-        pageSubtitle: { fontSize: 16, color: colors.textSubtle, marginTop: 2 },
+        pageSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 3 },
         headerRight: { flexDirection: 'row', gap: 8 },
     });
 }

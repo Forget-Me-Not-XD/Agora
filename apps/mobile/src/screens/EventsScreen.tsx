@@ -16,10 +16,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { listEvents, type EventResponse, type EventType } from '../api/events';
 import {
   getEventStatus,
+  getStatusPillColors,
   STATUS_LABELS,
   TYPE_LABELS,
   formatEventDate,
@@ -27,18 +28,8 @@ import {
   type EventStatus,
 } from '../lib/event-status';
 import { canCreateEvents } from '../lib/rbac';
-
-const STATUS_PILL_COLORS: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
-
-const STATUS_PILL_COLORS_DARK: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#0C4A6E', text: '#7DD3FC' },
-  ongoing:  { bg: '#064E3B', text: '#6EE7B7' },
-  past:     { bg: '#1F2937', text: '#9CA3AF' },
-};
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type MenuState = { eventId: string; x: number; y: number } | null;
 
@@ -46,8 +37,8 @@ export function EventsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
-  const isDark = colors.background === '#0B1A24';
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
 
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,10 +112,10 @@ export function EventsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Funksies</Text>
-        <View style={styles.headerRight}>
-          {canCreateEvents(role) && (
+      <ScreenHeader
+        title="Funksies"
+        right={
+          canCreateEvents(role) ? (
             <TouchableOpacity
               style={styles.createBtn}
               onPress={() => navigation.navigate('EventDetail', { eventId: 'new' })}
@@ -132,9 +123,9 @@ export function EventsScreen() {
             >
               <Feather name="plus" size={16} color={colors.surface} />
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
+          ) : undefined
+        }
+      />
 
       {/* ── Search bar ── */}
       <View style={styles.searchRow}>
@@ -343,9 +334,9 @@ function EventCard({
   onMenuPress: () => void;
 }) {
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const status = getEventStatus(event);
-  const pillColors = isDark ? STATUS_PILL_COLORS_DARK[status] : STATUS_PILL_COLORS[status];
+  const pillColors = getStatusPillColors(status, isDark);
   const { day, month } = formatEventDate(event.date);
 
   return (
@@ -379,6 +370,11 @@ function EventCard({
               {STATUS_LABELS[status]}
             </Text>
           </View>
+          {event.sellsTickets && (
+            <View style={[styles.statusPill, { backgroundColor: colors.warningBg }]}>
+              <Text style={[styles.statusPillText, { color: colors.warning }]}>Betaal</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -401,16 +397,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 10,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    headerRight: { flexDirection: 'row', gap: 8 },
     createBtn: {
       width: 36,
       height: 36,
@@ -507,20 +493,20 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 48,
       minHeight: 52,
       borderRadius: 12,
-      backgroundColor: '#E0F7FA',
+      backgroundColor: colors.infoBg,
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 6,
     },
-    dateDay: { fontSize: 20, fontWeight: '900', color: '#0369A1', lineHeight: 24 },
-    dateMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1', marginTop: 1 },
+    dateDay: { fontSize: 20, fontWeight: '900', color: colors.info, lineHeight: 24 },
+    dateMonth: { fontSize: 16, fontWeight: '800', color: colors.info, marginTop: 1 },
     cardContent: { flex: 1 },
-    cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    cardMeta: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 6 },
+    cardTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    cardMeta: { ...typography.caption, color: colors.textSubtle, marginBottom: 6 },
     cardStats: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    rsvpCount: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    rsvpCount: { ...typography.subtitle, color: colors.primary },
     forecastCount: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
-    cardFooter: { flexDirection: 'row', alignItems: 'center' },
+    cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     statusPill: {
       borderRadius: 999,
       paddingHorizontal: 8,
@@ -535,7 +521,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     // Filter sheet
     sheetBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: colors.overlay,
       justifyContent: 'flex-end',
     },
     sheet: {
@@ -587,7 +573,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     // Context menu
     menuBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 24,

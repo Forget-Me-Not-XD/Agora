@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { apiClient, TokenPair, UserResponse } from '../api/client';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { apiClient, API_URL, UserResponse } from '../api/client';
+import type { TokenPair } from '../api/client';
+
+export type SsoProvider = 'google' | 'microsoft';
 
 /**
  * Authentication state store.
@@ -20,6 +25,7 @@ interface AuthState {
     // Actions:
     initialize: () => Promise<void>;
     login: (email: string, password: string) => Promise<void>;
+    loginWithSso: (provider: SsoProvider) => Promise<void>;
     register: (data: RegisterPayload) => Promise<void>;
     changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
     logout: () => Promise<void>;
@@ -78,6 +84,50 @@ login: async (email, password) => {
     const msg = err?.response?.data?.message ?? 'Login failed';
     set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Login failed', isLoading: false });
     throw err;
+  }
+},
+
+/**
+ * Opens the backend's mobile SSO route in an in-app browser session.
+ * The backend does the actual Google/Microsoft OAuth dance, then
+ * redirects to this app's own agora:// scheme with the JWT pair
+ * attached as query params, exactly like the web flow does with
+ * cookies instead — WebBrowser.openAuthSessionAsync() closes the
+ * browser automatically once that redirect happens and hands the
+ * final URL back to us.
+ */
+loginWithSso: async (provider) => {
+  set({ isLoading: true, error: null });
+  try {
+    const redirectUri = Linking.createURL('sso-callback');
+    const authUrl = `${API_URL}/auth/${provider}/mobile`;
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+    if (result.type !== 'success' || !result.url) {
+      set({ isLoading: false });
+      return;
+    }
+
+    const { queryParams } = Linking.parse(result.url);
+    const accessToken = queryParams?.accessToken as string | undefined;
+    const refreshToken = queryParams?.refreshToken as string | undefined;
+    const ssoError = queryParams?.error as string | undefined;
+
+    if (ssoError || !accessToken || !refreshToken) {
+      set({
+        error: ssoError === 'sso_no_account'
+          ? 'Geen Agora-rekening met hierdie e-posadres gevind nie.'
+          : 'Aanmelding het misluk. Probeer asseblief weer.',
+        isLoading: false,
+      });
+      return;
+    }
+
+    await apiClient.setTokens(accessToken, refreshToken);
+    const user = await apiClient.get<UserResponse>('/users/me');
+    set({ user, isLoading: false });
+  } catch {
+    set({ error: 'Aanmelding het misluk. Probeer asseblief weer.', isLoading: false });
   }
 },
 

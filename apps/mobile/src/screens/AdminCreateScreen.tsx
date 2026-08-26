@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
@@ -11,6 +11,7 @@ import { AxiosError } from 'axios';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { adminCreateUser, CreateUserPayload } from '../api/auth';
 import { useThemeColors } from '../theme/theme';
+import { ScreenHeader } from '../components/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminCreateUser'>;
 
@@ -36,7 +37,7 @@ const EMPTY_FORM: CreateUserPayload = {
 
 export function AdminCreateUserScreen({ navigation }: Props) {
     const colors = useThemeColors();
-    const styles = makeStyles(colors);
+    const styles = useMemo(() => makeStyles(colors), [colors]);
 
     const [form, setForm] = useState<CreateUserPayload>(EMPTY_FORM);
     const [centerOpen, setCenterOpen] = useState(false);
@@ -71,17 +72,13 @@ export function AdminCreateUserScreen({ navigation }: Props) {
 
     return (
     <SafeAreaView style={styles.safe}>
+        <ScreenHeader title="Skep gebruiker" onBack={() => navigation.goBack()} />
         <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
         >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <View style={styles.formWrap}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                <Text style={styles.backText}>Terug</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.heading}>Skep gebruiker</Text>
             <Text style={styles.helper}>Skep DOSENT-, ADMIN- of FOTOGRAAF-rekeninge</Text>
 
             {error && (
@@ -227,18 +224,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     container: { flex: 1 },
     scroll: { flexGrow: 1, padding: 24 },
     formWrap: { width: '100%', maxWidth: 520, alignSelf: 'center' },
-    backBtn: {
-        alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderRadius: 10,
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
-        marginBottom: 12,
-    },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
-    heading: { fontSize: 24, fontWeight: '700', color: colors.text },
     helper: { fontSize: 16, color: colors.textSubtle, marginTop: 4, marginBottom: 24 },
 
     errorBox: {
@@ -257,10 +242,10 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         borderRadius: 10,
         padding: 12,
         borderWidth: 1,
-        borderColor: '#16A34A',
+        borderColor: colors.success,
         marginBottom: 16,
     },
-    successText: { color: '#16A34A', fontSize: 16, fontWeight: '600' },
+    successText: { color: colors.success, fontSize: 16, fontWeight: '600' },
 
     row: { flexDirection: 'row', gap: 8 },
     halfInput: { flex: 1 },
@@ -297,7 +282,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         backgroundColor: colors.surface,
         borderWidth: 1,
         borderColor: colors.border,
-        borderRadius: 14,
+        borderRadius: 16,
         paddingVertical: 14,
         paddingHorizontal: 12,
         alignItems: 'center',
@@ -318,7 +303,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     buttonDisabled: { opacity: 0.7 },
     buttonText: { color: colors.primaryText, fontSize: 16, fontWeight: '800' },
 
-    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 18 },
+    modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', padding: 18 },
     modalCard: {
         backgroundColor: colors.surface,
         borderRadius: 16,

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import type { ComponentProps } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +11,8 @@ import { useThemeColors } from '../theme/theme';
 import { listEvents, type EventResponse } from '../api/events';
 import { getPrediction, type PredictionResult } from '../api/analytics';
 import { formatEventTime } from '../lib/event-status';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -26,7 +29,7 @@ export function AiScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,9 +66,7 @@ export function AiScreen() {
   if (!canViewAi) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>KI Insigte</Text>
-        </View>
+        <ScreenHeader title="KI Insigte" />
         <View style={styles.noAccessCard}>
           <Feather name="lock" size={28} color={colors.textSubtle} />
           <Text style={styles.noAccessTitle}>Toegang beperk</Text>
@@ -85,10 +86,7 @@ export function AiScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>KI Insigte</Text>
-        <Text style={styles.pageSubtitle}>LSTM voorspellingsmodel</Text>
-      </View>
+      <ScreenHeader title="KI Insigte" subtitle="LSTM voorspellingsmodel" />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -166,9 +164,9 @@ export function AiScreen() {
                     </View>
 
                     <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: `${predictedPct}%` as any }]} />
+                      <View style={[styles.progressFill, { width: `${predictedPct}%` as `${number}%` }]} />
                       {/* Werklike bygewoon-merker */}
-                      <View style={[styles.registeredMarker, { left: `${fillPct}%` as any }]} />
+                      <View style={[styles.registeredMarker, { left: `${fillPct}%` as `${number}%` }]} />
                     </View>
                     <Text style={styles.progressCaption}>
                       {prediction.estimatedAttendees} verwag van {event.maxCapacity} kapasiteit
@@ -222,7 +220,7 @@ function HowRow({
   body,
   colors,
 }: {
-  icon: string;
+  icon: ComponentProps<typeof Feather>['name'];
   title: string;
   body: string;
   colors: ReturnType<typeof useThemeColors>;
@@ -237,11 +235,11 @@ function HowRow({
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-        <Feather name={icon as any} size={14} color={colors.primary} />
+        <Feather name={icon} size={14} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 }}>{title}</Text>
-        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textSubtle, lineHeight: 17 }}>{body}</Text>
+        <Text style={{ ...typography.subtitle, color: colors.text, marginBottom: 2 }}>{title}</Text>
+        <Text style={{ ...typography.bodyRegular, color: colors.textSubtle, lineHeight: 17 }}>{body}</Text>
       </View>
     </View>
   );
@@ -250,14 +248,6 @@ function HowRow({
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-
-    pageHeader: {
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 8,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    pageSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
@@ -271,8 +261,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       gap: 10,
     },
-    noAccessTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    noAccessSubtitle: { fontSize: 16, color: colors.textSubtle, textAlign: 'center', lineHeight: 18, fontWeight: '600' },
+    noAccessTitle: { ...typography.subtitle, color: colors.text },
+    noAccessSubtitle: { ...typography.bodyRegular, color: colors.textSubtle, textAlign: 'center', lineHeight: 18 },
 
     modelCard: {
       backgroundColor: colors.surface,
@@ -287,8 +277,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'flex-start',
       marginBottom: 14,
     },
-    modelCardTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    modelCardSub: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    modelCardTitle: { ...typography.subtitle, color: colors.text },
+    modelCardSub: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     modelActivePill: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -300,8 +290,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#10B981' },
-    modelActiveText: { fontSize: 16, fontWeight: '800', color: colors.text },
+    activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.success },
+    modelActiveText: { ...typography.micro, color: colors.text },
     modelInactivePill: { borderColor: colors.textSubtle },
     inactiveDot: { backgroundColor: colors.textSubtle },
 
@@ -335,16 +325,16 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'flex-start',
       gap: 10,
     },
-    forecastTitle: { fontSize: 16, fontWeight: '900', color: colors.text },
-    forecastMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    forecastTitle: { ...typography.body, color: colors.text },
+    forecastMeta: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
 
     forecastNumbers: {
       flexDirection: 'row',
       alignItems: 'center',
     },
     forecastNum: { flex: 1, alignItems: 'center' },
-    forecastNumVal: { fontSize: 20, fontWeight: '900', color: colors.text },
-    forecastNumLbl: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    forecastNumVal: { ...typography.title, color: colors.text },
+    forecastNumLbl: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
 
     progressTrack: {
       height: 8,
@@ -367,7 +357,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 1,
       backgroundColor: colors.primary,
     },
-    progressCaption: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    progressCaption: { ...typography.caption, color: colors.textSubtle },
 
     howCard: {
       backgroundColor: colors.surface,
@@ -376,6 +366,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    howTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
+    howTitle: { ...typography.subtitle, color: colors.text, marginBottom: 4 },
   });
 }

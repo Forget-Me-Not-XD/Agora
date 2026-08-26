@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { getBudgetPerMonth, type BudgetPerMonth } from '../api/analytics';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 const MONTHS_AF = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -20,8 +22,8 @@ type AccentKey = keyof typeof ACCENTS;
 
 export function BudgetScreen() {
   const colors = useThemeColors();
-  const isDark = colors.background === '#0B1A24';
-  const styles = makeStyles(colors, isDark);
+  const isDark = useIsDark();
+  const styles = useMemo(() => makeStyles(colors, isDark), [colors, isDark]);
 
   const [data, setData] = useState<BudgetPerMonth[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,10 +62,7 @@ export function BudgetScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Begroting</Text>
-        <Text style={styles.subtitle}>Toegekende begroting oor alle geleenthede</Text>
-      </View>
+      <ScreenHeader title="Begroting" subtitle="Toegekende begroting oor alle geleenthede" />
 
       {loading ? (
         <View style={styles.centerFill}>
@@ -174,10 +173,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
     isDark,
     ...StyleSheet.create({
       safe: { flex: 1, backgroundColor: colors.background },
-      header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-      title: { fontSize: 22, fontWeight: '900', color: colors.text },
-      subtitle: { fontSize: 16, color: colors.textSubtle, marginTop: 4, fontWeight: '600' },
-
       centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
       errorCard: {
         alignItems: 'center',
@@ -210,14 +205,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
         justifyContent: 'center',
         marginBottom: 10,
       },
-      statLabel: { color: colors.textSubtle, fontSize: 16, fontWeight: '700' },
-      statValue: { color: colors.text, fontSize: 18, fontWeight: '900', marginTop: 6 },
-      statSub: { color: colors.textSubtle, fontSize: 16, marginTop: 4, fontWeight: '600' },
+      statLabel: { ...typography.caption, color: colors.textSubtle },
+      statValue: { ...typography.heroStat, color: colors.text, marginTop: 6 },
+      statSub: { ...typography.caption, color: colors.textSubtle, marginTop: 4 },
 
       sectionTitle: {
+        ...typography.caption,
         color: colors.textSubtle,
-        fontSize: 16,
-        fontWeight: '900',
         letterSpacing: 0.5,
         marginTop: 18,
         marginBottom: 10,
@@ -247,15 +241,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>, isDark: boolean) 
       },
       rowFirst: { borderTopWidth: 0 },
       rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 },
-      rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700', flexShrink: 1 },
+      rowLabel: { ...typography.body, color: colors.text, flexShrink: 1 },
 
       countBadge: {
-        backgroundColor: isDark ? '#1E3A5F' : '#DBEAFE',
+        backgroundColor: isDark ? ACCENTS.blue.bgDark : ACCENTS.blue.bgLight,
         borderRadius: 999,
         paddingHorizontal: 8,
         paddingVertical: 2,
       },
-      countBadgeText: { color: isDark ? '#93C5FD' : '#1D4ED8', fontSize: 16, fontWeight: '800' },
+      countBadgeText: { ...typography.caption, color: isDark ? ACCENTS.blue.fgDark : ACCENTS.blue.fgLight },
 
       progressTrack: { height: 6, borderRadius: 999, backgroundColor: colors.border, overflow: 'hidden' },
       progressFill: { height: '100%', borderRadius: 999, backgroundColor: colors.primary },

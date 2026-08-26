@@ -15,17 +15,20 @@ export interface AppConfig {
         refreshExpiry: string;
     };
     oauth: {
+        mobileScheme: string;
         google: {
             clientId: string;
             clientSecret: string;
             callbackUrl: string;
             calendarCallbackUrl: string;
+            mobileCallbackUrl: string;
         };
         microsoft: {
             clientId: string;
             clientSecret: string;
             callbackUrl: string;
             calendarCallbackUrl: string;
+            mobileCallbackUrl: string;
         };
     };
     payfast: {
@@ -59,17 +62,20 @@ export default (): AppConfig => {
             refreshExpiry: process.env.JWT_REFRESH_EXPIRY ?? '7d',
         },
         oauth: {
+            mobileScheme: process.env.MOBILE_APP_SCHEME ?? 'agora',
             google: {
                 clientId: process.env.GOOGLE_CLIENT_ID ?? 'not-configured',
                 clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? 'not-configured',
                 callbackUrl: process.env.GOOGLE_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/google/callback',
                 calendarCallbackUrl: process.env.GOOGLE_CALENDAR_CALLBACK_URL ?? 'http://localhost:3000/api/v1/calendar/google/callback',
+                mobileCallbackUrl: process.env.GOOGLE_MOBILE_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/google/mobile/callback',
             },
             microsoft: {
                 clientId: process.env.MICROSOFT_CLIENT_ID ?? 'not-configured',
                 clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? 'not-configured',
                 callbackUrl: process.env.MICROSOFT_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/microsoft/callback',
                 calendarCallbackUrl: process.env.MICROSOFT_CALENDAR_CALLBACK_URL ?? 'http://localhost:3000/api/v1/calendar/microsoft/callback',
+                mobileCallbackUrl: process.env.MICROSOFT_MOBILE_CALLBACK_URL ?? 'http://localhost:3000/api/v1/auth/microsoft/mobile/callback',
             },
         },
         payfast: {

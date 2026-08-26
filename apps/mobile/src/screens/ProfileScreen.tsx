@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -8,6 +8,8 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import { getRoleLabel } from '../lib/rbac';
 import { updateUser, UserTitle } from '../api/users';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
@@ -23,7 +25,7 @@ const TITLE_OPTIONS: Array<{ value: UserTitle, label: string }> = [
 
 export function ProfileScreen({ navigation }: Props) {
     const colors = useThemeColors();
-    const styles = makeStyles(colors);
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const user = useAuthStore((s) => s.user);
 
     const [title, setTitle] = useState<UserTitle>((user?.title as UserTitle) ?? UserTitle.NONE);
@@ -50,13 +52,7 @@ export function ProfileScreen({ navigation }: Props) {
 
     return (
         <SafeAreaView style={styles.safe}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Text style={styles.backText}>Terug</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>My Profiel</Text>
-                <View style={{ width: 60 }} />
-            </View>
+            <ScreenHeader title="My Profiel" onBack={() => navigation.goBack()} />
 
             <View style={styles.card}>
                 <View style={styles.readRow}>
@@ -113,29 +109,9 @@ export function ProfileScreen({ navigation }: Props) {
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     return StyleSheet.create({
         safe: { flex: 1, backgroundColor: colors.background, padding: 16 },
-        header: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: 8,
-            marginBottom: 16,
-        },
-        backBtn: {
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-            borderRadius: 10,
-            backgroundColor: colors.surface,
-            borderWidth: 1,
-            borderColor: colors.border,
-            width: 60,
-            alignItems: 'center',
-        },
-        backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
-        title: { color: colors.text, fontSize: 18, fontWeight: '800' },
-
         card: {
             backgroundColor: colors.surface,
-            borderRadius: 14,
+            borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.border,
             overflow: 'hidden',
@@ -155,8 +131,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             borderTopWidth: 1,
             borderTopColor: colors.border,
         },
-        readLabel: { color: colors.textSubtle, fontSize: 16, marginBottom: 2 },
-        readValue: { color: colors.text, fontSize: 16, fontWeight: '600' },
+        readLabel: { ...typography.caption, color: colors.textSubtle, marginBottom: 2 },
+        readValue: { ...typography.body, color: colors.text },
 
         row: {
             flexDirection: 'row',
@@ -184,7 +160,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         radioDotActive: { backgroundColor: colors.primary },
 
         errorText: { color: colors.red, fontSize: 16, fontWeight: '600', marginTop: 12, textAlign: 'center' },
-        successText: { color: '#16A34A', fontSize: 16, fontWeight: '600', marginTop: 12, textAlign: 'center' },
+        successText: { color: colors.success, fontSize: 16, fontWeight: '600', marginTop: 12, textAlign: 'center' },
 
         saveBtn: {
             backgroundColor: colors.primary,

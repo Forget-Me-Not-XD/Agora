@@ -2,6 +2,7 @@
   "expo": {
     "name": "AGORA",
     "slug": "akademia-mobile",
+    "scheme": "agora",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -18,7 +19,8 @@
         {
           "cameraPermission": "Laat Akademia toe om die kamera te gebruik om gaste se QR-kodes te skandeer."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": true,

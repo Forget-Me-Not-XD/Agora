@@ -15,9 +15,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { listEvents, type EventResponse } from '../api/events';
-import { getEventStatus, STATUS_LABELS, MONTHS_SHORT_AF, type EventStatus } from '../lib/event-status';
+import { getEventStatus, getStatusPillColors, STATUS_LABELS, MONTHS_SHORT_AF } from '../lib/event-status';
+import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
 import { canManageCheckIns } from '../lib/rbac';
 import {
   getMyRsvps,
@@ -26,26 +27,17 @@ import {
   type RsvpWithEvent,
   type RsvpStatus,
 } from '../api/rsvp';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-const RSVP_STATUS_CONFIG: Record<RsvpStatus, { label: string; bg: string; text: string; icon: string }> = {
-  BEVESTIG:     { label: 'Bevestig',     bg: '#D1FAE5', text: '#065F46', icon: 'check-circle' },
-  HANGENDE:     { label: 'Hangende',     bg: '#FEF3C7', text: '#92400E', icon: 'clock' },
-  GEKANSELLEER: { label: 'Gekanselleer', bg: '#FEE2E2', text: '#991B1B', icon: 'x-circle' },
-};
-
-const EVENT_STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
 
 export function RsvpScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
 
   const role = user?.role ?? 'STUDENT';
   const isManager = canManageCheckIns(role);
@@ -150,10 +142,7 @@ export function RsvpScreen() {
   if (isManager) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>RSVP Oorsig</Text>
-          <Text style={styles.pageSubtitle}>Bestuur alle inskrywings</Text>
-        </View>
+        <ScreenHeader title="RSVP Oorsig" subtitle="Bestuur alle inskrywings" />
 
         {loading ? (
           <View style={styles.emptyState}>
@@ -176,7 +165,7 @@ export function RsvpScreen() {
                 ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
                 : 0;
               const status = getEventStatus(event);
-              const badge = EVENT_STATUS_BADGE[status];
+              const badge = getStatusPillColors(status, isDark);
               const { day, month } = formatDate(event.date);
               return (
                 <TouchableOpacity
@@ -226,9 +215,9 @@ export function RsvpScreen() {
                       style={[
                         styles.progressFill,
                         {
-                          width: `${Math.min(fillPct, 100)}%` as any,
+                          width: `${Math.min(fillPct, 100)}%` as `${number}%`,
                           backgroundColor:
-                            fillPct >= 90 ? '#EF4444' : fillPct >= 70 ? '#F59E0B' : colors.primary,
+                            fillPct >= 90 ? colors.red : fillPct >= 70 ? colors.warning : colors.primary,
                         },
                       ]}
                     />
@@ -266,12 +255,10 @@ export function RsvpScreen() {
   // Student/GAS view: personal RSVPs
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>My RSVPs</Text>
-        <Text style={styles.pageSubtitle}>
-          {rsvps.length} inskrywing{rsvps.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
+      <ScreenHeader
+        title="My RSVPs"
+        subtitle={`${rsvps.length} inskrywing${rsvps.length !== 1 ? 's' : ''}`}
+      />
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
@@ -283,11 +270,11 @@ export function RsvpScreen() {
               filter === s && styles.chipActive,
             ]}
             onPress={() => setFilter(s)}
-            accessibilityLabel={s === 'alles' ? 'Alle RSVPs' : RSVP_STATUS_CONFIG[s].label}
+            accessibilityLabel={s === 'alles' ? 'Alle RSVPs' : RSVP_STATUS_LABELS[s]}
             accessibilityState={{ selected: filter === s }}
           >
             <Text style={[styles.chipText, filter === s && styles.chipTextActive]}>
-              {s === 'alles' ? 'Alles' : RSVP_STATUS_CONFIG[s].label}
+              {s === 'alles' ? 'Alles' : RSVP_STATUS_LABELS[s]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -307,7 +294,7 @@ export function RsvpScreen() {
           <View style={styles.emptyState}>
             <Feather name="check-square" size={32} color={colors.textSubtle} />
             <Text style={styles.emptyTitle}>
-              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_CONFIG[filter].label.toLowerCase()} RSVPs nie`}
+              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_LABELS[filter].toLowerCase()} RSVPs nie`}
             </Text>
             <Text style={styles.emptySubtitle}>
               Gaan na Funksies om vir aankomende geleenthede te RSVP.
@@ -315,7 +302,11 @@ export function RsvpScreen() {
           </View>
         ) : (
           filteredRsvps.map(({ _id, status, event }) => {
-            const cfg = RSVP_STATUS_CONFIG[status];
+            const cfg = {
+              ...getRsvpStatusColors(status, isDark),
+              label: RSVP_STATUS_LABELS[status],
+              icon: RSVP_STATUS_ICONS[status],
+            };
             const { day, month } = formatDate(event.date);
             const showQr = openQrId === _id;
             return (
@@ -330,7 +321,7 @@ export function RsvpScreen() {
                     <Text style={styles.rsvpMeta} numberOfLines={1}> {event.location}</Text>
                   </View>
                   <View style={[styles.rsvpBadge, { backgroundColor: cfg.bg }]}>
-                    <Feather name={cfg.icon as any} size={12} color={cfg.text} />
+                    <Feather name={cfg.icon} size={12} color={cfg.text} />
                   </View>
                 </View>
 
@@ -394,14 +385,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    pageHeader: {
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 8,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    pageSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
-
     filterRow: {
       flexDirection: 'row',
       gap: 8,
@@ -445,15 +428,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 44,
       height: 44,
       borderRadius: 10,
-      backgroundColor: '#E0F7FA',
+      backgroundColor: colors.infoBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    rsvpDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    rsvpMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
+    rsvpDay: { fontSize: 17, fontWeight: '900', color: colors.info, lineHeight: 20 },
+    rsvpMonth: { fontSize: 16, fontWeight: '800', color: colors.info },
     rsvpInfo: { flex: 1 },
-    rsvpTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    rsvpMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    rsvpTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    rsvpMeta: { ...typography.caption, color: colors.textSubtle },
     rsvpBadge: {
       width: 30,
       height: 30,
@@ -468,8 +451,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 6,
     },
     rsvpDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    rsvpDetailLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
-    rsvpDetailValue: { fontSize: 16, fontWeight: '800', color: colors.text },
+    rsvpDetailLabel: { ...typography.caption, color: colors.textSubtle },
+    rsvpDetailValue: { ...typography.body, color: colors.text },
     cancelBtn: {
       alignSelf: 'flex-start',
       borderWidth: 1,
@@ -520,22 +503,22 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 44,
       height: 44,
       borderRadius: 10,
-      backgroundColor: '#E0F7FA',
+      backgroundColor: colors.infoBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    managerDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    managerMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
+    managerDay: { fontSize: 17, fontWeight: '900', color: colors.info, lineHeight: 20 },
+    managerMonth: { fontSize: 16, fontWeight: '800', color: colors.info },
     managerInfo: { flex: 1 },
-    managerTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    managerMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    managerTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    managerMeta: { ...typography.caption, color: colors.textSubtle },
     statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
     statusPillText: { fontSize: 16, fontWeight: '800' },
 
     managerStats: { flexDirection: 'row', gap: 4 },
     managerStat: { flex: 1, alignItems: 'center' },
-    managerStatVal: { fontSize: 16, fontWeight: '900', color: colors.text },
-    managerStatLbl: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 1 },
+    managerStatVal: { ...typography.heroStat, color: colors.text },
+    managerStatLbl: { ...typography.caption, color: colors.textSubtle, marginTop: 1 },
 
     progressTrack: {
       height: 6,

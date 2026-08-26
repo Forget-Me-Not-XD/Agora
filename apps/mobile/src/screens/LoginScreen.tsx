@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
@@ -18,13 +18,13 @@ const agoraIconLight = require('../../assets/agora-icon.png');
 const agoraIconDark = require('../../assets/agora-icon-dark.png');
 
 export function LoginScreen({ navigation }: Props) {
-  const { 
-    login, isLoading, error, clearError,
+  const {
+    login, loginWithSso, isLoading, error, clearError,
     biometricsAvailable, biometricsEnabled,
     checkBiometricsAvailability, loginWithBiometrics
   } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const mode = useThemeStore((s) => s.mode);
   const systemScheme = useThemeStore((s) => s.systemScheme);
   const isDark = (mode === 'system' ? systemScheme : mode) === 'dark';
@@ -41,6 +41,15 @@ export function LoginScreen({ navigation }: Props) {
     if (!email || !password) return;
     try {
       await login(email.trim(), password);
+    } catch {
+      // Error already in store
+    }
+  };
+
+  const handleSsoLogin = async (provider: 'google' | 'microsoft') => {
+    clearError();
+    try {
+      await loginWithSso(provider);
     } catch {
       // Error already in store
     }
@@ -140,14 +149,35 @@ export function LoginScreen({ navigation }: Props) {
               )}
             </TouchableOpacity>
 
-            {showBiometricButton && (
-              <>
-              <View style={styles.dividerRow}>
+            <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>OF</Text>
               <View style={styles.dividerLine} />
-              </View>
+            </View>
 
+            <TouchableOpacity
+              style={[styles.ssoBtn, isLoading && styles.buttonDisabled]}
+              onPress={() => handleSsoLogin('google')}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Meld aan met Google"
+            >
+              <MaterialCommunityIcons name="google" size={18} color={colors.text} />
+              <Text style={styles.ssoText}>Meld aan met Google</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.ssoBtn, isLoading && styles.buttonDisabled]}
+              onPress={() => handleSsoLogin('microsoft')}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Meld aan met Microsoft"
+            >
+              <MaterialCommunityIcons name="microsoft" size={18} color={colors.text} />
+              <Text style={styles.ssoText}>Meld aan met Microsoft</Text>
+            </TouchableOpacity>
+
+            {showBiometricButton && (
               <TouchableOpacity
                 style={[styles.biometricBtn, isLoading && styles.buttonDisabled]}
                 onPress={handleBiometricLogin}
@@ -158,7 +188,6 @@ export function LoginScreen({ navigation }: Props) {
                 <MaterialCommunityIcons name="fingerprint" size={20} color={colors.primary} />
                 <Text style={styles.biometricText}>Meld aan met Biometrie</Text>
               </TouchableOpacity>
-            </>
             )}
 
             <TouchableOpacity
@@ -257,6 +286,20 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
     dividerText: { color: colors.textSubtle, fontSize: 12, fontWeight: '700' },
       
+    ssoBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      borderRadius: 12,
+      paddingVertical: 13,
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    ssoText: { color: colors.text, fontSize: 16, fontWeight: '700' },
+
     biometricBtn: {
       flexDirection: 'row',
       alignItems: 'center',

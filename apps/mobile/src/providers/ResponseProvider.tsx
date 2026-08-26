@@ -1,4 +1,4 @@
-import React, { createContext, memo, PropsWithChildren, useContext, useState } from 'react';
+import React, { createContext, memo, PropsWithChildren, useContext, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
@@ -68,7 +68,7 @@ export default function ResponseProvider({ children }: PropsWithChildren) {
 // ── Loading-oorleg ──
 const LoadingOverlay = memo(() => {
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.backdrop} pointerEvents="auto">
       <View style={styles.block}>
@@ -83,7 +83,7 @@ const LoadingOverlay = memo(() => {
 const ResultOverlay = memo(
   ({ result, onNext }: { result: NonNullable<ResultState>; onNext: () => void }) => {
     const colors = useThemeColors();
-    const styles = makeStyles(colors);
+    const styles = useMemo(() => makeStyles(colors), [colors]);
 
     return (
       <View style={styles.backdrop} pointerEvents="auto">

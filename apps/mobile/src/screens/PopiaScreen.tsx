@@ -1,10 +1,12 @@
 // ========== Imports: ==========
+import { useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
+import { ScreenHeader } from '../components/ScreenHeader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Popia'>;
 
@@ -48,17 +50,11 @@ const GAPS = [
 
 export function PopiaScreen({ navigation }: Props) {
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Terug</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>POPIA</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title="POPIA" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.updated}>Laas opgedateer: 4 Augustus 2026</Text>
@@ -195,25 +191,6 @@ export function PopiaScreen({ navigation }: Props) {
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background, padding: 16 },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 8,
-      marginBottom: 16,
-    },
-    backBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      width: 60,
-      alignItems: 'center',
-    },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
-    title: { color: colors.text, fontSize: 18, fontWeight: '800' },
     scroll: { paddingBottom: 32 },
     updated: { color: colors.textSubtle, fontSize: 16, marginBottom: 12 },
 
@@ -230,7 +207,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
 
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 14,

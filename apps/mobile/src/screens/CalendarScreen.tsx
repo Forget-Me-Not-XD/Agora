@@ -13,16 +13,18 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { listEvents, type EventResponse } from '../api/events';
 import {
   getEventStatus,
+  getStatusPillColors,
   STATUS_LABELS,
   MONTHS_AF,
   MONTHS_SHORT_AF,
   formatEventTime,
-  type EventStatus,
 } from '../lib/event-status';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,18 +32,17 @@ const DAYS_SHORT = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Sa', 'So'];
 
 type ViewMode = 'maand' | 'agenda';
 
-const EVENT_DOT_COLORS: Record<string, string> = {
-  public:           '#14B8C7',
-  internal_student: '#8B5CF6',
-  private:          '#F59E0B',
-  department:       '#6366F1',
-};
+const EVENT_TYPES = ['public', 'internal_student', 'private', 'department'] as const;
 
-const STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
+function getEventTypeColor(type: string, colors: ReturnType<typeof useThemeColors>): string {
+  switch (type) {
+    case 'public': return colors.eventTypePublic;
+    case 'internal_student': return colors.eventTypeInternal;
+    case 'private': return colors.eventTypePrivate;
+    case 'department': return colors.eventTypeDepartment;
+    default: return colors.primary;
+  }
+}
 
 // Plaaslike (nie-UTC) datumsleutel, om tydsone-skuiwe te vermy
 function dateKeyFromIso(iso: string): string {
@@ -53,7 +54,8 @@ export function CalendarScreen() {
   const navigation = useNavigation<Nav>();
   const { user } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -135,9 +137,7 @@ export function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Page header ── */}
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Kalender</Text>
-      </View>
+      <ScreenHeader title="Kalender" />
 
       {/* ── View mode toggle ── */}
       <View style={styles.toggleRow}>
@@ -250,7 +250,7 @@ export function CalendarScreen() {
                                 key={e.id}
                                 style={[
                                   styles.eventDot,
-                                  { backgroundColor: EVENT_DOT_COLORS[e.type] ?? colors.primary },
+                                  { backgroundColor: getEventTypeColor(e.type, colors) },
                                 ]}
                               />
                             ))}
@@ -286,9 +286,9 @@ export function CalendarScreen() {
 
             {/* ── Legend ── */}
             <View style={styles.legend}>
-              {Object.entries(EVENT_DOT_COLORS).map(([type, color]) => (
+              {EVENT_TYPES.map((type) => (
                 <View key={type} style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: color }]} />
+                  <View style={[styles.legendDot, { backgroundColor: getEventTypeColor(type, colors) }]} />
                   <Text style={styles.legendText}>
                     {type === 'public' ? 'Publiek'
                       : type === 'internal_student' ? 'Intern'
@@ -317,6 +317,7 @@ export function CalendarScreen() {
                   event={event}
                   colors={colors}
                   styles={styles}
+                  isDark={isDark}
                   onOpen={() => navigation.navigate('EventDetail', { eventId: event.id })}
                 />
               ))
@@ -343,7 +344,7 @@ function DayEventCard({
 }) {
   return (
     <View style={styles.dayEventCard}>
-      <View style={[styles.dayEventAccent, { backgroundColor: EVENT_DOT_COLORS[event.type] ?? colors.primary }]} />
+      <View style={[styles.dayEventAccent, { backgroundColor: getEventTypeColor(event.type, colors) }]} />
       <View style={styles.dayEventContent}>
         <Text style={styles.dayEventTitle}>{event.title}</Text>
         <Text style={styles.dayEventMeta}>
@@ -363,16 +364,18 @@ function AgendaEventCard({
   event,
   colors,
   styles,
+  isDark,
   onOpen,
 }: {
   event: EventResponse;
   colors: ReturnType<typeof useThemeColors>;
   styles: ReturnType<typeof makeStyles>;
+  isDark: boolean;
   onOpen: () => void;
 }) {
   const d = new Date(event.date);
   const status = getEventStatus(event);
-  const badge = STATUS_BADGE[status];
+  const badge = getStatusPillColors(status, isDark);
   return (
     <TouchableOpacity
       style={styles.agendaCard}
@@ -384,7 +387,7 @@ function AgendaEventCard({
         <Text style={styles.agendaDay}>{d.getDate()}</Text>
         <Text style={styles.agendaMonth}>{MONTHS_SHORT_AF[d.getMonth()]}</Text>
       </View>
-      <View style={[styles.agendaAccent, { backgroundColor: EVENT_DOT_COLORS[event.type] ?? colors.primary }]} />
+      <View style={[styles.agendaAccent, { backgroundColor: getEventTypeColor(event.type, colors) }]} />
       <View style={styles.agendaInfo}>
         <Text style={styles.agendaTitle} numberOfLines={1}>{event.title}</Text>
         <Text style={styles.agendaMeta}>{formatEventTime(event.date)} · {event.location}</Text>
@@ -405,13 +408,6 @@ function AgendaEventCard({
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-
-    pageHeader: {
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 8,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
 
     toggleRow: {
       flexDirection: 'row',
@@ -487,8 +483,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     dayNumberToday: { backgroundColor: colors.primary },
     dayNumberSelected: { backgroundColor: colors.navy },
     dayNumberText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
-    dayNumberTextToday: { color: '#FFFFFF', fontWeight: '900' },
-    dayNumberTextSelected: { color: '#FFFFFF', fontWeight: '900' },
+    dayNumberTextToday: { color: colors.primaryText, fontWeight: '900' },
+    dayNumberTextSelected: { color: colors.primaryText, fontWeight: '900' },
 
     dotsRow: { flexDirection: 'row', gap: 2, marginTop: 2 },
     eventDot: { width: 5, height: 5, borderRadius: 999 },
@@ -498,7 +494,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       padding: 16,
       alignItems: 'center',
     },
@@ -509,13 +505,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       overflow: 'hidden',
     },
     dayEventAccent: { width: 5 },
     dayEventContent: { flex: 1, padding: 14 },
-    dayEventTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
-    dayEventMeta: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 10 },
+    dayEventTitle: { ...typography.body, color: colors.text, marginBottom: 4 },
+    dayEventMeta: { ...typography.caption, color: colors.textSubtle, marginBottom: 10 },
     openBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -556,19 +552,19 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       padding: 14,
       gap: 12,
     },
     agendaDateCol: { width: 36, alignItems: 'center' },
-    agendaDay: { fontSize: 20, fontWeight: '900', color: colors.text, lineHeight: 24 },
-    agendaMonth: { fontSize: 16, fontWeight: '800', color: colors.textSubtle },
+    agendaDay: { ...typography.title, color: colors.text, lineHeight: 24 },
+    agendaMonth: { ...typography.caption, color: colors.textSubtle },
     agendaAccent: { width: 3, alignSelf: 'stretch', borderRadius: 2 },
     agendaInfo: { flex: 1 },
-    agendaTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    agendaMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginBottom: 4 },
+    agendaTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    agendaMeta: { ...typography.caption, color: colors.textSubtle, marginBottom: 4 },
     agendaStatsRow: { flexDirection: 'row' },
-    agendaRsvp: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    agendaRsvp: { ...typography.subtitle, color: colors.primary },
     agendaForecast: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     agendaBadge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
     agendaBadgeText: { fontSize: 16, fontWeight: '800' },

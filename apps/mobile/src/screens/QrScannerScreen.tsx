@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import { useResponse } from '../providers/ResponseProvider';
 import { scanQr, getEventRsvps, registerWalkIn, type RsvpWithUser } from '../api/rsvp';
 import { getEvent, type EventResponse } from '../api/events';
 import { formatEventTime } from '../lib/event-status';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
@@ -34,7 +36,7 @@ export function QrScannerScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [rsvps, setRsvps] = useState<RsvpWithUser[]>([]);
@@ -138,22 +140,18 @@ export function QrScannerScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Header ── */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Terug"
-        >
-          <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>QR Skandeerder</Text>
-        <View style={styles.activeBadge}>
-          <View style={styles.activeDot} />
-          <Text style={styles.activeText}>
-            {loading ? '...' : event ? formatEventTime(event.date) : '—'}
-          </Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="QR Skandeerder"
+        onBack={() => navigation.goBack()}
+        right={
+          <View style={styles.activeBadge}>
+            <View style={styles.activeDot} />
+            <Text style={styles.activeText}>
+              {loading ? '...' : event ? formatEventTime(event.date) : '—'}
+            </Text>
+          </View>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Camera viewfinder ── */}
@@ -197,7 +195,7 @@ export function QrScannerScreen() {
           ) : (
             <>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#10B981' }]}>{checkedInCount}</Text>
+                <Text style={[styles.statValue, { color: colors.success }]}>{checkedInCount}</Text>
                 <Text style={styles.statLabel}>Ingemeld</Text>
               </View>
               <View style={styles.statDivider} />
@@ -207,7 +205,7 @@ export function QrScannerScreen() {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#F59E0B' }]}>{Math.max(outstanding, 0)}</Text>
+                <Text style={[styles.statValue, { color: colors.warning }]}>{Math.max(outstanding, 0)}</Text>
                 <Text style={styles.statLabel}>Uitstaande</Text>
               </View>
             </>
@@ -218,7 +216,7 @@ export function QrScannerScreen() {
         {lastScannedName && (
           <View style={styles.scannedCard}>
             <View style={styles.checkCircle}>
-              <Feather name="check" size={18} color="#10B981" />
+              <Feather name="check" size={18} color={colors.success} />
             </View>
             <View style={styles.scannedInfo}>
               <Text style={styles.scannedName}>{lastScannedName}</Text>
@@ -297,7 +295,7 @@ export function QrScannerScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.recentName}>{attendeeName(r)}</Text>
                 </View>
-                <Feather name="check-circle" size={14} color="#10B981" />
+                <Feather name="check-circle" size={14} color={colors.success} />
               </View>
             ))}
             {checkedIn.length > 5 && (
@@ -314,24 +312,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 10,
-    },
-    backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    topBarTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: colors.text },
     activeBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -343,7 +323,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: '#10B981' },
+    activeDot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.success },
     activeText: { fontSize: 16, fontWeight: '700', color: colors.text },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
@@ -399,8 +379,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 22, fontWeight: '900', color: colors.text },
-    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statValue: { ...typography.heroStat, color: colors.text },
+    statLabel: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
     // Last scanned
@@ -409,7 +389,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
       backgroundColor: colors.surface,
       borderWidth: 1,
-      borderColor: '#10B981',
+      borderColor: colors.success,
       borderRadius: 16,
       padding: 14,
       gap: 12,
@@ -418,13 +398,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 36,
       height: 36,
       borderRadius: 999,
-      backgroundColor: '#D1FAE5',
+      backgroundColor: colors.successBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
     scannedInfo: { flex: 1 },
-    scannedName: { fontSize: 16, fontWeight: '900', color: colors.text },
-    scannedMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    scannedName: { ...typography.subtitle, color: colors.text },
+    scannedMeta: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
 
     // Controls
     controlRow: { flexDirection: 'row', gap: 12 },
@@ -454,8 +434,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    walkInTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 4 },
-    walkInSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 12 },
+    walkInTitle: { ...typography.subtitle, color: colors.text, marginBottom: 4 },
+    walkInSubtitle: { ...typography.caption, color: colors.textSubtle, marginBottom: 12 },
     walkInRow: { flexDirection: 'row', gap: 10 },
     walkInInput: {
       flex: 1,
@@ -487,7 +467,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    recentTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 10 },
+    recentTitle: { ...typography.subtitle, color: colors.text, marginBottom: 10 },
     recentRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -496,9 +476,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
-    recentDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' },
-    recentName: { fontSize: 16, fontWeight: '800', color: colors.text },
-    recentMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 1 },
-    moreText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 8 },
+    recentDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+    recentName: { ...typography.body, color: colors.text },
+    recentMeta: { ...typography.caption, color: colors.textSubtle, marginTop: 1 },
+    moreText: { ...typography.caption, color: colors.textSubtle, marginTop: 8 },
   });
 }
