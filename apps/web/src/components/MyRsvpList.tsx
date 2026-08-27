@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, X, Loader2 } from 'lucide-react';
 import type { MyRsvp, RsvpStatus } from '@/lib/api/rsvp';
@@ -23,6 +23,19 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [cancelingId, setCancelingId] = useState<string | null>(null);
     const [errorId, setErrorId] = useState<string | null>(null);
+    const [highlightEventId, setHighlightEventId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const highlight = params.get('highlight');
+        if (!highlight) return;
+
+        setHighlightEventId(highlight);
+        document.getElementById(`rsvp-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        const timer = setTimeout(() => setHighlightEventId(null), 4200);
+        return () => clearTimeout(timer);
+    }, []);
 
     const sorted = [...rsvps].sort((a, b) => {
         const aTime = new Date(a.event?.date ?? a.createdAt).getTime();
@@ -57,6 +70,21 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
 
     return (
         <div className="space-y-5">
+            <style>{`
+                @keyframes rsvp-glow-pulse {
+                    0%, 100% {
+                        box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 70%, transparent),
+                                    0 0 16px 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
+                    }
+                    50% {
+                        box-shadow: 0 0 0 3px var(--color-primary),
+                                    0 0 28px 8px color-mix(in srgb, var(--color-primary) 60%, transparent);
+                    }
+                }
+                .rsvp-glow {
+                    animation: rsvp-glow-pulse 1s ease-in-out 4;
+                }
+            `}</style>
             <div className="flex flex-wrap gap-2">
                 {FILTERS.map((f) => (
                     <button
@@ -82,12 +110,15 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filtered.map((r) => {
                         const isCancelled = r.status === 'GEKANSELLEER';
+                        const isHighlighted = !!r.event && r.event._id === highlightEventId;
                         return (
                             <div
                                 key={r._id}
+                                id={r.event ? `rsvp-${r.event._id}` : undefined}
                                 className={[
                                     'bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-col gap-3',
                                     isCancelled ? 'opacity-60' : '',
+                                    isHighlighted ? 'rsvp-glow' : '',
                                 ].join(' ')}
                             >
                                 <div className="flex items-start justify-between gap-3">
@@ -105,9 +136,14 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                                             </span>
                                         )}
                                     </div>
-                                    <Pill tone={RSVP_STATUS_TONE[r.status]} className="shrink-0">
-                                        {RSVP_STATUS_LABEL[r.status]}
-                                    </Pill>
+                                    <div className="flex flex-col items-end gap-1 shrink-0">
+                                        <Pill tone={RSVP_STATUS_TONE[r.status]}>
+                                            {RSVP_STATUS_LABEL[r.status]}
+                                        </Pill>
+                                        {r.paid && (
+                                            <Pill tone="green">Betaal via PayFast</Pill>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {r.event && (

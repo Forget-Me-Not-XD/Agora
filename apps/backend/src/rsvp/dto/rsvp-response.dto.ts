@@ -30,6 +30,8 @@ export class RsvpResponseDto {
     qrPayload!: string;
     checkedIn!: boolean;
     checkedInAt!: Date | null;
+    paid!: boolean;
+    payment!: string | null;
     createdAt!: Date;
 
     // 'n Walk-in het geen gekoppelde gebruiker nie -- `user` is dan null en
@@ -44,6 +46,8 @@ export class RsvpResponseDto {
             qrPayload: rsvp.qrPayload,
             checkedIn: rsvp.checkedIn,
             checkedInAt: rsvp.checkedInAt,
+            paid: rsvp.paid,
+            payment: rsvp.payment ? rsvp.payment.toString() : null,
             createdAt: rsvp.createdAt!,
         };
     }

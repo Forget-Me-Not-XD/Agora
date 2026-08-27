@@ -9,10 +9,12 @@ import { join } from 'path';
 import { stringify } from 'csv-stringify/sync';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { Payment, PaymentDocument, PaymentStatus } from '../payments/schemas/payment.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService } from './lstm.service';
+import { Trend, TrendDirection } from './dto/trend.dto';
 
 const execFileAsync = promisify(execFile);
 
@@ -35,7 +37,8 @@ export interface BudgetPerMonth {
 
 export interface AdminKpi {
     value: number;
-    deltaPct: number | null    //<-- Null - zero comparison possible yet
+    deltaPct: number | null;    //<-- Null - zero comparison possible yet
+    direction: TrendDirection;
 }
 
 export interface AdminKpis {
@@ -59,6 +62,23 @@ export interface RsvpStatusCount {
     count: number;
 }
 
+export interface TicketRevenueSummary {
+    totalRevenue: number;
+    totalTicketsSold: number;
+}
+
+export interface EventRevenue {
+    eventTitle: string;
+    ticketsSold: number;
+    revenue: number;
+}
+
+export interface RevenuePerMonth {
+    year: number;
+    month: number;
+    total: number;
+}
+
 export interface AttendancePrediction {
     predictedFillRate: number;
     predictedAttendance: number;
@@ -69,6 +89,7 @@ export class AnalyticsService {
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
         @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
         private readonly lstmService: LstmService,
     ) {}
@@ -223,6 +244,30 @@ export class AnalyticsService {
         return Math.round(((current - previous) / previous) * 1000) / 10;
     }
 
+    private readonly TREND_STABLE_THRESHOLD_PCT = 2;
+
+    private computeTrend(current: number, previous: number): Trend {
+        const deltaPct = this.delta(current, previous);
+        if(deltaPct === null) return {deltaPct: null, direction: 'stable'};
+
+        const direction: TrendDirection = 
+        deltaPct > this.TREND_STABLE_THRESHOLD_PCT ? 'up'
+        : deltaPct < -this.TREND_STABLE_THRESHOLD_PCT ? 'down'
+        : 'stable';
+
+        return { deltaPct, direction };
+    }
+
+    private weekRange(offsetWeeks: number): { start: Date; end: Date } {
+        const now = new Date();
+        const day = now.getDay();
+        const diffToMonday = (day === 0 ? -6 : 1) - day;
+        const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + offsetWeeks * 7);
+        const start = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate());
+        const end = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+        return { start, end };
+    }
+
     async getAdminKpis(): Promise <AdminKpis> {
         const thisMonth = this.monthRange(0);
         const lastMonth = this.monthRange(-1);
@@ -245,10 +290,10 @@ export class AnalyticsService {
         ]);
 
         return {
-        totalEvents: { value: totalEvents, deltaPct: this.delta(eventsThisMonth, eventsLastMonth) },
-        activeUsers: { value: totalUsers, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
-        newSignups:  { value: usersThisMonth, deltaPct: this.delta(usersThisMonth, usersLastMonth) },
-        totalRsvps:  { value: totalRsvps, deltaPct: this.delta(rsvpsThisMonth, rsvpsLastMonth) },
+        totalEvents: { value: totalEvents, ...this.computeTrend(eventsThisMonth, eventsLastMonth) },
+        activeUsers: { value: totalUsers, ...this.computeTrend(usersThisMonth, usersLastMonth) },
+        newSignups:  { value: usersThisMonth, ...this.computeTrend(usersThisMonth, usersLastMonth) },
+        totalRsvps:  { value: totalRsvps, ...this.computeTrend(rsvpsThisMonth, rsvpsLastMonth) },
         };
     }
 
@@ -272,6 +317,125 @@ async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
         { $sort: { count: -1 } },
     ]).exec();
 }
+
+async getTicketRevenueSummary(): Promise<TicketRevenueSummary> {
+    const result = await this.paymentModel.aggregate<TicketRevenueSummary>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: null,
+                totalRevenue: { $sum: '$amount' },
+                totalTicketsSold: { $sum: 1 },
+            },
+        },
+        { $project: { _id: 0, totalRevenue: 1, totalTicketsSold: 1 } },
+    ]).exec();
+
+    return result.length > 0 ? result[0] : { totalRevenue: 0, totalTicketsSold: 0 };
+}
+
+async getRevenuePerEvent(limit = 5): Promise<EventRevenue[]> {
+    return this.paymentModel.aggregate<EventRevenue>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: '$event',
+                ticketsSold: { $sum: 1 },
+                revenue: { $sum: '$amount' },
+            },
+        },
+        {
+            $lookup: {
+                from: 'events',
+                localField: '_id',
+                foreignField: '_id',
+                as: 'eventDoc',
+            },
+        },
+        { $unwind: '$eventDoc' },
+        {
+            $project: {
+                _id: 0,
+                eventTitle: '$eventDoc.title',
+                ticketsSold: 1,
+                revenue: 1,
+            },
+        },
+        { $sort: { revenue: -1 } },
+        { $limit: limit },
+    ]).exec();
+}
+
+async getRevenuePerMonth(): Promise<RevenuePerMonth[]> {
+    return this.paymentModel.aggregate<RevenuePerMonth>([
+        { $match: { status: PaymentStatus.VOLTOOI } },
+        {
+            $group: {
+                _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+                total: { $sum: '$amount' },
+            },
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } },
+        { $project: { _id: 0, year: '$_id.year', month: '$_id.month', total: 1 } },
+    ]).exec();
+}
+
+async getEventsTrend(): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+    const [current, previous] = await Promise.all([
+        this.eventModel.countDocuments({ date: { $gte: thisMonth.start, $lt: thisMonth.end } }).exec(),
+        this.eventModel.countDocuments({ date: { $gte: lastMonth.start, $lt: lastMonth.end } }).exec(),
+    ]);
+    return this.computeTrend(current, previous);
+}
+
+// Week-over-week, not month-over-month: RSVPs happen often enough that a weekly view is more useful.
+async getRsvpsTrend(): Promise<Trend> {
+    const thisWeek = this.weekRange(0);
+    const lastWeek = this.weekRange(-1);
+    const [current, previous] = await Promise.all([
+        this.rsvpModel.countDocuments({ createdAt: { $gte: thisWeek.start, $lt: thisWeek.end } }).exec(),
+        this.rsvpModel.countDocuments({ createdAt: { $gte: lastWeek.start, $lt: lastWeek.end } }).exec(),
+    ]);
+    return this.computeTrend(current, previous);
+}
+
+async getBudgetTrend(assignedToUserId?: string): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+    const scopeMatch = assignedToUserId ? { assignedTo: new Types.ObjectId(assignedToUserId) } : {};
+
+    const [current, previous] = await Promise.all([
+        this.eventModel.aggregate<{ total: number }>([
+            { $match: { ...scopeMatch, date: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$budget' } } },
+        ]).exec(),
+        this.eventModel.aggregate<{ total: number }>([
+            { $match: { ...scopeMatch, date: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$budget' } } },
+        ]).exec(),
+    ]);
+    return this.computeTrend(current[0]?.total ?? 0, previous[0]?.total ?? 0);
+}
+
+async getRevenueTrend(): Promise<Trend> {
+    const thisMonth = this.monthRange(0);
+    const lastMonth = this.monthRange(-1);
+
+    const [current, previous] = await Promise.all([
+        this.paymentModel.aggregate<{ total: number }>([
+            { $match: { status: PaymentStatus.VOLTOOI, createdAt: { $gte: thisMonth.start, $lt: thisMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]).exec(),
+        this.paymentModel.aggregate<{ total: number }>([
+            { $match: { status: PaymentStatus.VOLTOOI, createdAt: { $gte: lastMonth.start, $lt: lastMonth.end } } },
+            { $group: { _id: null, total: { $sum: '$amount' } } },
+        ]).exec(),
+    ]);
+    return this.computeTrend(current[0]?.total ?? 0, previous[0]?.total ?? 0);
+}
+
 
 async getRecentRsvps(limit: number): Promise<RecentRsvp[]> {
     const rsvps = await this.rsvpModel

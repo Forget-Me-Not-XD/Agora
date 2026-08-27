@@ -64,6 +64,13 @@ export interface AdminKpis {
     totalRsvps: AdminKpi;
 }
 
+export type TrendDirection = 'up' | 'down' | 'stable';
+
+export interface Trend {
+    deltaPct: number | null;
+    direction: TrendDirection;
+}
+
 export interface RecentRsvp {
     id: string;
     eventTitle: string;
@@ -102,6 +109,51 @@ export interface BudgetPerMonth {
 
 export async function getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
     return apiFetch<BudgetPerMonth[]>('/api/v1/analytics/budget-per-month');
+}
+
+export interface TicketRevenueSummary {
+    totalRevenue: number;
+    totalTicketsSold: number;
+}
+
+export async function getTicketRevenueSummary(): Promise <TicketRevenueSummary> {
+    return apiFetch<TicketRevenueSummary>('/api/v1/analytics/ticket-revenue-summary');
+}
+
+export interface EventRevenue {
+    eventTitle: string;
+    ticketsSold: number;
+    revenue: number;
+}
+
+export async function getRevenuePerEvent(): Promise <EventRevenue[]> {
+    return apiFetch<EventRevenue[]>('/api/v1/analytics/revenue-per-event');
+}
+
+export interface RevenuePerMonth {
+    year: number;
+    month: number;
+    total: number;
+}
+
+export async function getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
+    return apiFetch<RevenuePerMonth[]>('/api/v1/analytics/revenue-per-month');
+}
+
+export async function getEventsTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/events-trend');
+}
+
+export async function getRsvpsTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/rsvps-trend');
+}
+
+export async function getBudgetTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/budget-trend');
+}
+
+export async function getRevenueTrend(): Promise<Trend> {
+    return apiFetch<Trend>('/api/v1/analytics/revenue-trend');
 }
 
 export interface PredictionResult {

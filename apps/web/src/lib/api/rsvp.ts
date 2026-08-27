@@ -41,6 +41,8 @@ export interface MyRsvp {
     qrPayload:   string;
     checkedIn:   boolean;
     checkedInAt: string | null;
+    paid:        boolean;
+    payment:     string | null;
     createdAt:   string;
     updatedAt:   string;
 }

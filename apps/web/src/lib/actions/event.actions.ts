@@ -4,15 +4,20 @@
 import { createEvent, getEvents, updateEvent } from '@/lib/api/events';
 import type { CreateEventPayload, Event, UpdateEventPayload } from '@/lib/api/events';
 
+export interface CreateEventResult {
+    id?:    string;
+    error?: string;
+}
+
 export async function createEventAction(
     payload: CreateEventPayload,
-): Promise<string | null> {
+): Promise<CreateEventResult> {
     try {
-        await createEvent(payload);
+        const event = await createEvent(payload);
+        return { id: event.id };
     } catch (err) {
-        return err instanceof Error ? err.message : 'Geleentheid skep het misluk.';
+        return { error: err instanceof Error ? err.message : 'Geleentheid skep het misluk.' };
     }
-    return null;
 }
 
 export async function updateEventAction(

@@ -22,6 +22,9 @@ export interface Event {
     confirmedAttendees:       number;
     intendedAttendance:       AttendanceRole;
     type:                     EventType;
+    sellsTickets:             boolean;
+    ticketPrice:              number | null;
+    ticketsAvailable:         number | null;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -39,6 +42,9 @@ export interface CreateEventPayload {
     photographerInstructions?: string;
     assignedTo?:               string;
     type?:                     EventType;
+    sellsTickets?:             boolean;
+    ticketPrice?:              number;
+    ticketsAvailable?:         number;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;

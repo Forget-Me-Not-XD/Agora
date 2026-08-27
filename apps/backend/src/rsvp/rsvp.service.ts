@@ -31,6 +31,10 @@ export class RsvpService {
     async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
 
+        if (event.sellsTickets) {
+            throw new ForbiddenException('Hierdie geleentheid vereis \'n kaartjie-aankoop');
+        }
+
         const existing = await this.rsvpModel
         .findOne({ event: dto.eventId, user: userId })
         .exec();
@@ -57,6 +61,26 @@ export class RsvpService {
         }
 
         return rsvp;
+    }
+
+    async hasTicket(eventId: string, userId: string): Promise<boolean> {
+        const existing = await this.rsvpModel
+        .findOne({ event: eventId, user: userId, status: { $ne: RsvpStatus.GEKANSELLEER } })
+        .exec();
+        return existing !== null;
+    }
+
+    async createPaidTicket(eventId: string, userId: string, paymentId: string): Promise<RsvpDocument> {
+        await this.eventsService.incrementConfirmedAttendees(eventId);
+
+        const rsvp = new this.rsvpModel({
+            event: eventId,
+            user: userId,
+            qrPayload: uuidv4(),
+            paid: true,
+            payment: paymentId,
+        });
+        return rsvp.save();
     }
 
     async findMyRsvps(userId: string): Promise<RsvpDocument[]> {

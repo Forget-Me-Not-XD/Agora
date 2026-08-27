@@ -25,6 +25,9 @@ export class EventResponseDto {
     confirmedAttendees!: number;
     intendedAttendance!: Role;
     type!: EventType;
+    sellsTickets!: boolean;
+    ticketPrice!: number | null;
+    ticketsAvailable!: number | null;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -45,6 +48,9 @@ export class EventResponseDto {
             confirmedAttendees:         event.confirmedAttendees,
             intendedAttendance:         event.intendedAttendance,
             type:                       event.type,
+            sellsTickets:               event.sellsTickets,
+            ticketPrice:                event.ticketPrice,
+            ticketsAvailable:           event.ticketsAvailable,
             createdAt:                  event.createdAt!,
             updatedAt:                  event.updatedAt!,
         };

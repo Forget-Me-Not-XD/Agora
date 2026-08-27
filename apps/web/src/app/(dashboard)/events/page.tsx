@@ -9,9 +9,11 @@ import ExportCsvButton from '@/components/ExportCsvButton';
 import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
+import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
 import type { EventStatus } from '@/lib/event-view';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 
 const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
@@ -47,33 +49,63 @@ export default function EventsPage() {
     const [events, setEvents]       = useState<Event[]>([]);
     const [loading, setLoading]     = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [rsvpdEventIds, setRsvpdEventIds] = useState<Set<string>>(new Set());
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
+
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const [newEventId, setNewEventId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const created = searchParams.get('created');
+        if (created) {
+            setNewEventId(created);
+            router.replace('/events'); // vee die query-param uit sodat 'n verfris nie die gloed herhaal nie
+        }
+    }, [searchParams, router]);
 
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
     useEffect(() => {
         let active = true;
         (async () => {
-            const result = await listEventsAction();
+            const [eventsResult, rsvpsResult] = await Promise.all([
+                listEventsAction(),
+                getMyRsvpsAction(),
+            ]);
             if (!active) return;
-            if (result.error) setLoadError(result.error);
-            else setEvents(result.events ?? []);
+            if (eventsResult.error) setLoadError(eventsResult.error);
+            else setEvents(eventsResult.events ?? []);
+
+            const activeEventIds = (rsvpsResult.rsvps ?? [])
+                .filter((r) => r.status !== 'GEKANSELLEER' && r.event)
+                .map((r) => r.event!._id);
+            setRsvpdEventIds(new Set(activeEventIds));
+
             setLoading(false);
         })();
         return () => { active = false; };
     }, []);
 
-    const filtered = events.filter((event) => {
-        const matchesSearch =
-            event.title.toLowerCase().includes(search.toLowerCase()) ||
-            event.description.toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
-        const matchesType = typeFilter === 'all' || event.type === typeFilter;
-        return matchesSearch && matchesStatus && matchesType;
-    });
+    const filtered = events
+        .filter((event) => {
+            const matchesSearch =
+                event.title.toLowerCase().includes(search.toLowerCase()) ||
+                event.description.toLowerCase().includes(search.toLowerCase());
+            const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
+            const matchesType = typeFilter === 'all' || event.type === typeFilter;
+            return matchesSearch && matchesStatus && matchesType;
+        })
+        // Skuif die pas-geskepte geleentheid na voor sodat die gebruiker dit dadelik
+        // sien, sonder om die res van die lys se chronologiese volgorde te verander.
+        .sort((a, b) => {
+            if (a.id === newEventId) return -1;
+            if (b.id === newEventId) return 1;
+            return 0;
+        });
 
     const selectClass =
         'bg-[var(--color-surface)] border border-[var(--color-border)] text-sm text-[var(--color-text)] rounded-xl px-3 py-2 outline-none cursor-pointer';
@@ -198,7 +230,12 @@ export default function EventsPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {filtered.map((event) => (
-                        <EventCard key={event.id} event={event} />
+                        <EventCard
+                            key={event.id}
+                            event={event}
+                            alreadyRsvpd={rsvpdEventIds.has(event.id)}
+                            isNew={event.id === newEventId}
+                        />
                     ))}
                 </div>
             )}
