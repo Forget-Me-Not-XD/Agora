@@ -9,6 +9,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth, TicketRevenueSummary, EventRevenue, RevenuePerMonth } from './analytics.service';
+import { Trend } from './dto/trend.dto';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 interface EventsSummaryResponse {
@@ -107,6 +108,34 @@ export class AnalyticsController {
     @Roles(Role.ADMIN)
     async getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
         return this.analyticsService.getRevenuePerMonth();
+    }
+
+    @Get('events-trend')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getEventsTrend(): Promise<Trend> {
+        return this.analyticsService.getEventsTrend();
+    }
+
+    @Get('rsvps-trend')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRsvpsTrend(): Promise<Trend> {
+        return this.analyticsService.getRsvpsTrend();
+    }
+
+    // Same scoping rule as budget-per-month: ADMIN sees the full trend, everyone else sees only their own.
+    @Get('budget-trend')
+    async getBudgetTrend(@CurrentUser() user: JwtPayload): Promise<Trend> {
+        const assignedToUserId = user.role === Role.ADMIN ? undefined : user.sub;
+        return this.analyticsService.getBudgetTrend(assignedToUserId);
+    }
+
+    @Get('revenue-trend')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
+    async getRevenueTrend(): Promise<Trend> {
+        return this.analyticsService.getRevenueTrend();
     }
 
     // ADMIN sien die volle begroting oor alle geleenthede. Enige ander aangemelde
