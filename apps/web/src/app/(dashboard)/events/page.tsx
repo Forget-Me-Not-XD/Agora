@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
@@ -69,26 +69,55 @@ export default function EventsPage() {
 
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
-    useEffect(() => {
-        let active = true;
-        (async () => {
+    const loadEvents = useCallback(async (showLoading = false) => {
+        if (showLoading) setLoading(true);
+
+        try {
             const [eventsResult, rsvpsResult] = await Promise.all([
                 listEventsAction(),
                 getMyRsvpsAction(),
             ]);
-            if (!active) return;
-            if (eventsResult.error) setLoadError(eventsResult.error);
-            else setEvents(eventsResult.events ?? []);
+
+            if (eventsResult.error) {
+                if (showLoading) setLoadError(eventsResult.error);
+            } else {
+                setLoadError(null);
+                setEvents(eventsResult.events ?? []);
+            }
 
             const activeEventIds = (rsvpsResult.rsvps ?? [])
                 .filter((r) => r.status !== 'GEKANSELLEER' && r.event)
                 .map((r) => r.event!._id);
             setRsvpdEventIds(new Set(activeEventIds));
+            
+        } catch {
+            if (showLoading) setLoadError('Kon nie geleenthede laai nie.');
 
+        } finally {
             setLoading(false);
-        })();
-        return () => { active = false; };
+        }
     }, []);
+
+    useEffect(() => {
+     let active = true;
+
+        const initialLoad = async () => {
+         if (!active) return;
+         await loadEvents(true);
+     };
+
+    initialLoad();
+
+    const interval = setInterval(() => {
+        if (active) {
+            loadEvents(false);
+        }
+    }, 60000);
+
+    return () => {active = false; 
+        clearInterval(interval);
+    };
+}, [loadEvents]);
 
     const filtered = events
         .filter((event) => {

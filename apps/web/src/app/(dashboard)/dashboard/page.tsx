@@ -16,6 +16,7 @@ import TicketRevenueTrendChart from '@/components/charts/TicketRevenueTrendChart
 import RecentBookingsTable from '@/components/charts/RecentBookingTable';
 import DosentDashboard from '@/components/dashboard/DosentDashboard';
 import AttendeeDashboard from '@/components/dashboard/AttendeeDashboard';
+import AutoRefresh from '@/components/AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,6 +117,10 @@ async function AdminDashboard() {
     const monthlyTicketRevenue = mergeSingleMonthlySeries(revenuePerMonth);
 
     return (
+
+        <>
+            <AutoRefresh /> 
+
         <div className="space-y-6">
             {/* Stat cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -233,6 +238,7 @@ async function AdminDashboard() {
             </div>
 
         </div>
+        </>
     );
 }
 
