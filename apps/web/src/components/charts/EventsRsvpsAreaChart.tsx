@@ -5,6 +5,8 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 import type { MonthlyPoint } from '@/lib/chart-utils';
+import type { Trend } from '@/lib/api/analytics';
+import TrendIndicator from './TrendIndicator';
 
 function ChartTooltip({ active, payload, label }: TooltipContentProps) {
     if (!active || !payload?.length) return null;
@@ -20,7 +22,7 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
     );
 }
 
-export default function EventsRsvpsAreaChart({ data }: { data: MonthlyPoint[] }) {
+export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoint[]; trend?: Trend | null }) {
     const totalEvents = data.reduce((s, d) => s + d.a, 0);
     const totalRsvps = data.reduce((s, d) => s + d.b, 0);
     const avgRsvpsPerEvent = totalEvents > 0 ? (totalRsvps / totalEvents).toFixed(1) : '0';
@@ -55,6 +57,7 @@ export default function EventsRsvpsAreaChart({ data }: { data: MonthlyPoint[] })
                 <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
                     ~{avgRsvpsPerEvent} RSVPs per geleentheid
                 </span>
+                <TrendIndicator trend = {trend} label="vs. verlede week" />
             </div>
 
             <div className="flex-1 min-h-[220px]">

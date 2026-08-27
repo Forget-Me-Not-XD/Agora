@@ -2,14 +2,12 @@
 
 import { LineChart, Line, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import type { MonthlyPoint } from '@/lib/chart-utils';
+import type { Trend } from '@/lib/api/analytics';
+import TrendIndicator from './TrendIndicator';
 
-export default function RsvpTrendLineChart({ data }: { data: MonthlyPoint[] }) {
+export default function RsvpTrendLineChart({ data, trend }: { data: MonthlyPoint[]; trend?: Trend | null }) {
     const latest = data.at(-1);
-    const previous = data.at(-2);
     const latestValue = latest?.b ?? 0;
-    const deltaPct = previous && previous.b > 0
-        ? Math.round(((latestValue - previous.b) / previous.b) * 1000) / 10
-        : null;
 
     const best = data.reduce((max, d) => (d.b > max.b ? d : max), data[0] ?? { label: '--', a: 0, b: 0 });
     const avg = data.length > 0 ? Math.round(data.reduce((s, d) => s + d.b, 0) / data.length) : 0;
@@ -19,11 +17,7 @@ export default function RsvpTrendLineChart({ data }: { data: MonthlyPoint[] }) {
             <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-xl font-bold text-[var(--color-text)]">{latestValue}</span>
                 <span className="text-xs text-[var(--color-text-subtle)]">RSVPs hierdie maand</span>
-                {deltaPct !== null && (
-                    <span className={`text-xs font-semibold ${deltaPct >= 0 ? 'text-[var(--color-green)]' : 'text-[var(--color-red)]'}`}>
-                        {deltaPct >= 0 ? '↑' : '↓'} {Math.abs(deltaPct)}%
-                    </span>
-                )}
+                <TrendIndicator trend={trend} label="vs. verlede week" />
             </div>
 
             <ResponsiveContainer width="100%" height={90}>
