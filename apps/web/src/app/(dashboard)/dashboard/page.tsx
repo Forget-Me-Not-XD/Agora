@@ -115,11 +115,6 @@ async function AdminDashboard() {
     const ticketRevenueSummary = ticketRevenueSummaryRes.status === 'fulfilled' ? ticketRevenueSummaryRes.value : null;
     const revenuePerEvent = revenuePerEventRes.status === 'fulfilled' ? revenuePerEventRes.value : [];
     const revenuePerMonth = revenuePerMonthRes.status === 'fulfilled' ? revenuePerMonthRes.value : [];
-    const eventsTrend = eventsTrendRes.status === 'fulfilled' ? eventsTrendRes.value : null;
-    const rsvpsTrend = rsvpsTrendRes.status === 'fulfilled' ? rsvpsTrendRes.value : null;
-    const budgetTrend = budgetTrendRes.status === 'fulfilled' ? budgetTrendRes.value : null;
-    const revenueTrend = revenueTrendRes.status === 'fulfilled' ? revenueTrendRes.value : null;
-
     const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
     const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);
     const monthlyTicketRevenue = mergeSingleMonthlySeries(revenuePerMonth);

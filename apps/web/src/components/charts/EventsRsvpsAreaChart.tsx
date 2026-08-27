@@ -29,7 +29,7 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
 
     // Klein bykomende insigte — vul die ruimte onder die grafiek met iets nuttig
     // pleks van net leë kaartruimte.
-    const { peakMonth, trend } = useMemo(() => {
+    const { peakMonth, trend: computedTrend } = useMemo(() => {
         if (data.length === 0) return { peakMonth: null, trend: null };
 
         const peak = data.reduce((best, d) => (d.b > best.b ? d : best), data[0]);
@@ -103,18 +103,18 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                 </ResponsiveContainer>
             </div>
 
-            {peakMonth && trend !== null && (
+            {peakMonth && computedTrend !== null && (
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 mt-3 pt-3 border-t border-[var(--color-border)] shrink-0 text-xs text-[var(--color-text-subtle)]">
                     <span>
                         Beste maand: <strong className="text-[var(--color-text)]">{peakMonth.label}</strong> ({peakMonth.b} RSVPs)
                     </span>
                     <span className="flex items-center gap-1.5">
                         Tendens (eerste helfte → laaste helfte):
-                        {trend > 5 && <TrendingUp size={13} style={{ color: 'var(--color-green)' }} />}
-                        {trend < -5 && <TrendingDown size={13} style={{ color: 'var(--color-red)' }} />}
-                        {trend >= -5 && trend <= 5 && <Minus size={13} />}
-                        <strong style={{ color: trend > 5 ? 'var(--color-green)' : trend < -5 ? 'var(--color-red)' : 'var(--color-text)' }}>
-                            {trend > 0 ? '+' : ''}{trend}%
+                        {computedTrend > 5 && <TrendingUp size={13} style={{ color: 'var(--color-green)' }} />}
+                        {computedTrend < -5 && <TrendingDown size={13} style={{ color: 'var(--color-red)' }} />}
+                        {computedTrend >= -5 && computedTrend <= 5 && <Minus size={13} />}
+                        <strong style={{ color: computedTrend > 5 ? 'var(--color-green)' : computedTrend < -5 ? 'var(--color-red)' : 'var(--color-text)' }}>
+                            {computedTrend > 0 ? '+' : ''}{computedTrend}%
                         </strong>
                     </span>
                 </div>
