@@ -1,11 +1,14 @@
-import { View, Text, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeStore, ThemeMode } from '../stores/theme.store';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { useEffect, useState } from 'react'
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
+import { safeGoBack } from '../lib/navigation';
+import { useEffect, useMemo, useState } from 'react'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -21,7 +24,7 @@ export function SettingsScreen({ navigation }: Props) {
   const setMode = useThemeStore((s) => s.setMode);
   const user = useAuthStore((s) => s.user);
 
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const biometricsAvailable = useAuthStore((s) => s.biometricsAvailable);
   const biometricsEnabled = useAuthStore((s) => s.biometricsEnabled);
@@ -52,14 +55,9 @@ export function SettingsScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>Terug</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Instellings</Text>
-        <View style={{ width: 60 }} />
-      </View>
+      <ScreenHeader title="Instellings" onBack={() => safeGoBack(navigation)} />
 
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       <View style={[styles.card, { marginBottom: 16 }]}>
         <Text style={styles.cardTitle}>Profiel</Text>
         <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Profile')}>
@@ -84,7 +82,7 @@ export function SettingsScreen({ navigation }: Props) {
                 <Text style={styles.rowLabel}>{opt.label}</Text>
                 <Text style={styles.rowSubtitle}>{opt.subtitle}</Text>
               </View>
-              <View style={[styles.radio, active && styles.radioActive]}>
+              <View key={`radio-${active}`} style={[styles.radio, active && styles.radioActive]}>
                 <View style={[styles.radioDot, active && styles.radioDotActive]} />
               </View>
             </TouchableOpacity>
@@ -127,6 +125,15 @@ export function SettingsScreen({ navigation }: Props) {
           <Text style={styles.cardTitle}>Administrasie</Text>
           <TouchableOpacity
             style={styles.row}
+            onPress={() => navigation.navigate('AdminUsers')}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.rowLabel}>Bestuur gebruikers</Text>
+              <Text style={styles.rowSubtitle}>Alle gebruikers, rolle en tags</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.row}
             onPress={() => navigation.navigate('AdminCreateUser')}
           >
             <View style={styles.rowText}>
@@ -136,36 +143,18 @@ export function SettingsScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: colors.background, padding: 16 },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 8,
-      marginBottom: 16,
-    },
-    backBtn: {
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      width: 60,
-      alignItems: 'center',
-    },
-    backText: { color: colors.text, fontWeight: '600', fontSize: 16 },
-    title: { color: colors.text, fontSize: 18, fontWeight: '800' },
-
+    safe: { flex: 1, backgroundColor: colors.background },
+    scroll: { padding: 16, paddingBottom: 32 },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 14,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
@@ -192,19 +181,20 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.background,
     },
     rowText: { flex: 1, paddingRight: 12 },
-    rowLabel: { color: colors.text, fontSize: 16, fontWeight: '700' },
-    rowSubtitle: { color: colors.textSubtle, fontSize: 16, marginTop: 2 },
+    rowLabel: { ...typography.body, color: colors.text },
+    rowSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     radio: {
       width: 22,
       height: 22,
-      borderRadius: 999,
+      borderRadius: 11,
       borderWidth: 2,
       borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     radioActive: { borderColor: colors.primary },
-    radioDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: 'transparent' },
+    radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'transparent' },
     radioDotActive: { backgroundColor: colors.primary },
   });
 }

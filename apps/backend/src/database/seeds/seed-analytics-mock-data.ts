@@ -314,6 +314,7 @@ async function seed(): Promise<void> {
             photographers: Types.ObjectId[];
             photographerInstructions: string;
             confirmedAttendees: number;
+            checkedInCount: number;
             createdAt: Date;
             updatedAt: Date;
         };
@@ -368,6 +369,7 @@ async function seed(): Promise<void> {
                         photographers: [],
                         photographerInstructions: '',
                         confirmedAttendees,
+                        checkedInCount,
                         createdAt,
                         updatedAt: eventDate,
                     },

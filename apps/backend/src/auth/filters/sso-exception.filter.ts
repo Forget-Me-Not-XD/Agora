@@ -1,7 +1,7 @@
 // ========== Imports: ==========
 import { ArgumentsHost, Catch, ExceptionFilter, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { SsoAccountNotFoundException } from '../exceptions/sso-account-not-found.exception';
 
 @Catch()
@@ -12,12 +12,17 @@ export class SsoExceptionFilter implements ExceptionFilter {
     constructor(private readonly config: ConfigService) {}
 
     catch(exception: unknown, host: ArgumentsHost): void {
-        const res = host.switchToHttp().getResponse<Response>();
-        const frontendUrl = this.config.get<string>('frontendUrl');
+        const ctx = host.switchToHttp();
+        const res = ctx.getResponse<Response>();
+        const req = ctx.getRequest<Request>();
+        const isMobile = req.originalUrl.includes('/mobile');
+        const target = isMobile
+            ? `${this.config.get<string>('oauth.mobileScheme')}://sso-callback`
+            : `${this.config.get<string>('frontendUrl')}/login`;
 
         if (exception instanceof SsoAccountNotFoundException) {
             const params = new URLSearchParams({ error: 'sso_no_account', email: exception.email });
-            res.redirect(`${frontendUrl}/login?${params.toString()}`);
+            res.redirect(`${target}?${params.toString()}`);
             return;
         }
 
@@ -25,6 +30,6 @@ export class SsoExceptionFilter implements ExceptionFilter {
         const stack = exception instanceof Error ? exception.stack : undefined;
         this.logger.error(`SSO flow failed: ${message}`, stack);
 
-        res.redirect(`${frontendUrl}/login?error=sso_failed`);
+        res.redirect(`${target}?error=sso_failed`);
     }
 }

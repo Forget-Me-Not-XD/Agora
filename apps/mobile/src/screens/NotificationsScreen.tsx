@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from "@react-navigation/native";
 import { useThemeColors } from "../theme/theme";
 import { useNotificationsStore } from "../stores/notifications.store";
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 const AF_MONTHS = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -22,7 +24,7 @@ function formatDate(iso: string): string {
 
 export function NotificationsScreen() {
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const items     = useNotificationsStore((s) => s.items);
   const isLoading = useNotificationsStore((s) => s.isLoading);
@@ -40,9 +42,7 @@ export function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Kennisgewings</Text>
-      </View>
+      <ScreenHeader title="Kennisgewings" />
 
       {isLoading && items.length === 0 ? (
         <View style={styles.center}>
@@ -89,9 +89,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background},
 
-    header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 24, gap: 10 },
@@ -124,8 +121,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
     cardContent: { flex: 1 },
-    message: { fontSize: 16, color: colors.textSubtle, lineHeight: 20, fontWeight: '600' },
+    message: { ...typography.bodyRegular, color: colors.textSubtle, lineHeight: 20 },
     messageUnread: { color: colors.text, fontWeight: '800' },
-    date: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 6 },
+    date: { ...typography.caption, color: colors.textSubtle, marginTop: 6 },
   });
 }

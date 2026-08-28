@@ -1,12 +1,12 @@
 // ========== Imports: ==========
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type PhotographerProfileDocument = HydratedDocument<PhotographerProfile>
 
 @Schema({ timestamps: true, collection: 'photographer_profiles' })
 export class PhotographerProfile {
-    @Prop({ required: true, type: Types.ObjectId, ref: 'User', unique: true, index: true})
+    @Prop({ required: true, type: SchemaTypes.ObjectId, ref: 'User', unique: true, index: true})
     user!: Types.ObjectId;
 
     @Prop({ required: true, trim: true })

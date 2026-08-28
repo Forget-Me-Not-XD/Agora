@@ -58,3 +58,7 @@ export function formatEventTime(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleTimeString('af-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
+
+export function getStatusPillColors(status: EventStatus, isDark: boolean): { bg: string, text: string} {
+    return isDark ? STATUS_PILL_COLORS_DARK[status] : STATUS_PILL_COLORS[status];
+}

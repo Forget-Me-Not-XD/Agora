@@ -101,6 +101,38 @@ export class AuthController {
     this.redirectWithTokens(res, tokens);
   }
 
+  @Get('google/mobile')
+  @UseGuards(AuthGuard('google-mobile'))
+  @UseFilters(SsoExceptionFilter)
+  googleMobileLogin(): void {}
+
+  @Get('google/mobile/callback')
+  @UseGuards(AuthGuard('google-mobile'))
+  @UseFilters(SsoExceptionFilter)
+  async googleMobileCallback(
+    @CurrentUser() profile: SsoProfile,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tokens = await this.authService.loginWithSso(profile, SsoProvider.GOOGLE);
+    this.redirectWithTokensMobile(res, tokens);
+  }
+
+  @Get('microsoft/mobile')
+  @UseGuards(AuthGuard('microsoft-mobile'))
+  @UseFilters(SsoExceptionFilter)
+  microsoftMobileLogin(): void {}
+
+  @Get('microsoft/mobile/callback')
+  @UseGuards(AuthGuard('microsoft-mobile'))
+  @UseFilters(SsoExceptionFilter)
+  async microsoftMobileCallback(
+    @CurrentUser() profile: SsoProfile,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tokens = await this.authService.loginWithSso(profile, SsoProvider.MICROSOFT);
+    this.redirectWithTokensMobile(res, tokens);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -115,5 +147,14 @@ export class AuthController {
       refreshToken: tokens.refreshToken,
     });
     res.redirect(`${frontendUrl}/api/auth/sso-callback?${params.toString()}`);
+  }
+
+  private redirectWithTokensMobile(res: Response, tokens: TokenPairDto): void {
+    const mobileScheme = this.config.get<string>('oauth.mobileScheme');
+    const params = new URLSearchParams({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+    res.redirect(`${mobileScheme}://sso-callback?${params.toString()}`);
   }
 }

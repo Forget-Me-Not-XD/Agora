@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,17 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { listEvents, type EventResponse, type EventType } from '../api/events';
 import {
   getEventStatus,
+  getStatusPillColors,
   STATUS_LABELS,
   TYPE_LABELS,
   formatEventDate,
@@ -27,29 +28,19 @@ import {
   type EventStatus,
 } from '../lib/event-status';
 import { canCreateEvents } from '../lib/rbac';
-import { useCallback } from 'react';
-
-
-const STATUS_PILL_COLORS: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
-
-const STATUS_PILL_COLORS_DARK: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#0C4A6E', text: '#7DD3FC' },
-  ongoing:  { bg: '#064E3B', text: '#6EE7B7' },
-  past:     { bg: '#1F2937', text: '#9CA3AF' },
-};
+import { takeEventsPrefetch } from '../lib/prefetch';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
 
 type MenuState = { eventId: string; x: number; y: number } | null;
 
 export function EventsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
-  const isDark = colors.background === '#0B1A24';
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
+  const insets = useSafeAreaInsets();
 
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +55,10 @@ export function EventsScreen() {
   const role = user?.role ?? 'STUDENT';
 
   // Rol-gebaseerde sigbaarheid word reeds backend-kant afgedwing (events.service.ts),
-  // so ons wys eenvoudig net wat die API teruggee.
+  // so ons wys eenvoudig net wat die API teruggee. Laai elke keer wat hierdie
+  // oortjie fokus kry (nie net met die eerste koppeling nie) -- die tabblad bly
+  // gemonteer solank die app loop, so sonder dit sou 'n pas-geskepte geleentheid
+  // eers ná 'n volle app-herbegin in hierdie lys verskyn.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -72,7 +66,7 @@ export function EventsScreen() {
         setLoading(true);
         setLoadError(null);
         try {
-          const result = await listEvents();
+          const result = await (takeEventsPrefetch() ?? listEvents());
           if (active) setEvents(result);
         } catch {
           if (active) setLoadError('Kon nie funksies laai nie.');
@@ -96,13 +90,17 @@ export function EventsScreen() {
     });
   }, [events, search, statusFilter, typeFilter]);
 
-  function openMenu(event: EventResponse) {
-    setMenuState({ eventId: event.id, x: 0, y: 0 });
-  }
+  const openMenu = useCallback((eventId: string) => {
+    setMenuState({ eventId, x: 0, y: 0 });
+  }, []);
 
   function closeMenu() {
     setMenuState(null);
   }
+
+  const handleCardPress = useCallback((eventId: string) => {
+    navigation.navigate('EventDetail', { eventId });
+  }, [navigation]);
 
   function handleDetails() {
     if (!menuState) return;
@@ -125,10 +123,10 @@ export function EventsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={styles.pageTitle}>Funksies</Text>
-        <View style={styles.headerRight}>
-          {canCreateEvents(role) && (
+      <ScreenHeader
+        title="Funksies"
+        right={
+          canCreateEvents(role) ? (
             <TouchableOpacity
               style={styles.createBtn}
               onPress={() => navigation.navigate('EventDetail', { eventId: 'new' })}
@@ -136,9 +134,9 @@ export function EventsScreen() {
             >
               <Feather name="plus" size={16} color={colors.surface} />
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
+          ) : undefined
+        }
+      />
 
       {/* ── Search bar ── */}
       <View style={styles.searchRow}>
@@ -209,8 +207,8 @@ export function EventsScreen() {
                 key={event.id}
                 event={event}
                 isDark={isDark}
-                onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                onMenuPress={() => openMenu(event)}
+                onPress={handleCardPress}
+                onMenuPress={openMenu}
               />
             ))
           )}
@@ -225,7 +223,10 @@ export function EventsScreen() {
         onRequestClose={() => setFilterOpen(false)}
       >
         <Pressable style={styles.sheetBackdrop} onPress={() => setFilterOpen(false)}>
-          <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => {}}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: 20 + insets.bottom }]}
+            onPress={() => {}}
+          >
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={[styles.sheetTitle, { color: colors.text }]}>Filter funksies</Text>
@@ -293,7 +294,7 @@ export function EventsScreen() {
               style={[styles.applyBtn, { backgroundColor: colors.primary }]}
               onPress={() => setFilterOpen(false)}
             >
-              <Text style={[styles.applyBtnText, { color: colors.surface }]}>Toepas</Text>
+              <Text style={[styles.applyBtnText, { color: colors.surface }]}>Pas Toe</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -335,7 +336,7 @@ function canRsvpVisible(role: string): boolean {
 }
 
 // ── EventCard ─────────────────────────────────────────────────────────────────
-function EventCard({
+const EventCard = memo(function EventCard({
   event,
   isDark,
   onPress,
@@ -343,19 +344,19 @@ function EventCard({
 }: {
   event: EventResponse;
   isDark: boolean;
-  onPress: () => void;
-  onMenuPress: () => void;
+  onPress: (eventId: string) => void;
+  onMenuPress: (eventId: string) => void;
 }) {
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const status = getEventStatus(event);
-  const pillColors = isDark ? STATUS_PILL_COLORS_DARK[status] : STATUS_PILL_COLORS[status];
+  const pillColors = getStatusPillColors(status, isDark);
   const { day, month } = formatEventDate(event.date);
 
   return (
     <TouchableOpacity
       style={styles.eventCard}
-      onPress={onPress}
+      onPress={() => onPress(event.id)}
       activeOpacity={0.75}
       accessibilityLabel={`${event.title}, ${day} ${month}, ${event.location}`}
       accessibilityRole="button"
@@ -383,13 +384,18 @@ function EventCard({
               {STATUS_LABELS[status]}
             </Text>
           </View>
+          {event.sellsTickets && (
+            <View style={[styles.statusPill, { backgroundColor: colors.warningBg }]}>
+              <Text style={[styles.statusPillText, { color: colors.warning }]}>Betaal</Text>
+            </View>
+          )}
         </View>
       </View>
 
       {/* 3-dot menu */}
       <TouchableOpacity
         style={styles.menuBtn}
-        onPress={onMenuPress}
+        onPress={() => onMenuPress(event.id)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessibilityLabel="Meer opsies"
         accessibilityRole="button"
@@ -398,23 +404,13 @@ function EventCard({
       </TouchableOpacity>
     </TouchableOpacity>
   );
-}
+});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 10,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    headerRight: { flexDirection: 'row', gap: 8 },
     createBtn: {
       width: 36,
       height: 36,
@@ -465,16 +461,18 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     filterBadge: {
       position: 'absolute',
-      top: 6,
-      right: 6,
-      width: 14,
-      height: 14,
-      borderRadius: 7,
-      backgroundColor: colors.surface,
+      top: -4,
+      right: -4,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.primaryText,
+      borderWidth: 2,
+      borderColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    filterBadgeText: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    filterBadgeText: { fontSize: 11, fontWeight: '900', color: colors.primary },
 
     resultCount: {
       fontSize: 16,
@@ -511,20 +509,20 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 48,
       minHeight: 52,
       borderRadius: 12,
-      backgroundColor: '#E0F7FA',
+      backgroundColor: colors.infoBg,
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 6,
     },
-    dateDay: { fontSize: 20, fontWeight: '900', color: '#0369A1', lineHeight: 24 },
-    dateMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1', marginTop: 1 },
+    dateDay: { fontSize: 20, fontWeight: '900', color: colors.info, lineHeight: 24 },
+    dateMonth: { fontSize: 16, fontWeight: '800', color: colors.info, marginTop: 1 },
     cardContent: { flex: 1 },
-    cardTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    cardMeta: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginBottom: 6 },
+    cardTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    cardMeta: { ...typography.caption, color: colors.textSubtle, marginBottom: 6 },
     cardStats: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    rsvpCount: { fontSize: 16, fontWeight: '900', color: colors.primary },
+    rsvpCount: { ...typography.subtitle, color: colors.primary },
     forecastCount: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
-    cardFooter: { flexDirection: 'row', alignItems: 'center' },
+    cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     statusPill: {
       borderRadius: 999,
       paddingHorizontal: 8,
@@ -539,14 +537,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     // Filter sheet
     sheetBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: colors.overlay,
       justifyContent: 'flex-end',
     },
     sheet: {
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       padding: 20,
-      paddingBottom: 36,
     },
     sheetHandle: {
       width: 36,
@@ -591,7 +588,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     // Context menu
     menuBackdrop: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.35)',
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 24,

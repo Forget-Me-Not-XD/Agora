@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/AppNavigator';
-import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
-import { listEvents, type EventResponse } from '../api/events';
-import { getEventStatus, STATUS_LABELS, MONTHS_SHORT_AF, type EventStatus } from '../lib/event-status';
-import { canManageCheckIns } from '../lib/rbac';
+import { useFocusEffect } from '@react-navigation/native';
+import { useThemeColors, useIsDark } from '../theme/theme';
+import { MONTHS_SHORT_AF } from '../lib/event-status';
+import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
 import {
   getMyRsvps,
   cancelRsvp,
@@ -26,40 +22,20 @@ import {
   type RsvpWithEvent,
   type RsvpStatus,
 } from '../api/rsvp';
-import { useCallback } from 'react';
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-
-const RSVP_STATUS_CONFIG: Record<RsvpStatus, { label: string; bg: string; text: string; icon: string }> = {
-  BEVESTIG:     { label: 'Bevestig',     bg: '#D1FAE5', text: '#065F46', icon: 'check-circle' },
-  HANGENDE:     { label: 'Hangende',     bg: '#FEF3C7', text: '#92400E', icon: 'clock' },
-  GEKANSELLEER: { label: 'Gekanselleer', bg: '#FEE2E2', text: '#991B1B', icon: 'x-circle' },
-};
-
-const EVENT_STATUS_BADGE: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
+import { takeMyRsvpsPrefetch } from '../lib/prefetch';
 
 export function RsvpScreen() {
-  const navigation = useNavigation<Nav>();
-  const { user } = useAuthStore();
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
-
-  const role = user?.role ?? 'STUDENT';
-  const isManager = canManageCheckIns(role);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
 
   const [filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
 
-  // my rsvps (student/gas)
   const [rsvps, setRsvps] = useState<RsvpWithEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // manager oorsig (dosent/admin)
-  const [events, setEvents] = useState<EventResponse[]>([]);
 
   // QR per inskrywing
   const [openQrId, setOpenQrId] = useState<string | null>(null);
@@ -67,7 +43,12 @@ export function RsvpScreen() {
   const [qrLoadingId, setQrLoadingId] = useState<string | null>(null);
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
-  
+
+  // Almal (ook ADMIN/DOSENT) sien hier net hul eie RSVPs -- funksie-bestuur
+  // (Bestuur RSVPs / QR Skandeerder) sit reeds op elke funksie se eie skerm.
+  // Gekanselleerde RSVPs word nooit gewys nie (nie net dié wat in-app gekanselleer
+  // is nie, ook enige uit 'n vorige sessie) -- en laai elke keer wat die oortjie
+  // fokus kry, sodat 'n vars kaartjie-aankoop of -kansellasie altyd raakgesien word.
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -75,21 +56,16 @@ export function RsvpScreen() {
         setLoading(true);
         setLoadError(null);
         try {
-          if (isManager) {
-            const data = await listEvents();
-            if (active) setEvents(data);
-          } else {
-            const data = await getMyRsvps();
-            if (active) setRsvps(data);
-          }
+          const data = await (takeMyRsvpsPrefetch() ?? getMyRsvps());
+          if (active) setRsvps(data.filter((r) => r.status !== 'GEKANSELLEER'));
         } catch {
-          if (active) setLoadError(isManager ? 'Kon nie funksies laai nie.' : 'Kon nie jou RSVPs laai nie.');
+          if (active) setLoadError('Kon nie jou RSVPs laai nie.');
         } finally {
           if (active) setLoading(false);
         }
       })();
       return () => { active = false; };
-    }, [isManager]),
+    }, []),
   );
 
   const filteredRsvps = useMemo(
@@ -128,11 +104,10 @@ export function RsvpScreen() {
             setCancelingId(rsvpId);
             try {
               await cancelRsvp(rsvpId);
-              setRsvps((prev) =>
-                prev.map((r) =>
-                  r._id === rsvpId ? { ...r, status: 'GEKANSELLEER' as RsvpStatus } : r,
-                ),
-              );
+              // Gekanselleerde RSVPs verdwyn dadelik uit hierdie lys -- die
+              // beskikbare plekke vir die geleentheid word backend-kant reeds
+              // vrygestel (sien rsvp.service.ts se cancelRsvp).
+              setRsvps((prev) => prev.filter((r) => r._id !== rsvpId));
             } catch {
               Alert.alert('Kanselleer', 'Kon nie die RSVP kanselleer nie. Probeer asseblief weer.');
             } finally {
@@ -149,136 +124,16 @@ export function RsvpScreen() {
     return { day: d.getDate(), month: MONTHS_SHORT_AF[d.getMonth()] };
   }
 
-  // Manager view: show event overview with RSVP stats
-  if (isManager) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.pageTitle}>RSVP Oorsig</Text>
-          <Text style={styles.pageSubtitle}>Bestuur alle inskrywings</Text>
-        </View>
-
-        {loading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : loadError ? (
-          <View style={styles.emptyState}>
-            <Feather name="alert-circle" size={32} color={colors.red} />
-            <Text style={styles.emptyTitle}>{loadError}</Text>
-          </View>
-        ) : events.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="calendar" size={32} color={colors.textSubtle} />
-            <Text style={styles.emptyTitle}>Geen funksies nie</Text>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-            {events.map((event) => {
-              const fillPct = event.maxCapacity > 0
-                ? Math.round((event.confirmedAttendees / event.maxCapacity) * 100)
-                : 0;
-              const status = getEventStatus(event);
-              const badge = EVENT_STATUS_BADGE[status];
-              const { day, month } = formatDate(event.date);
-              return (
-                <TouchableOpacity
-                  key={event.id}
-                  style={styles.managerCard}
-                  onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                  activeOpacity={0.75}
-                  accessibilityLabel={`${event.title} RSVP besonderhede`}
-                >
-                  <View style={styles.managerCardTop}>
-                    <View style={styles.managerDateBadge}>
-                      <Text style={styles.managerDay}>{day}</Text>
-                      <Text style={styles.managerMonth}>{month}</Text>
-                    </View>
-                    <View style={styles.managerInfo}>
-                      <Text style={styles.managerTitle} numberOfLines={1}>{event.title}</Text>
-                      <Text style={styles.managerMeta}>{event.location}</Text>
-                    </View>
-                    <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
-                      <Text style={[styles.statusPillText, { color: badge.text }]}>
-                        {STATUS_LABELS[status]}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.managerStats}>
-                    <View style={styles.managerStat}>
-                      <Text style={[styles.managerStatVal, { color: colors.primary }]}>
-                        {event.confirmedAttendees}
-                      </Text>
-                      <Text style={styles.managerStatLbl}>Bygewoon</Text>
-                    </View>
-                    <View style={styles.managerStat}>
-                      <Text style={styles.managerStatVal}>
-                        {event.maxCapacity}
-                      </Text>
-                      <Text style={styles.managerStatLbl}>Kapasiteit</Text>
-                    </View>
-                    <View style={styles.managerStat}>
-                      <Text style={styles.managerStatVal}>{fillPct}%</Text>
-                      <Text style={styles.managerStatLbl}>Vol</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.progressTrack}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${Math.min(fillPct, 100)}%` as any,
-                          backgroundColor:
-                            fillPct >= 90 ? '#EF4444' : fillPct >= 70 ? '#F59E0B' : colors.primary,
-                        },
-                      ]}
-                    />
-                  </View>
-
-                  <View style={styles.managerActions}>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => navigation.navigate('EventDetail', { eventId: event.id })}
-                      accessibilityLabel={`Bestuur RSVPs vir ${event.title}`}
-                    >
-                      <Feather name="users" size={13} color={colors.primary} />
-                      <Text style={styles.actionBtnText}>Bestuur RSVPs</Text>
-                    </TouchableOpacity>
-                    {status === 'upcoming' || status === 'ongoing' ? (
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => navigation.navigate('QrScanner', { eventId: event.id })}
-                        accessibilityLabel={`QR skandeerder vir ${event.title}`}
-                      >
-                        <Feather name="maximize" size={13} color={colors.primary} />
-                        <Text style={styles.actionBtnText}>QR Skandeer</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    );
-  }
-
-  // Student/GAS view: personal RSVPs
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>My RSVPs</Text>
-        <Text style={styles.pageSubtitle}>
-          {rsvps.length} inskrywing{rsvps.length !== 1 ? 's' : ''}
-        </Text>
-      </View>
+      <ScreenHeader
+        title="My RSVPs"
+        subtitle={`${rsvps.length} inskrywing${rsvps.length !== 1 ? 's' : ''}`}
+      />
 
       {/* Filter chips */}
       <View style={styles.filterRow}>
-        {(['alles', 'BEVESTIG', 'HANGENDE', 'GEKANSELLEER'] as const).map((s) => (
+        {(['alles', 'BEVESTIG', 'HANGENDE'] as const).map((s) => (
           <TouchableOpacity
             key={s}
             style={[
@@ -286,11 +141,11 @@ export function RsvpScreen() {
               filter === s && styles.chipActive,
             ]}
             onPress={() => setFilter(s)}
-            accessibilityLabel={s === 'alles' ? 'Alle RSVPs' : RSVP_STATUS_CONFIG[s].label}
+            accessibilityLabel={s === 'alles' ? 'Alle RSVPs' : RSVP_STATUS_LABELS[s]}
             accessibilityState={{ selected: filter === s }}
           >
             <Text style={[styles.chipText, filter === s && styles.chipTextActive]}>
-              {s === 'alles' ? 'Alles' : RSVP_STATUS_CONFIG[s].label}
+              {s === 'alles' ? 'Alles' : RSVP_STATUS_LABELS[s]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -310,7 +165,7 @@ export function RsvpScreen() {
           <View style={styles.emptyState}>
             <Feather name="check-square" size={32} color={colors.textSubtle} />
             <Text style={styles.emptyTitle}>
-              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_CONFIG[filter].label.toLowerCase()} RSVPs nie`}
+              {filter === 'alles' ? 'Geen RSVPs nie' : `Geen ${RSVP_STATUS_LABELS[filter].toLowerCase()} RSVPs nie`}
             </Text>
             <Text style={styles.emptySubtitle}>
               Gaan na Funksies om vir aankomende geleenthede te RSVP.
@@ -318,7 +173,11 @@ export function RsvpScreen() {
           </View>
         ) : (
           filteredRsvps.map(({ _id, status, event }) => {
-            const cfg = RSVP_STATUS_CONFIG[status];
+            const cfg = {
+              ...getRsvpStatusColors(status, isDark),
+              label: RSVP_STATUS_LABELS[status],
+              icon: RSVP_STATUS_ICONS[status],
+            };
             const { day, month } = formatDate(event.date);
             const showQr = openQrId === _id;
             return (
@@ -333,7 +192,7 @@ export function RsvpScreen() {
                     <Text style={styles.rsvpMeta} numberOfLines={1}> {event.location}</Text>
                   </View>
                   <View style={[styles.rsvpBadge, { backgroundColor: cfg.bg }]}>
-                    <Feather name={cfg.icon as any} size={12} color={cfg.text} />
+                    <Feather name={cfg.icon} size={12} color={cfg.text} />
                   </View>
                 </View>
 
@@ -397,14 +256,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    pageHeader: {
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 8,
-    },
-    pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
-    pageSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '700', marginTop: 2 },
-
     filterRow: {
       flexDirection: 'row',
       gap: 8,
@@ -448,15 +299,15 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       width: 44,
       height: 44,
       borderRadius: 10,
-      backgroundColor: '#E0F7FA',
+      backgroundColor: colors.infoBg,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    rsvpDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    rsvpMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
+    rsvpDay: { fontSize: 17, fontWeight: '900', color: colors.info, lineHeight: 20 },
+    rsvpMonth: { fontSize: 16, fontWeight: '800', color: colors.info },
     rsvpInfo: { flex: 1 },
-    rsvpTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    rsvpMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
+    rsvpTitle: { ...typography.body, color: colors.text, marginBottom: 2 },
+    rsvpMeta: { ...typography.caption, color: colors.textSubtle },
     rsvpBadge: {
       width: 30,
       height: 30,
@@ -471,8 +322,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       gap: 6,
     },
     rsvpDetailRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    rsvpDetailLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
-    rsvpDetailValue: { fontSize: 16, fontWeight: '800', color: colors.text },
+    rsvpDetailLabel: { ...typography.caption, color: colors.textSubtle },
+    rsvpDetailValue: { ...typography.body, color: colors.text },
     cancelBtn: {
       alignSelf: 'flex-start',
       borderWidth: 1,
@@ -508,59 +359,5 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 12,
     },
     qrImage: { width: '100%', height: '100%' },
-
-    // Manager card
-    managerCard: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 16,
-      padding: 14,
-      gap: 12,
-    },
-    managerCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    managerDateBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 10,
-      backgroundColor: '#E0F7FA',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    managerDay: { fontSize: 17, fontWeight: '900', color: '#0369A1', lineHeight: 20 },
-    managerMonth: { fontSize: 16, fontWeight: '800', color: '#0369A1' },
-    managerInfo: { flex: 1 },
-    managerTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    managerMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle },
-    statusPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-    statusPillText: { fontSize: 16, fontWeight: '800' },
-
-    managerStats: { flexDirection: 'row', gap: 4 },
-    managerStat: { flex: 1, alignItems: 'center' },
-    managerStatVal: { fontSize: 16, fontWeight: '900', color: colors.text },
-    managerStatLbl: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 1 },
-
-    progressTrack: {
-      height: 6,
-      borderRadius: 999,
-      backgroundColor: colors.border,
-      overflow: 'hidden',
-    },
-    progressFill: { height: 6, borderRadius: 999 },
-
-    managerActions: { flexDirection: 'row', gap: 10 },
-    actionBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      paddingVertical: 8,
-    },
-    actionBtnText: { fontSize: 16, fontWeight: '800', color: colors.primary },
   });
 }

@@ -162,6 +162,44 @@ export class EventsService {
         throw new ConflictException('Geen kaartjies meer beskikbaar nie');
     }
 
+    // Word inkrementeer wanneer 'n RSVP se QR-kode werklik geskandeer word
+    // (checkInRsvp/scanRsvp) -- dus "hoeveel mense het opgedaag", nie hoeveel
+    // ingeskryf het nie (dis confirmedAttendees hierbo).
+    async incrementCheckedInCount(id: string): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id },
+            { $inc: { checkedInCount: 1 } },
+            { new: true },
+        ).exec();
+
+        if (!updated) throw new NotFoundException(`Event ${id} not found`);
+        return updated;
+    }
+
+    // Terugrolling vir die uitsonderlike geval waar iemand wat reeds ingeteken
+    // is se RSVP daarna gekanselleer word (sien rsvp.service.ts se cancelRsvp).
+    async decrementCheckedInCount(id: string): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id, checkedInCount: { $gt: 0 } },
+            { $inc: { checkedInCount: -1 } },
+            { new: true },
+        ).exec();
+
+        if (updated) return updated;
+
+        const event = await this.eventModel.findById(id).exec();
+        if (!event) throw new NotFoundException(`Event ${id} not found`);
+        return event;
+    }
+
     // Gebruik om 'n voorheen-afgetrekte kaartjie terug te gee wanneer 'n betaling
     // uiteindelik geen nuwe kaartjie geskep het nie (bv. die gebruiker het reeds
     // een uit 'n ander, aparte betaling).

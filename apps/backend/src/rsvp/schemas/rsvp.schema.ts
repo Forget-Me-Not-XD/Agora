@@ -1,6 +1,6 @@
 // ========== Imports: ==========
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export enum RsvpStatus {
     BEVESTIG = 'BEVESTIG',
@@ -12,11 +12,11 @@ export type RsvpDocument = HydratedDocument<Rsvp>;
 
 @Schema({ timestamps: true, collection: 'rsvps' })
 export class Rsvp {
-    @Prop ({ required: true, type: Types.ObjectId, ref: 'Event', index: true })
+    @Prop ({ required: true, type: SchemaTypes.ObjectId, ref: 'Event', index: true })
     event!: Types.ObjectId;
 
     // Ontbreek vir 'n walk-in -- iemand wat sonder 'n gebruikersrekening ter plekke geregistreer is.
-    @Prop ({ type: Types.ObjectId, ref: 'User', index: true })
+    @Prop ({ type: SchemaTypes.ObjectId, ref: 'User', index: true })
     user?: Types.ObjectId;
 
     // Net gestel vir 'n walk-in; onnodig wanneer 'n `user` gekoppel is.
@@ -44,7 +44,7 @@ export class Rsvp {
     @Prop ({ default: false })
     paid!: boolean;
 
-    @Prop ({ type: Types.ObjectId, ref: 'Payment', default: null })
+    @Prop ({ type: SchemaTypes.ObjectId, ref: 'Payment', default: null })
     payment!: Types.ObjectId | null;
 
     createdAt?: Date;

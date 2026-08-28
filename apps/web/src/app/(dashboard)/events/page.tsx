@@ -58,12 +58,24 @@ export default function EventsPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [newEventId, setNewEventId] = useState<string | null>(null);
+    const [paymentNotice, setPaymentNotice] = useState<'success' | 'cancelled' | null>(null);
 
     useEffect(() => {
         const created = searchParams.get('created');
         if (created) {
             setNewEventId(created);
             router.replace('/events'); // vee die query-param uit sodat 'n verfris nie die gloed herhaal nie
+        }
+    }, [searchParams, router]);
+
+    // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
+    // /payments/return en /cancel) -- PayFast se eie ITN bevestig die kaartjie
+    // reeds op die agtergrond, hierdie is bloot terugvoer vir die gebruiker.
+    useEffect(() => {
+        const payment = searchParams.get('payment');
+        if (payment === 'success' || payment === 'cancelled') {
+            setPaymentNotice(payment);
+            router.replace('/events');
         }
     }, [searchParams, router]);
 
@@ -154,6 +166,25 @@ export default function EventsPage() {
 
     return (
         <div className="space-y-6">
+
+            {paymentNotice && (
+                <div
+                    className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${
+                        paymentNotice === 'success'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
+                            : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
+                    }`}
+                >
+                    <span>
+                        {paymentNotice === 'success'
+                            ? 'Jou betaling is ontvang — jou kaartjie word tans bevestig.'
+                            : 'Die betaling is gekanselleer.'}
+                    </span>
+                    <button onClick={() => setPaymentNotice(null)} className="text-xs underline shrink-0">
+                        Maak toe
+                    </button>
+                </div>
+            )}
 
             {/* ── Header ── */}
             <div className="flex items-start justify-between gap-4 flex-wrap">

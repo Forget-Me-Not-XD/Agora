@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -6,30 +6,16 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import { getEvent, type EventResponse } from '../api/events';
 import { getEventRsvps, cancelRsvp, checkInRsvp, type RsvpWithUser, type RsvpStatus } from '../api/rsvp';
+import { RSVP_STATUS_LABELS, getRsvpStatusColors } from '../lib/rsvp-status';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { typography } from '../theme/typography';
+import { safeGoBack } from '../lib/navigation';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RsvpManagement'>;
 type Route = RouteProp<RootStackParamList, 'RsvpManagement'>;
-
-const STATUS_LABELS: Record<RsvpStatus, string> = {
-  BEVESTIG: 'Bevestig',
-  HANGENDE: 'Hangende',
-  GEKANSELLEER: 'Gekanselleer',
-};
-
-const BADGE_COLORS_LIGHT: Record<RsvpStatus, { bg: string; text: string }> = {
-  BEVESTIG: { bg: '#D1FAE5', text: '#065F46' },
-  HANGENDE: { bg: '#FEF3C7', text: '#92400E' },
-  GEKANSELLEER: { bg: '#F3F4F6', text: '#4B5563' },
-};
-
-const BADGE_COLORS_DARK: Record<RsvpStatus, { bg: string; text: string }> = {
-  BEVESTIG: { bg: '#064E3B', text: '#6EE7B7' },
-  HANGENDE: { bg: '#78350F', text: '#FCD34D' },
-  GEKANSELLEER: { bg: '#1F2937', text: '#9CA3AF' },
-};
 
 function attendeeName(rsvp: RsvpWithUser): string {
   if (rsvp.user) return `${rsvp.user.name} ${rsvp.user.surname}`;
@@ -40,9 +26,8 @@ export function RsvpManagementScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const colors = useThemeColors();
-  const isDark = colors.background === '#0B1A24';
-  const badgeColors = isDark ? BADGE_COLORS_DARK : BADGE_COLORS_LIGHT;
-  const styles = makeStyles(colors);
+  const isDark = useIsDark();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [rsvps, setRsvps] = useState<RsvpWithUser[]>([]);
@@ -118,14 +103,10 @@ export function RsvpManagementScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} accessibilityLabel="Terug">
-          <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle} numberOfLines={1}>
-          {event ? event.title : 'Bestuur RSVPs'}
-        </Text>
-      </View>
+      <ScreenHeader
+        title={event ? event.title : 'Bestuur RSVPs'}
+        onBack={() => safeGoBack(navigation)}
+      />
 
       {loading ? (
         <View style={styles.centerWrap}>
@@ -140,7 +121,7 @@ export function RsvpManagementScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: '#10B981' }]}>{checkedInCount}</Text>
+              <Text style={[styles.statValue, { color: colors.success }]}>{checkedInCount}</Text>
               <Text style={styles.statLabel}>Ingemeld</Text>
             </View>
             <View style={styles.statDivider} />
@@ -160,54 +141,58 @@ export function RsvpManagementScreen() {
           ) : activeRsvps.length === 0 ? (
             <Text style={styles.emptyText}>Geen aktiewe RSVPs nie.</Text>
           ) : (
-            activeRsvps.map((rsvp) => (
-              <View key={rsvp.id} style={styles.row}>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowName}>{attendeeName(rsvp)}</Text>
-                  <Text style={styles.rowMeta}>{rsvp.user ? rsvp.user.email : 'Walk-in (geen rekening nie)'}</Text>
-                  <View style={styles.badgeRow}>
-                    <View style={[styles.badge, { backgroundColor: badgeColors[rsvp.status].bg }]}>
-                      <Text style={[styles.badgeText, { color: badgeColors[rsvp.status].text }]}>
-                        {STATUS_LABELS[rsvp.status]}
-                      </Text>
-                    </View>
-                    {rsvp.checkedIn && (
-                      <View style={[styles.badge, { backgroundColor: badgeColors.BEVESTIG.bg }]}>
-                        <Feather name="check" size={11} color={badgeColors.BEVESTIG.text} />
-                        <Text style={[styles.badgeText, { color: badgeColors.BEVESTIG.text }]}>Ingemeld</Text>
+            rsvps.map((rsvp) => {
+              const statusColors = getRsvpStatusColors(rsvp.status, isDark);
+              const confirmedColors = getRsvpStatusColors('BEVESTIG', isDark);
+              return (
+                <View key={rsvp.id} style={styles.row}>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{attendeeName(rsvp)}</Text>
+                    <Text style={styles.rowMeta}>{rsvp.user ? rsvp.user.email : 'Walk-in (geen rekening nie)'}</Text>
+                    <View style={styles.badgeRow}>
+                      <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
+                        <Text style={[styles.badgeText, { color: statusColors.text }]}>
+                          {RSVP_STATUS_LABELS[rsvp.status]}
+                        </Text>
                       </View>
-                    )}
+                      {rsvp.checkedIn && (
+                        <View style={[styles.badge, { backgroundColor: confirmedColors.bg }]}>
+                          <Feather name="check" size={11} color={confirmedColors.text} />
+                          <Text style={[styles.badgeText, { color: confirmedColors.text }]}>Ingemeld</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </View>
 
-                {rsvp.status !== 'GEKANSELLEER' && (
-                  <View style={styles.rowActions}>
-                    {!rsvp.checkedIn && (
+                  {rsvp.status !== 'GEKANSELLEER' && (
+                    <View style={styles.rowActions}>
+                      {!rsvp.checkedIn && (
+                        <TouchableOpacity
+                          style={styles.actionBtn}
+                          onPress={() => handleCheckIn(rsvp)}
+                          disabled={busyId === rsvp.id}
+                          accessibilityLabel={`Teken ${attendeeName(rsvp)} in`}
+                        >
+                          {busyId === rsvp.id ? (
+                            <ActivityIndicator size="small" color={colors.primary} />
+                          ) : (
+                            <Feather name="check-circle" size={16} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => handleCheckIn(rsvp)}
+                        style={styles.actionBtnDanger}
+                        onPress={() => handleCancel(rsvp)}
                         disabled={busyId === rsvp.id}
-                        accessibilityLabel={`Teken ${attendeeName(rsvp)} in`}
+                        accessibilityLabel={`Kanselleer RSVP van ${attendeeName(rsvp)}`}
                       >
-                        {busyId === rsvp.id ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <Feather name="check-circle" size={16} color={colors.primary} />
-                        )}
+                        <Feather name="x-circle" size={16} color={colors.red} />
                       </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      style={styles.actionBtnDanger}
-                      onPress={() => handleCancel(rsvp)}
-                      disabled={busyId === rsvp.id}
-                      accessibilityLabel={`Kanselleer RSVP van ${attendeeName(rsvp)}`}
-                    >
-                      <Feather name="x-circle" size={16} color={colors.red} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            ))
+                    </View>
+                  )}
+                </View>
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -218,25 +203,6 @@ export function RsvpManagementScreen() {
 function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 10,
-    },
-    backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    topBarTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: colors.text },
-
     centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
     errorText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, textAlign: 'center' },
 
@@ -251,8 +217,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 20, fontWeight: '900', color: colors.text },
-    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statValue: { ...typography.heroStat, color: colors.text },
+    statLabel: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
     emptyText: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, textAlign: 'center', marginTop: 24 },
@@ -263,13 +229,13 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 14,
+      borderRadius: 16,
       padding: 14,
       gap: 10,
     },
     rowInfo: { flex: 1 },
-    rowName: { fontSize: 16, fontWeight: '800', color: colors.text },
-    rowMeta: { fontSize: 16, fontWeight: '600', color: colors.textSubtle, marginTop: 2 },
+    rowName: { ...typography.body, color: colors.text },
+    rowMeta: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     badgeRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
     badge: {
       flexDirection: 'row',

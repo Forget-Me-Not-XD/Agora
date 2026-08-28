@@ -109,8 +109,11 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+export { API_URL };
 
 // ========== Shared response types: ==========
+export type UserTag = 'FINANCE';
+
 export interface UserResponse {
     id: string;
     name: string;
@@ -122,6 +125,7 @@ export interface UserResponse {
     createdAt: string;
     title: string;
     mustChangePassword: boolean;
+    tags: UserTag[];
 }
 
 export interface TokenPair {

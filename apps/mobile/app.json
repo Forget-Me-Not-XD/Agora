@@ -2,6 +2,7 @@
   "expo": {
     "name": "AGORA",
     "slug": "akademia-mobile",
+    "scheme": "agora",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -18,7 +19,9 @@
         {
           "cameraPermission": "Laat Akademia toe om die kamera te gebruik om gaste se QR-kodes te skandeer."
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
@@ -32,10 +35,14 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "backgroundColor": "#1E3A5F"
+    },
+    "androidNavigationBar": {
+      "enforceContrast": false
     },
     "extra": {
-      "apiUrl": "http://10.0.2.2:3000/api/v1",
+      "apiUrl": "http://192.168.3.67:3000/api/v1",
       "eas": {
         "projectId": "3bb685b0-d97f-4fd4-b968-af704e8499be"
       }

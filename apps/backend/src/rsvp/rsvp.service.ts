@@ -127,11 +127,19 @@ export class RsvpService {
             this.eventsService.assertOwnership(event, requesterId, requesterRole);
         }
 
+        const wasCheckedIn = rsvp.checkedIn;
+
         rsvp.status = RsvpStatus.GEKANSELLEER;
         await rsvp.save();
 
         event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
         await event.save();
+
+        // Ongewone geval: iemand wat reeds ingeteken is se RSVP word daarna
+        // gekanselleer -- moenie hulle steeds as "bygewoon" tel nie.
+        if (wasCheckedIn) {
+            await this.eventsService.decrementCheckedInCount(event._id.toString());
+        }
 
         if (rsvp.user && (rsvp.googleCalendarEventId || rsvp.outlookCalendarEventId)) {
             const user = await this.usersService.findById(rsvp.user.toString());
@@ -181,6 +189,7 @@ export class RsvpService {
         rsvp.checkedInAt = new Date();
         rsvp.status = RsvpStatus.BEVESTIG;
         await rsvp.save();
+        await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         return rsvp;
     }
@@ -222,6 +231,7 @@ export class RsvpService {
         rsvp.checkedInAt = new Date();
         rsvp.status = RsvpStatus.BEVESTIG;
         await rsvp.save();
+        await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         return {
             guestName: `${rsvp.user.name} ${rsvp.user.surname}`,
@@ -238,6 +248,7 @@ export class RsvpService {
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
 
         await this.eventsService.incrementConfirmedAttendees(dto.eventId);
+        await this.eventsService.incrementCheckedInCount(dto.eventId);
 
         const rsvp = new this.rsvpModel({
             event: dto.eventId,

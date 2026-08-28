@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -7,27 +7,25 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
-import { useThemeColors } from '../theme/theme';
+import { useThemeColors, useIsDark } from '../theme/theme';
 import {
   getEventStatus,
+  getStatusPillColors,
   STATUS_LABELS,
   TYPE_LABELS,
   formatFullDate,
   formatEventTime,
-  type EventStatus,
 } from '../lib/event-status';
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
+import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getEvent, createEvent, type EventResponse } from '../api/events';
 import { createRsvp } from '../api/rsvp';
 import { getDraftPrediction, getPrediction } from '../api/analytics';
 import type { PredictionResult } from '../api/analytics';
-
-const STATUS_PILL: Record<EventStatus, { bg: string; text: string }> = {
-  upcoming: { bg: '#E0F2FE', text: '#0369A1' },
-  ongoing:  { bg: '#D1FAE5', text: '#065F46' },
-  past:     { bg: '#F3F4F6', text: '#4B5563' },
-};
+import { ScreenHeader } from '../components/ScreenHeader';
+import { PaymentModal } from '../components/PaymentModal';
+import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -35,9 +33,10 @@ type Route = RouteProp<RootStackParamList, 'EventDetail'>;
 export function EventDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
-  const styles = makeStyles(colors);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const isDark = useIsDark();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
 
@@ -122,7 +121,7 @@ export function EventDetailScreen() {
         <View style={styles.errorWrap}>
           <Feather name="alert-circle" size={32} color={colors.textSubtle} />
           <Text style={styles.errorText}>Funksie nie gevind nie</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation)}>
             <Text style={styles.backBtnText}>Terug</Text>
           </TouchableOpacity>
         </View>
@@ -133,7 +132,7 @@ export function EventDetailScreen() {
   const status = getEventStatus(event);
   const fillPct = event.maxCapacity > 0 ? Math.min(Math.round((event.confirmedAttendees / event.maxCapacity) * 100), 100) : 0;
   const predictedPct = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
-  const pillColor = STATUS_PILL[status];
+  const pillColor = getStatusPillColors(status, isDark);
 
   function handleManageRsvps() {
     navigation.navigate('RsvpManagement', { eventId: event!.id });
@@ -176,21 +175,17 @@ export function EventDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Back + header ── */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backIconBtn}
-          onPress={() => navigation.goBack()}
-          accessibilityLabel="Terug"
-        >
-          <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle} numberOfLines={1}>Funksie Detail</Text>
-        <View style={[styles.statusPill, { backgroundColor: pillColor.bg }]}>
-          <Text style={[styles.statusPillText, { color: pillColor.text }]}>
-            {STATUS_LABELS[status]}
-          </Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="Funksie Detail"
+        onBack={() => safeGoBack(navigation)}
+        right={
+          <View style={[styles.statusPill, { backgroundColor: pillColor.bg }]}>
+            <Text style={[styles.statusPillText, { color: pillColor.text }]}>
+              {STATUS_LABELS[status]}
+            </Text>
+          </View>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -205,7 +200,7 @@ export function EventDetailScreen() {
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{event.confirmedAttendees}</Text>
+            <Text style={styles.statValue}>{event.checkedInCount}</Text>
             <Text style={styles.statLabel}>Bygewoon</Text>
           </View>
           <View style={styles.statDivider} />
@@ -217,14 +212,14 @@ export function EventDetailScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#F59E0B' }]}>{event.maxCapacity}</Text>
+            <Text style={[styles.statValue, { color: colors.warning }]}>{event.maxCapacity}</Text>
             <Text style={styles.statLabel}>Kapasiteit</Text>
           </View>
         </View>
 
         {/* ── AI prediction card ──
-             Verby geleenthede het reeds 'n regte uitkoms (sien "Bygewoon" hierbo) --
-             die model voorspel net vooruit en het geen benul van wat werklik gebeur
+            Verby geleenthede het reeds 'n regte uitkoms (sien "Bygewoon" hierbo) --
+            die model voorspel net vooruit en het geen benul van wat werklik gebeur
              het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie. */}
         {status !== 'past' && (
           <View style={styles.aiCard}>
@@ -268,6 +263,13 @@ export function EventDetailScreen() {
           <DetailRow label="Lokaal" value={event.location} colors={colors} />
           <DetailRow label="Tipe" value={TYPE_LABELS[event.type]} colors={colors} />
           <DetailRow label="Kapasiteit" value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`} colors={colors} />
+          {event.sellsTickets && (
+            <DetailRow
+              label="Kaartjieprys"
+              value={`R${event.ticketPrice ?? 0}${event.ticketsAvailable !== null ? ` · ${event.ticketsAvailable} oor` : ''}`}
+              colors={colors}
+            />
+          )}
           {canViewBudget(role) && (
             <DetailRow
               label="Begroting"
@@ -312,22 +314,26 @@ export function EventDetailScreen() {
           </>
         )}
 
-        {!canManageCheckIns(role) && (status === 'upcoming' || status === 'ongoing') && (
-          <TouchableOpacity
-            style={[styles.primaryBtn, rsvpSubmitting && { opacity: 0.6 }]}
-            onPress={handleRsvp}
-            disabled={rsvpSubmitting}
-            accessibilityLabel="RSVP vir hierdie funksie"
-          >
-            {rsvpSubmitting ? (
-              <ActivityIndicator color={colors.surface} />
-            ) : (
-              <>
-                <Feather name="check-circle" size={16} color={colors.surface} />
-                <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
-              </>
-            )}
-          </TouchableOpacity>
+        {(status === 'upcoming' || status === 'ongoing') && (
+          event.sellsTickets ? (
+            <PaymentModal event={event} />
+          ) : (
+            <TouchableOpacity
+              style={[styles.primaryBtn, rsvpSubmitting && styles.btnDisabled]}
+              onPress={handleRsvp}
+              disabled={rsvpSubmitting}
+              accessibilityLabel="RSVP vir hierdie funksie"
+            >
+              {rsvpSubmitting ? (
+                <ActivityIndicator color={colors.surface} />
+              ) : (
+                <>
+                  <Feather name="check-circle" size={16} color={colors.surface} />
+                  <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )
         )}
 
       </ScrollView>
@@ -355,6 +361,9 @@ function CreateEventForm({
   const [location, setLocation] = useState('');
   const [maxCapacity, setMaxCapacity] = useState('');
   const [budget, setBudget] = useState('');
+  const [sellsTickets, setSellsTickets] = useState(false);
+  const [ticketPrice, setTicketPrice] = useState('');
+  const [ticketsAvailable, setTicketsAvailable] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -451,6 +460,21 @@ function CreateEventForm({
       }
     }
 
+    let ticketPriceNum: number | undefined;
+    let ticketsAvailableNum: number | undefined;
+    if (sellsTickets) {
+      ticketPriceNum = Number(ticketPrice);
+      if (!ticketPrice.trim() || isNaN(ticketPriceNum) || ticketPriceNum <= 0) {
+        setError('Gee asseblief \'n geldige kaartjieprys.');
+        return;
+      }
+      ticketsAvailableNum = Number(ticketsAvailable);
+      if (!ticketsAvailable.trim() || isNaN(ticketsAvailableNum) || ticketsAvailableNum <= 0) {
+        setError('Gee asseblief \'n geldige aantal kaartjies.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -477,8 +501,11 @@ function CreateEventForm({
         location: location.trim(),
         maxCapacity: cap,
         budget: budgetNum,
+        sellsTickets,
+        ticketPrice: sellsTickets ? ticketPriceNum : undefined,
+        ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
       });
-      navigation.goBack();
+      safeGoBack(navigation);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
       const raw = axiosErr?.response?.data?.message;
@@ -496,17 +523,11 @@ function CreateEventForm({
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.backIconBtn}
-          onPress={() => navigation.goBack()}
-          disabled={isSubmitting}
-        >
-          <Feather name="arrow-left" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Nuwe Funksie</Text>
-        <View style={{ width: 36 }} />
-      </View>
+      <ScreenHeader
+        title="Nuwe Funksie"
+        onBack={() => safeGoBack(navigation)}
+        backDisabled={isSubmitting}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -654,6 +675,49 @@ function CreateEventForm({
             keyboardType="number-pad"
             returnKeyType="done"
           />
+
+          <View style={styles.ticketToggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Verkoop kaartjies</Text>
+              <Text style={styles.fieldHint}>Gaste moet betaal om in te skryf</Text>
+            </View>
+            <Switch
+              value={sellsTickets}
+              onValueChange={setSellsTickets}
+              disabled={isSubmitting}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+
+          {sellsTickets && (
+            <View style={styles.ticketRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Kaartjieprys (R) *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="bv. 150"
+                  placeholderTextColor={colors.textSubtle}
+                  value={ticketPrice}
+                  onChangeText={setTicketPrice}
+                  editable={!isSubmitting}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Aantal kaartjies *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="bv. 100"
+                  placeholderTextColor={colors.textSubtle}
+                  value={ticketsAvailable}
+                  onChangeText={setTicketsAvailable}
+                  editable={!isSubmitting}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+          )}
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -739,7 +803,7 @@ function CreateEventForm({
 
         <TouchableOpacity
           style={[styles.secondaryBtn, { marginTop: 10 }]}
-          onPress={() => navigation.goBack()}
+          onPress={() => safeGoBack(navigation)}
           disabled={isSubmitting}
         >
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
@@ -760,8 +824,8 @@ function PredictionStat({
 }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }}>{value}</Text>
-      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 }}>{label}</Text>
+      <Text style={{ ...typography.subtitle, color: colors.text }}>{value}</Text>
+      <Text style={{ ...typography.caption, color: colors.textSubtle, marginTop: 2 }}>{label}</Text>
     </View>
   );
 }
@@ -790,8 +854,8 @@ function DetailRow({
         },
       ]}
     >
-      <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textSubtle }}>{label}</Text>
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, maxWidth: '60%', textAlign: 'right' }}>
+      <Text style={{ ...typography.caption, color: colors.textSubtle }}>{label}</Text>
+      <Text style={{ ...typography.body, color: colors.text, maxWidth: '60%', textAlign: 'right' }}>
         {value}
       </Text>
     </View>
@@ -802,24 +866,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
 
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 10,
-    },
-    backIconBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    topBarTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: colors.text },
     statusPill: {
       borderRadius: 999,
       paddingHorizontal: 10,
@@ -837,7 +883,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     eventTitle: { fontSize: 22, fontWeight: '900', color: colors.text, marginBottom: 6 },
-    eventSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', lineHeight: 18 },
+    eventSubtitle: { ...typography.bodyRegular, color: colors.textSubtle, lineHeight: 18 },
 
     statsRow: {
       flexDirection: 'row',
@@ -848,8 +894,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 16,
     },
     statItem: { flex: 1, alignItems: 'center' },
-    statValue: { fontSize: 24, fontWeight: '900', color: colors.primary },
-    statLabel: { fontSize: 16, fontWeight: '700', color: colors.textSubtle, marginTop: 2 },
+    statValue: { ...typography.heroStat, color: colors.primary },
+    statLabel: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     statDivider: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
 
     aiCard: {
@@ -867,8 +913,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     },
     aiNumRow: { flexDirection: 'row', alignItems: 'baseline' },
     aiNum: { fontSize: 36, fontWeight: '900', color: colors.primary },
-    aiLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
-    aiSubtitle: { fontSize: 16, color: colors.textSubtle, fontWeight: '600', marginTop: 2 },
+    aiLabel: { ...typography.body, color: colors.text },
+    aiSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     aiBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -880,7 +926,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    aiBadgeText: { fontSize: 16, fontWeight: '800', color: colors.primary },
+    aiBadgeText: { ...typography.micro, color: colors.primary },
     progressTrack: {
       height: 8,
       borderRadius: 999,
@@ -908,8 +954,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 16,
       padding: 16,
     },
-    descLabel: { fontSize: 16, fontWeight: '900', color: colors.textSubtle, marginBottom: 8, letterSpacing: 0.5 },
-    descText: { fontSize: 16, color: colors.text, lineHeight: 20, fontWeight: '600' },
+    descLabel: { ...typography.caption, color: colors.textSubtle, marginBottom: 8, letterSpacing: 0.5 },
+    descText: { ...typography.bodyRegular, color: colors.text, lineHeight: 20 },
 
     primaryBtn: {
       flexDirection: 'row',
@@ -979,6 +1025,18 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       color: colors.textSubtle,
       marginBottom: 6,
       letterSpacing: 0.3,
+    },
+    fieldHint: { fontSize: 16, color: colors.textSubtle },
+    ticketToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 14,
+      gap: 10,
+    },
+    ticketRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
     },
     textInput: {
       backgroundColor: colors.background,
