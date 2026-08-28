@@ -88,7 +88,7 @@ function StatCardSkeletons() {
 
 // Haal die admin-KPI's, grafiekdata en onlangse besprekings, en wys die volledige admin-uitleg
 async function AdminDashboard() {
-    const [kpisRes, eventsSummaryRes, rsvpSummaryRes, rsvpsPerMonthRes, recentRsvpsRes, budgetPerMonthRes, ticketRevenueSummaryRes, revenuePerEventRes, revenuePerMonthRes] =
+    const [kpisRes, eventsSummaryRes, rsvpSummaryRes, rsvpsPerMonthRes, recentRsvpsRes, budgetPerMonthRes, ticketRevenueSummaryRes, revenuePerEventRes, revenuePerMonthRes, eventsTrendRes, rsvpsTrendRes, budgetTrendRes, revenueTrendRes] =
         await Promise.allSettled([
             getAdminKpis(),
             getEventsSummary(),
