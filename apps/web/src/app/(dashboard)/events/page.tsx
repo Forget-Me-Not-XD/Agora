@@ -69,11 +69,17 @@ export default function EventsPage() {
 
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
+    //
+    // Verstek-venster: vandag tot die einde van volgende maand -- verby
+    // geleenthede word so nie eens gehaal nie
     useEffect(() => {
         let active = true;
         (async () => {
+            const now = new Date();
+            const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
+
             const [eventsResult, rsvpsResult] = await Promise.all([
-                listEventsAction(),
+                listEventsAction({ from: now.toISOString(), to: endOfNextMonth.toISOString() }),
                 getMyRsvpsAction(),
             ]);
             if (!active) return;
