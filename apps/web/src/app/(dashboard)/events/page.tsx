@@ -70,8 +70,10 @@ export default function EventsPage() {
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
     //
-    // Verstek-venster: vandag tot die einde van volgende maand -- verby
-    // geleenthede word so nie eens gehaal nie
+    // Bo-grens: einde van volgende maand,  verder-in-die-toekoms geleenthede
+    // bly die kalenderbladsy se werk. Geen onder-grens nie: verby geleenthede
+    // word steeds gehaal sodat die "Verby"-statusfilter hulle kan wys, hulle
+    // word net client-kant (matchesStatus hieronder) by verstek weggesteek.
     useEffect(() => {
         let active = true;
         (async () => {
@@ -79,7 +81,7 @@ export default function EventsPage() {
             const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
             const [eventsResult, rsvpsResult] = await Promise.all([
-                listEventsAction({ from: now.toISOString(), to: endOfNextMonth.toISOString() }),
+                listEventsAction({ to: endOfNextMonth.toISOString() }),
                 getMyRsvpsAction(),
             ]);
             if (!active) return;
@@ -101,7 +103,12 @@ export default function EventsPage() {
             const matchesSearch =
                 event.title.toLowerCase().includes(search.toLowerCase()) ||
                 event.description.toLowerCase().includes(search.toLowerCase());
-            const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
+            // 'Alle Status' beteken hier alle nie-verby geleenthede, 'n verby
+            // geleentheid wys slegs as die 'Verby'-status spesifiek gekies is.
+            const matchesStatus =
+                statusFilter === 'all'
+                    ? deriveStatus(event) !== 'past'
+                    : deriveStatus(event) === statusFilter;
             const matchesType = typeFilter === 'all' || event.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
         })

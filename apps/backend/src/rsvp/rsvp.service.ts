@@ -19,6 +19,10 @@ export interface ScanResponse {
     eventDate: Date;
 }
 
+// geleenthede word vir so lank gesien deur die stelsel as aan die gang
+// wanneer geen END DATE gegee was nie
+const EVENT_GRACE_PERIOD_MS = 3 * 60 * 60 * 1000;
+
 @Injectable()
 export class RsvpService {
     constructor(
@@ -33,6 +37,11 @@ export class RsvpService {
 
         if (event.sellsTickets) {
             throw new ForbiddenException('Hierdie geleentheid vereis \'n kaartjie-aankoop');
+        }
+
+        const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
+        if (effectiveEnd.getTime() < Date.now()) {
+            throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
         }
 
         const existing = await this.rsvpModel
