@@ -2,7 +2,7 @@
 
 // ========== Imports: ==========
 import { createEvent, getEvents, updateEvent } from '@/lib/api/events';
-import type { CreateEventPayload, Event, UpdateEventPayload } from '@/lib/api/events';
+import type { CreateEventPayload, Event, EventFilters, UpdateEventPayload } from '@/lib/api/events';
 
 export interface CreateEventResult {
     id?:    string;
@@ -37,9 +37,9 @@ export interface ListEventsResult {
     error?:  string;
 }
 
-export async function listEventsAction(): Promise<ListEventsResult> {
+export async function listEventsAction(filters?: EventFilters): Promise<ListEventsResult> {
     try {
-        const events = await getEvents();
+        const events = await getEvents(filters);
         return { events };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Kon nie geleenthede laai nie.' };

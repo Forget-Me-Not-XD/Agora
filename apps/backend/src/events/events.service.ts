@@ -48,11 +48,23 @@ export class EventsService {
         to?: string,
     ): Promise<EventDocument[]> {
         const filter: FilterQuery<EventDocument> = {};
+        const andConditions: FilterQuery<EventDocument>[] = [];
 
-        if (from || to) {
-            filter.date = {};
-            if (from) filter.date.$gte = new Date(from);
-            if (to)   filter.date.$lte = new Date(to);
+        // 'n Geleentheid val binne die venster as dit nog nie klaar is nie (endDate,
+        // of die begin-datum as daar nie een is nie, >= from) en nie na die venster begin
+        // nie (date <= to), so tel "aangaande" geleenthede wat voor `from` begin
+        // het maar steeds loop, ook, nie net die wat na `from` begin nie
+        if (from) {
+            const fromDate = new Date(from);
+            andConditions.push({
+                $or: [
+                    { endDate: { $gte: fromDate } },
+                    { endDate: { $in: [null, undefined] }, date: { $gte: fromDate } },
+                ],
+            });
+        }
+        if (to) {
+            andConditions.push({ date: { $lte: new Date(to) } });
         }
 
         // Rol-gebaseerde sigbaarheid: 'n gebruiker sien geleenthede op sy vlak en laer.
@@ -64,10 +76,16 @@ export class EventsService {
         if (viewerRole === Role.PHOTOGRAPHER) {
             filter.photographers = new Types.ObjectId(viewerId);
         } else if (viewerRole !== Role.ADMIN) {
-            filter.$or = [
-                { intendedAttendance: { $in: visibleAttendanceRoles(viewerRole) } },
-                { assignedTo: new Types.ObjectId(viewerId) },
-            ];
+            andConditions.push({
+                $or: [
+                    { intendedAttendance: { $in: visibleAttendanceRoles(viewerRole) } },
+                    { assignedTo: new Types.ObjectId(viewerId) },
+                ],
+            });
+        }
+
+        if (andConditions.length > 0) {
+            filter.$and = andConditions;
         }
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
