@@ -1,13 +1,13 @@
 // ========== Imports: ==========
-import { Calendar, MapPin, Ticket, CheckCircle2, Clock } from 'lucide-react';
+import { Ticket, CheckCircle2, Clock } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import ChartCard from '@/components/charts/ChartCard';
 import RsvpStatusBreakdown from '@/components/charts/RsvpStatusBreakdown';
+import UpcomingEventsCarousel from './UpcomingEventsCarousel';
 import MyBookingsTable from './MyBookingsTable';
 import { getMyRsvps } from '@/lib/api/rsvp';
 import type { RsvpStatus } from '@/lib/api/rsvp';
 import type { RsvpStatusCount } from '@/lib/api/analytics';
-import { formatDateLong } from '@/lib/format-date';
 
 const STATUS_ORDER: RsvpStatus[] = ['BEVESTIG', 'HANGENDE', 'GEKANSELLEER'];
 
@@ -26,7 +26,7 @@ export default async function AttendeeDashboard() {
         .filter((r) => r.event && r.status !== 'GEKANSELLEER' && new Date(r.event.date).getTime() >= now)
         .sort((a, b) => new Date(a.event!.date).getTime() - new Date(b.event!.date).getTime());
 
-    const next = upcoming[0];
+    const upcomingTop5 = upcoming.slice(0, 5);
 
     return (
         <div className="space-y-6">
@@ -37,24 +37,7 @@ export default async function AttendeeDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
-                {next?.event ? (
-                    <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                        <p className="text-xs text-[var(--color-text-subtle)] mb-1">Jou volgende geleentheid</p>
-                        <h2 className="text-lg font-bold text-[var(--color-text)]">{next.event.title}</h2>
-                        <div className="flex flex-wrap items-center gap-4 mt-2">
-                            <span className="flex items-center gap-1.5 text-sm text-[var(--color-text-subtle)]">
-                                <Calendar size={14} className="shrink-0" /> {formatDateLong(next.event.date)}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-sm text-[var(--color-text-subtle)]">
-                                <MapPin size={14} className="shrink-0" /> {next.event.location}
-                            </span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-center justify-center">
-                        <p className="text-sm text-[var(--color-text-subtle)]">Geen opkomende geleenthede bespreek nie.</p>
-                    </div>
-                )}
+                <UpcomingEventsCarousel upcoming={upcomingTop5} />
 
                 <ChartCard title="Jou RSVP-status" subtitle="Verdeling van jou besprekings" value={rsvps.length} valueLabel="in totaal">
                     <RsvpStatusBreakdown data={statusCounts} />
