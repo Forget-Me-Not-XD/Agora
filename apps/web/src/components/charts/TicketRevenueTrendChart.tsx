@@ -4,6 +4,8 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TooltipContentProps } from 'recharts';
 import type { SingleMonthlyPoint } from '@/lib/chart-utils';
+import type { Trend } from '@/lib/api/analytics';
+import TrendIndicator from './TrendIndicator';
 
 function fmtRand(v: number): string {
     if (v >= 1_000_000) return `R${(v / 1_000_000).toFixed(1)}m`;
@@ -23,7 +25,7 @@ function ChartTooltip({ active, payload, label }: TooltipContentProps) {
     );
 }
 
-export default function TicketRevenueTrendChart({ data }: { data: SingleMonthlyPoint[] }) {
+export default function TicketRevenueTrendChart({ data, trend }: { data: SingleMonthlyPoint[]; trend?: Trend | null }) {
     const total = data.reduce((s, d) => s + d.value, 0);
     const avgPerMonth = data.length > 0 ? total / data.length : 0;
 
@@ -37,6 +39,7 @@ export default function TicketRevenueTrendChart({ data }: { data: SingleMonthlyP
                 <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
                     ~{fmtRand(avgPerMonth)} per maand
                 </span>
+                <TrendIndicator trend={trend} label="vs. verlope week" />
             </div>
 
             <ResponsiveContainer width="100%" height={220}>

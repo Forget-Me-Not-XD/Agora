@@ -1,9 +1,10 @@
 'use client';
 
+// ========== Imports: ==========
 import { useMemo } from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import type { TooltipContentProps } from 'recharts';
+import type { TooltipContentProps, DotItemDotProps } from 'recharts';
 import type { MonthlyPoint } from '@/lib/chart-utils';
 import type { Trend } from '@/lib/api/analytics';
 import TrendIndicator from './TrendIndicator';
@@ -27,24 +28,83 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
     const totalRsvps = data.reduce((s, d) => s + d.b, 0);
     const avgRsvpsPerEvent = totalEvents > 0 ? (totalRsvps / totalEvents).toFixed(1) : '0';
 
-    // Klein bykomende insigte — vul die ruimte onder die grafiek met iets nuttig
-    // pleks van net leë kaartruimte.
-    const { peakMonth, trend: periodTrend } = useMemo(() => {
-        if (data.length === 0) return { peakMonth: null, trend: null };
+    const { anomalyIndices, anomalyMonths, declineIndices, declineMonths } = useMemo(() => {
+        if (data.length === 0) {
+            return {
+                anomalyIndices: new Set<number>(),
+                anomalyMonths: [] as string[],
+                declineIndices: new Set<number>(),
+                declineMonths: [] as string[],
+            };
+        }
 
-        const peak = data.reduce((best, d) => (d.b > best.b ? d : best), data[0]);
+        const avgEvents = data.reduce((s, d) => s + d.a, 0) / data.length;
+        const avgRsvps = data.reduce((s, d) => s + d.b, 0) / data.length;
+        const eventsStdDev = Math.sqrt(data.reduce((s, d) => s + (d.a - avgEvents) ** 2, 0) / data.length);
+        const rsvpsStdDev = Math.sqrt(data.reduce((s, d) => s + (d.b - avgRsvps) ** 2, 0) / data.length);
 
-        const half = Math.floor(data.length / 2) || 1;
-        const firstHalfAvg = data.slice(0, half).reduce((s, d) => s + d.b, 0) / half;
-        const secondHalfAvg = data.slice(-half).reduce((s, d) => s + d.b, 0) / half;
-        const deltaPct = firstHalfAvg > 0 ? Math.round(((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100) : 0;
+        const scored = data.map((d, index) => {
+            const eventsZ = eventsStdDev > 0 ? (d.a - avgEvents) / eventsStdDev : 0;
+            const rsvpsZ = rsvpsStdDev > 0 ? (d.b - avgRsvps) / rsvpsStdDev : 0;
+            return { label: d.label, index, divergence: rsvpsZ - eventsZ };
+        });
 
-        return { peakMonth: peak, trend: deltaPct };
+        const DIVERGENCE_FLOOR = 1;
+        const MAX_MARKERS_PER_SIDE = 3;
+
+        const anomalies = scored
+            .filter((s) => s.divergence >= DIVERGENCE_FLOOR)
+            .sort((x, y) => y.divergence - x.divergence)
+            .slice(0, MAX_MARKERS_PER_SIDE);
+
+        const declines = scored
+            .filter((s) => s.divergence <= -DIVERGENCE_FLOOR)
+            .sort((x, y) => x.divergence - y.divergence)
+            .slice(0, MAX_MARKERS_PER_SIDE);
+
+        return {
+            anomalyIndices: new Set(anomalies.map((x) => x.index)),
+            anomalyMonths: anomalies.map((x) => x.label),
+            declineIndices: new Set(declines.map((x) => x.index)),
+            declineMonths: declines.map((x) => x.label),
+        };
     }, [data]);
+
+    function renderRsvpDot(props: DotItemDotProps): ReactNode {
+        const { cx, cy, index } = props;
+        if (cx === undefined || cy === undefined || index === undefined) {
+            return <circle key={`dot-${index}`} r={0} />;
+        }
+
+        if (anomalyIndices.has(index)) {
+            return (
+                <g key={`anomaly-${index}`}>
+                    <circle cx={cx} cy={cy} r={9} fill="var(--color-surface)" stroke="var(--color-purple)" strokeWidth={2} />
+                    <circle cx={cx} cy={cy} r={3.5} fill="var(--color-purple)" />
+                    <text x={cx} y={cy - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--color-purple)">
+                        Ondersoek
+                    </text>
+                </g>
+            );
+        }
+
+        if (declineIndices.has(index)) {
+            return (
+                <g key={`decline-${index}`}>
+                    <circle cx={cx} cy={cy} r={9} fill="var(--color-surface)" stroke="var(--color-orange)" strokeWidth={2} />
+                    <circle cx={cx} cy={cy} r={3.5} fill="var(--color-orange)" />
+                    <text x={cx} y={cy - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--color-orange)">
+                        Daling
+                    </text>
+                </g>
+            );
+        }
+
+        return <circle key={`dot-${index}`} r={0} />;
+    }
 
     return (
         <div className="h-full flex flex-col">
-            {/* Legend + running totals — doubles as a quick-read summary */}
             <div className="flex flex-wrap items-center gap-4 mb-3 shrink-0">
                 <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-blue)' }} />
@@ -54,71 +114,66 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-red)' }} />
                     RSVPs <span className="font-semibold text-[var(--color-text)]">{totalRsvps}</span>
                 </span>
+                {anomalyMonths.length > 0 && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-purple)]">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[var(--color-purple)]" style={{ background: 'var(--color-surface)' }} />
+                        Ongewone doeltreffendheid gemerk
+                    </span>
+                )}
+                {declineMonths.length > 0 && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-orange)]">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[var(--color-orange)]" style={{ background: 'var(--color-surface)' }} />
+                        Skerp RSVP-daling gemerk
+                    </span>
+                )}
                 <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
                     ~{avgRsvpsPerEvent} RSVPs per geleentheid
                 </span>
-                <TrendIndicator trend = {trend} label="vs. verlede week" />
+                <TrendIndicator trend={trend} label="vs. verlede week" />
             </div>
 
-            <div className="flex-1 min-h-[220px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <defs>
-                            <linearGradient id="fillEvents" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--color-blue)" stopOpacity={0.35} />
-                                <stop offset="95%" stopColor="var(--color-blue)" stopOpacity={0} />
-                            </linearGradient>
-                            <linearGradient id="fillRsvps" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--color-red)" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="var(--color-red)" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                        <XAxis dataKey="label" stroke="var(--color-text-subtle)" fontSize={11} tickLine={false} axisLine={false} />
-                        {/* Geleenthede en RSVPs leef op heel ander skale (tientalle vs duisende) —
-                            elke reeks kry sy eie y-as sodat die kleiner reeks nie plat langs 0 verdwyn nie. */}
-                        <YAxis
-                            yAxisId="events"
-                            stroke="var(--color-blue)"
-                            fontSize={11}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={false}
-                            width={30}
-                        />
-                        <YAxis
-                            yAxisId="rsvps"
-                            orientation="right"
-                            stroke="var(--color-red)"
-                            fontSize={11}
-                            tickLine={false}
-                            axisLine={false}
-                            allowDecimals={false}
-                            width={36}
-                        />
-                        <Tooltip content={ChartTooltip} />
-                        <Area yAxisId="events" type="monotone" dataKey="a" name="Geleenthede" stroke="var(--color-blue)" fill="url(#fillEvents)" strokeWidth={2} />
-                        <Area yAxisId="rsvps" type="monotone" dataKey="b" name="RSVPs" stroke="var(--color-red)" fill="url(#fillRsvps)" strokeWidth={2} />
-                    </AreaChart>
-                </ResponsiveContainer>
-            </div>
-
-            {peakMonth && periodTrend !== null && (
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 mt-3 pt-3 border-t border-[var(--color-border)] shrink-0 text-xs text-[var(--color-text-subtle)]">
-                    <span>
-                        Beste maand: <strong className="text-[var(--color-text)]">{peakMonth.label}</strong> ({peakMonth.b} RSVPs)
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        Tendens (eerste helfte → laaste helfte):
-                        {periodTrend > 5 && <TrendingUp size={13} style={{ color: 'var(--color-green)' }} />}
-                        {periodTrend < -5 && <TrendingDown size={13} style={{ color: 'var(--color-red)' }} />}
-                        {periodTrend >= -5 && periodTrend <= 5 && <Minus size={13} />}
-                        <strong style={{ color: periodTrend > 5 ? 'var(--color-green)' : periodTrend < -5 ? 'var(--color-red)' : 'var(--color-text)' }}>
-                            {periodTrend > 0 ? '+' : ''}{periodTrend}%
-                        </strong>
-                    </span>
+            <div className="flex-1 min-h-0 flex items-center">
+                <div className="w-full aspect-[3/1] max-h-[320px] min-h-[160px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="fillEvents" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-blue)" stopOpacity={0.35} />
+                                    <stop offset="95%" stopColor="var(--color-blue)" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="fillRsvps" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-red)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--color-red)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                            <XAxis dataKey="label" stroke="var(--color-text-subtle)" fontSize={11} tickLine={false} axisLine={false} />
+                            <YAxis
+                                yAxisId="events"
+                                stroke="var(--color-blue)"
+                                fontSize={11}
+                                tickLine={false}
+                                axisLine={false}
+                                allowDecimals={false}
+                                width={34}
+                            />
+                            <YAxis
+                                yAxisId="rsvps"
+                                orientation="right"
+                                stroke="var(--color-red)"
+                                fontSize={11}
+                                tickLine={false}
+                                axisLine={false}
+                                allowDecimals={false}
+                                width={36}
+                            />
+                            <Tooltip content={ChartTooltip} />
+                            <Area yAxisId="events" type="monotone" dataKey="a" name="Geleenthede" stroke="var(--color-blue)" fill="url(#fillEvents)" strokeWidth={2} />
+                            <Area yAxisId="rsvps" type="monotone" dataKey="b" name="RSVPs" stroke="var(--color-red)" fill="url(#fillRsvps)" strokeWidth={2} dot={renderRsvpDot} />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </div>
-            )}
+            </div>
         </div>
     );
 }
