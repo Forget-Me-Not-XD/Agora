@@ -17,6 +17,7 @@ export type ThemeColors = {
 
   // Status
   red: string;
+  redBg: string;
   blue: string;
 
   // Role colors
@@ -50,6 +51,7 @@ const light: ThemeColors = {
   textSubtle: '#475569',
 
   red: '#DC2626',
+  redBg: '#FEE2E2',
   blue: '#1E40AF',
 
   roleAdmin: '#5C77A5',
@@ -81,6 +83,7 @@ const dark: ThemeColors = {
   textSubtle: '#8AA4B8',
 
   red: '#F87171',
+  redBg: '#450A0A',
   blue: '#60A5FA',
 
   roleAdmin: '#5C77A5',

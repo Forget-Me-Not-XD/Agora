@@ -39,7 +39,10 @@ export interface PaymentNotifyResult {
 }
 
 export async function initiatePayment(eventId: string): Promise<InitiatePaymentResponse> {
-    return apiClient.post<InitiatePaymentResponse, { eventId: string }>('/payments/initiate', { eventId });
+    return apiClient.post<InitiatePaymentResponse, { eventId: string; platform: 'mobile' }>(
+        '/payments/initiate',
+        { eventId, platform: 'mobile' },
+    );
 }
 
 export async function notifyPayment(payload: SimulatedPayfastNotify): Promise<PaymentNotifyResult> {

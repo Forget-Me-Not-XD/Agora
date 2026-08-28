@@ -37,8 +37,7 @@ export interface AppConfig {
         passphrase: string;
         mode: string;
         notifyUrl: string;
-        returnUrl: string;
-        cancelUrl: string;
+        publicBaseUrl: string;
         processUrl: string;
     }
 }
@@ -84,8 +83,12 @@ export default (): AppConfig => {
             passphrase: process.env.PAYFAST_PASSPHRASE ?? '',
             mode: process.env.PAYFAST_MODE ?? 'simulate',
             notifyUrl: process.env.PAYFAST_NOTIFY_URL ?? 'http://localhost:3000/api/v1/payments/notify',
-            returnUrl: process.env.PAYFAST_RETURN_URL ?? 'http://localhost:3001/events',
-            cancelUrl: process.env.PAYFAST_CANCEL_URL ?? 'http://localhost:3001/events',
+            // PayFast moet die gebruiker se blaaier hierheen kan herlei ná betaling, so
+            // dit moet dieselfde publiek-bereikbare basis as notifyUrl wees (bv. dieselfde
+            // ngrok-tunnel) -- nie localhost nie, PayFast se werklike sandbox verwerp dit.
+            // /return en /cancel word hieronder aangeheg, met ?platform= om te weet of ons
+            // terug na die web-frontend of na die mobiele app se eie skema moet herlei.
+            publicBaseUrl: process.env.PAYFAST_PUBLIC_BASE_URL ?? 'http://localhost:3000/api/v1/payments',
             processUrl: process.env.PAYFAST_PROCESS_URL ?? 'https://sandbox.payfast.co.za/eng/process',
         },
     };

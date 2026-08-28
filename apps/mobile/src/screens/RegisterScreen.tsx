@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore, RegisterPayload } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
+import { safeGoBack } from '../lib/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
@@ -29,7 +30,10 @@ const STUDY_CENTERS = [
 ] as const;
 
 export function RegisterScreen({ navigation }: Props) {
-  const { register, isLoading, error, clearError } = useAuthStore();
+  const register = useAuthStore((s) => s.register);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const error = useAuthStore((s) => s.error);
+  const clearError = useAuthStore((s) => s.clearError);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -338,7 +342,7 @@ export function RegisterScreen({ navigation }: Props) {
 
             <TouchableOpacity
               style={styles.linkButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => safeGoBack(navigation)}
               disabled={isLoading}
             >
               <Text style={styles.linkText}>

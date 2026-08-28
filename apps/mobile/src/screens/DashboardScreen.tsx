@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -13,12 +13,14 @@ import { listEvents, type EventResponse } from '../api/events';
 import { getMyRsvps, type RsvpWithEvent } from '../api/rsvp';
 import { getPrediction, type PredictionResult } from '../api/analytics';
 import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from '../lib/event-status';
+import { takeEventsPrefetch, takeMyRsvpsPrefetch, takePredictionPrefetch } from '../lib/prefetch';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
 
 export function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, logout } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [aiInfoOpen, setAiInfoOpen] = useState(false);
@@ -31,41 +33,51 @@ export function DashboardScreen() {
 
   const isStaff = user?.role === 'ADMIN' || user?.role === 'DOSENT';
 
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
+  // Laai elke keer wat hierdie oortjie fokus kry (nie net met die eerste
+  // koppeling nie) -- sonder dit sou 'n RSVP wat elders gekanselleer is, of 'n
+  // nuwe funksie wat geskep is, nooit hier opgedateer wys totdat die hele app
+  // herbegin word nie.
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      let active = true;
 
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const eventList = await listEvents();
-        if (!active) return;
-        setEvents(eventList);
+      // Herbruik die agtergrond-voorlaai wat tydens onboarding begin het as dit nog
+      // vars is -- dan is daar hier glad geen nuwe netwerkversoek nodig nie.
+      const prefetchedPrediction = takePredictionPrefetch();
 
-        if (!isStaff) {
-          const rsvpList = await getMyRsvps();
-          if (active) setMyRsvps(rsvpList);
-        }
+      (async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+          const eventList = await (takeEventsPrefetch() ?? listEvents());
+          if (!active) return;
+          setEvents(eventList);
 
-        const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
-        if (isStaff && upcoming.length > 0) {
-          try {
-            const pred = await getPrediction(upcoming[0].id);
-            if (active) setPrediction(pred);
-          } catch {
-            if (active) setPrediction(null);
+          if (!isStaff) {
+            const rsvpList = await (takeMyRsvpsPrefetch() ?? getMyRsvps());
+            if (active) setMyRsvps(rsvpList);
           }
-        }
-      } catch {
-        if (active) setLoadError('Kon nie paneelbord-data laai nie.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
 
-    return () => { active = false; };
-  }, [user?.id, isStaff]);
+          const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
+          if (isStaff && upcoming.length > 0) {
+            try {
+              const pred = await (prefetchedPrediction ?? getPrediction(upcoming[0].id));
+              if (active) setPrediction(pred);
+            } catch {
+              if (active) setPrediction(null);
+            }
+          }
+        } catch {
+          if (active) setLoadError('Kon nie paneelbord-data laai nie.');
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+
+      return () => { active = false; };
+    }, [user?.id, isStaff]),
+  );
 
   if (!user) return null;
 
@@ -77,10 +89,13 @@ export function DashboardScreen() {
   const upcomingRsvpsCount = activeRsvps.filter((r) => getEventStatus(r.event) !== 'past').length;
 
   const totalConfirmedAttendees = events.reduce((sum, e) => sum + e.confirmedAttendees, 0);
-  const totalBudget = events.reduce((sum, e) => sum + (e.budget ?? 0), 0);
-  const fillRates = events.filter((e) => e.maxCapacity > 0).map((e) => e.confirmedAttendees / e.maxCapacity);
-  const averageAttendancePct = fillRates.length
-    ? Math.round((fillRates.reduce((a, b) => a + b, 0) / fillRates.length) * 100)
+  // "Bywoning" is werklike opdaag-syfers (QR geskandeer), nie RSVP-vulkoers nie --
+  // en 'n geleentheid wat nog moet plaasvind het per definisie nog geen bywoning
+  // om te meet nie, so ons tel net reeds-afgelope geleenthede.
+  const pastEvents = events.filter((e) => getEventStatus(e) === 'past' && e.maxCapacity > 0);
+  const attendanceRates = pastEvents.map((e) => e.checkedInCount / e.maxCapacity);
+  const averageAttendancePct = attendanceRates.length
+    ? Math.round((attendanceRates.reduce((a, b) => a + b, 0) / attendanceRates.length) * 100)
     : 0;
 
   const roleLabel = {
@@ -181,9 +196,6 @@ export function DashboardScreen() {
               {(user.role === 'ADMIN' || user.role === 'DOSENT') && (
                 <StatCard styles={styles} label="Gem. bywoning" value={`${averageAttendancePct}%`} />
               )}
-              {user.role === 'ADMIN' && (
-                <StatCard styles={styles} label="Begroting" value={`R${totalBudget.toLocaleString('af-ZA')}`} />
-              )}
               {(user.role === 'STUDENT' || user.role === 'GAS') && (
                 <StatCard styles={styles} label="Jou RSVPs" value={String(activeRsvps.length)} />
               )}
@@ -252,7 +264,7 @@ export function DashboardScreen() {
           </>
         )}
 
-        <Text style={styles.versionText}>Pre-Alfa v0.1.0</Text>
+        <Text style={styles.versionText}>Beta</Text>
 
       </ScrollView>
 

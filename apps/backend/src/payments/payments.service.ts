@@ -11,6 +11,7 @@ import { RsvpService } from "../rsvp/rsvp.service";
 import { UsersService } from "../users/users.service";
 import { PayfastNotifyDto, PayfastNotifyResultDto } from "./dto/payfast-notify.dto";
 import { InitiatePaymentResponseDto } from "./dto/initiate-payment-response.dto";
+import { PaymentPlatform } from "./dto/initiate-payment.dto";
 
 interface PayfastNotifyFields {
     [key: string]: string;
@@ -31,7 +32,7 @@ export class PaymentsService {
         private readonly usersService: UsersService,
     ) {}
 
-    async initiate(eventId: string, userId: string): Promise<InitiatePaymentResponseDto> {
+    async initiate(eventId: string, userId: string, platform: PaymentPlatform = 'web'): Promise<InitiatePaymentResponseDto> {
         const event = await this.eventsService.findById(eventId);
 
         if (!event.sellsTickets || event.ticketPrice === null) {
@@ -62,8 +63,9 @@ export class PaymentsService {
         const merchantKey = this.configService.get<string>('payfast.merchantKey')!;
         const passphrase = this.configService.get<string>('payfast.passphrase')!;
         const notifyUrl = this.configService.get<string>('payfast.notifyUrl')!;
-        const returnUrl = this.configService.get<string>('payfast.returnUrl')!;
-        const cancelUrl = this.configService.get<string>('payfast.cancelUrl')!;
+        const publicBaseUrl = this.configService.get<string>('payfast.publicBaseUrl')!;
+        const returnUrl = `${publicBaseUrl}/return?platform=${platform}`;
+        const cancelUrl = `${publicBaseUrl}/cancel?platform=${platform}`;
         const checkoutUrl = this.configService.get<string>('payfast.processUrl')!;
         const mode = this.configService.get<string>('payfast.mode');
 

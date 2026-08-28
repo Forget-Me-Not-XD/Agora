@@ -14,7 +14,10 @@ import { useThemeColors } from '../theme/theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'ChangePassword'>;
 
 export function ChangePasswordScreen(_props: Props) {
-  const { changePassword, isLoading, error, clearError } = useAuthStore();
+  const changePassword = useAuthStore((s) => s.changePassword);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const error = useAuthStore((s) => s.error);
+  const clearError = useAuthStore((s) => s.clearError);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 

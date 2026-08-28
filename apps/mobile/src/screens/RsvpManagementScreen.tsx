@@ -12,6 +12,7 @@ import { getEventRsvps, cancelRsvp, checkInRsvp, type RsvpWithUser, type RsvpSta
 import { RSVP_STATUS_LABELS, getRsvpStatusColors } from '../lib/rsvp-status';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
+import { safeGoBack } from '../lib/navigation';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RsvpManagement'>;
 type Route = RouteProp<RootStackParamList, 'RsvpManagement'>;
@@ -104,7 +105,7 @@ export function RsvpManagementScreen() {
     <SafeAreaView style={styles.safe}>
       <ScreenHeader
         title={event ? event.title : 'Bestuur RSVPs'}
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation)}
       />
 
       {loading ? (

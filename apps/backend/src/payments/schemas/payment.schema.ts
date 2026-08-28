@@ -1,6 +1,6 @@
 // ========== Imports: ==========
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export enum PaymentStatus {
     HANGENDE = 'HANGENDE',
@@ -12,10 +12,10 @@ export type PaymentDocument = HydratedDocument<Payment>;
 
 @Schema({ timestamps: true, collection: 'payments' })
 export class Payment {
-    @Prop ({ required: true, type: Types.ObjectId, ref: 'Event', index: true })
+    @Prop ({ required: true, type: SchemaTypes.ObjectId, ref: 'Event', index: true })
     event !: Types.ObjectId;
 
-    @Prop ({ required: true, type: Types.ObjectId, ref: 'User', index: true })
+    @Prop ({ required: true, type: SchemaTypes.ObjectId, ref: 'User', index: true })
     user !: Types.ObjectId;
 
     @Prop ({ required: true, unique: true, trim: true })
@@ -30,7 +30,7 @@ export class Payment {
     @Prop ({ type: String, default: null })
     providerPaymentId !: string | null;
 
-    @Prop ({ type: Types.ObjectId, ref: 'Rsvp', default: null })
+    @Prop ({ type: SchemaTypes.ObjectId, ref: 'Rsvp', default: null })
     rsvp !: Types.ObjectId | null;
 
     createdAt ?: Date;

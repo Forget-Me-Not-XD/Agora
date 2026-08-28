@@ -11,6 +11,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import { useThemeStore } from '../stores/theme.store';
+import { GoogleLogo, MicrosoftLogo } from '../components/BrandIcons';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -18,11 +19,15 @@ const agoraIconLight = require('../../assets/agora-icon.png');
 const agoraIconDark = require('../../assets/agora-icon-dark.png');
 
 export function LoginScreen({ navigation }: Props) {
-  const {
-    login, loginWithSso, isLoading, error, clearError,
-    biometricsAvailable, biometricsEnabled,
-    checkBiometricsAvailability, loginWithBiometrics
-  } = useAuthStore();
+  const login = useAuthStore((s) => s.login);
+  const loginWithSso = useAuthStore((s) => s.loginWithSso);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const error = useAuthStore((s) => s.error);
+  const clearError = useAuthStore((s) => s.clearError);
+  const biometricsAvailable = useAuthStore((s) => s.biometricsAvailable);
+  const biometricsEnabled = useAuthStore((s) => s.biometricsEnabled);
+  const checkBiometricsAvailability = useAuthStore((s) => s.checkBiometricsAvailability);
+  const loginWithBiometrics = useAuthStore((s) => s.loginWithBiometrics);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const mode = useThemeStore((s) => s.mode);
@@ -162,7 +167,7 @@ export function LoginScreen({ navigation }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Meld aan met Google"
             >
-              <MaterialCommunityIcons name="google" size={18} color={colors.text} />
+              <GoogleLogo />
               <Text style={styles.ssoText}>Meld aan met Google</Text>
             </TouchableOpacity>
 
@@ -173,7 +178,7 @@ export function LoginScreen({ navigation }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Meld aan met Microsoft"
             >
-              <MaterialCommunityIcons name="microsoft" size={18} color={colors.text} />
+              <MicrosoftLogo />
               <Text style={styles.ssoText}>Meld aan met Microsoft</Text>
             </TouchableOpacity>
 

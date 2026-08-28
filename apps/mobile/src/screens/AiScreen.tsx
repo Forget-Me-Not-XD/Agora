@@ -27,7 +27,7 @@ interface Forecast {
 
 export function AiScreen() {
   const navigation = useNavigation<Nav>();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -86,7 +86,19 @@ export function AiScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="KI Insigte" subtitle="LSTM voorspellingsmodel" />
+      <ScreenHeader
+        title="KI Insigte"
+        subtitle="LSTM voorspellingsmodel"
+        right={
+          <TouchableOpacity
+            style={styles.insightsBtn}
+            onPress={() => navigation.navigate('Insights')}
+            accessibilityLabel="Wys prestasie-insigte"
+          >
+            <Feather name="bar-chart-2" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -250,6 +262,17 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     safe: { flex: 1, backgroundColor: colors.background },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
+
+    insightsBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
     noAccessCard: {
       margin: 16,

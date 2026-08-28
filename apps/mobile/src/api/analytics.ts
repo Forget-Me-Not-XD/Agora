@@ -22,17 +22,6 @@ export async function getEventsSummary(): Promise<EventsSummary> {
     return apiClient.get<EventsSummary>('/analytics/events-summary');
 }
 
-export interface BudgetPerMonth {
-    year: number;
-    month: number;
-    total: number;
-}
-
-// GET /analytics/budget-per-month -- ADMIN-only op die backend
-export async function getBudgetPerMonth(): Promise<BudgetPerMonth[]> {
-    return apiClient.get<BudgetPerMonth[]>('/analytics/budget-per-month');
-}
-
 export interface PredictionResult {
     predictedFillRate: number;
     estimatedRsvps: number;

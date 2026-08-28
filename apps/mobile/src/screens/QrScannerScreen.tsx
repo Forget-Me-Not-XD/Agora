@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { safeGoBack } from '../lib/navigation';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
@@ -142,7 +143,7 @@ export function QrScannerScreen() {
       {/* ── Header ── */}
       <ScreenHeader
         title="QR Skandeerder"
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation)}
         right={
           <View style={styles.activeBadge}>
             <View style={styles.activeDot} />

@@ -52,7 +52,7 @@ function dateKeyFromIso(iso: string): string {
 
 export function CalendarScreen() {
   const navigation = useNavigation<Nav>();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDark = useIsDark();

@@ -1,10 +1,13 @@
 // ========== Imports: ==========
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, ActivityIndicator } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
 import { initiatePayment, notifyPayment, type InitiatePaymentResponse } from '../api/payments';
+import { API_URL } from '../api/client';
 import type { EventResponse } from '../api/events';
 
 type Step = 'closed' | 'processing' | 'gateway' | 'redirecting' | 'success' | 'error';
@@ -36,11 +39,48 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
     try {
       const result = await initiatePayment(event.id);
       setPayment(result);
-      setStep(result.simulation ? 'gateway' : 'redirecting');
+      if (result.simulation) {
+        setStep('gateway');
+      } else {
+        setStep('redirecting');
+        await openPayFastCheckout(result);
+      }
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
       const raw = axiosErr?.response?.data?.message;
       setError(typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie betaling begin nie.');
+      setStep('error');
+    }
+  }
+
+  // React Native het geen DOM om, soos die webweergawe, 'n POST-form na PayFast te
+  // bou en in te dien nie -- ons stuur die reeds-onderteken checkout-velde eerder
+  // as query-parameters na 'n klein bladsy wat die backend bedien (sien
+  // payments.controller.ts se /payments/checkout-redirect), wat op sy beurt daardie
+  // selfde POST namens ons doen binne 'n regte blaaierkonteks. Sodra PayFast klaar
+  // is, herlei dit terug na ons backend se /payments/return of /cancel, wat op sy
+  // beurt na agora://payment-callback herlei -- presies dieselfde patroon as die
+  // Google/Microsoft-aanmeldvloei hierbo elders in die app.
+  async function openPayFastCheckout(paymentResult: InitiatePaymentResponse): Promise<void> {
+    const params = new URLSearchParams(
+      paymentResult.checkout as unknown as Record<string, string>,
+    ).toString();
+    const checkoutRedirectUrl = `${API_URL}/payments/checkout-redirect?${params}`;
+    const redirectUri = Linking.createURL('payment-callback');
+
+    const result = await WebBrowser.openAuthSessionAsync(checkoutRedirectUrl, redirectUri);
+
+    if (result.type !== 'success') {
+      close();
+      return;
+    }
+
+    const { queryParams } = Linking.parse(result.url);
+    if (queryParams?.payment === 'success') {
+      setStep('success');
+      onPurchased?.();
+    } else {
+      setError('Die betaling is gekanselleer of het misluk.');
       setStep('error');
     }
   }
@@ -61,10 +101,6 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
       setError('Betaling kon nie bevestig word nie.');
       setStep('error');
     }
-  }
-
-  function openInBrowser() {
-    if (payment?.checkoutUrl) Linking.openURL(payment.checkoutUrl);
   }
 
   return (
@@ -105,11 +141,6 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
                 <Text style={styles.centerText}>
                   {step === 'redirecting' ? 'Word na PayFast herlei…' : 'Besig…'}
                 </Text>
-                {step === 'redirecting' && payment && (
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={openInBrowser}>
-                    <Text style={styles.secondaryBtnText}>Maak PayFast in blaaier oop</Text>
-                  </TouchableOpacity>
-                )}
               </View>
             )}
 

@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useThemeColors } from '../theme/theme';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { safeGoBack } from '../lib/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Popia'>;
 
@@ -54,7 +55,7 @@ export function PopiaScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="POPIA" onBack={() => navigation.goBack()} />
+      <ScreenHeader title="POPIA" onBack={() => safeGoBack(navigation)} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.updated}>Laas opgedateer: 4 Augustus 2026</Text>
@@ -62,7 +63,7 @@ export function PopiaScreen({ navigation }: Props) {
         <View style={styles.noticeBox}>
           <Text style={styles.noticeTitle}>Belangrike konteks</Text>
           <Text style={styles.noticeText}>
-            AGORA is 'n universiteits-kapstoneprojek, nie 'n geregistreerde maatskappy nie.
+            AGORA is 'n universiteits-kapstokprojek, nie 'n geregistreerde maatskappy nie.
             Ons pas POPIA se beginsels toe waar tegnies moontlik. Gapings word eerlik
             onderaan gelys.
           </Text>

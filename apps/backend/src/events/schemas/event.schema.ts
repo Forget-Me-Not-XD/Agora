@@ -1,6 +1,6 @@
 // ========== Imports: ==========
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
 import { EventType } from '../../common/enums/event-type.enum';
 import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
@@ -27,20 +27,29 @@ export class Event {
     @Prop ({ required: true })
     maxCapacity!: number;
 
-    @Prop ({ required: true, type: Types.ObjectId, ref: 'User', index: true })
+    @Prop ({ required: true, type: SchemaTypes.ObjectId, ref: 'User', index: true })
     createdBy!: Types.ObjectId;
 
-    @Prop ({ type: [Types.ObjectId], ref: 'User', default: [] })
+    @Prop ({ type: [SchemaTypes.ObjectId], ref: 'User', default: [] })
     photographers!: Types.ObjectId[];
 
     @Prop ({ required: false, trim: true, default: '' })
     photographerInstructions!: string;
 
-    @Prop ({ required: false, type: Types.ObjectId, ref: 'User', default: null, index: true })
+    @Prop ({ required: false, type: SchemaTypes.ObjectId, ref: 'User', default: null, index: true })
     assignedTo!: Types.ObjectId | null;
 
+    // Tel RSVP's (bevestig of hangende) -- dit is "hoeveel mense het ingeskryf",
+    // NIE "hoeveel mense het opgedaag" nie. Sien checkedInCount hieronder vir
+    // werklike bywoning (QR-kode geskandeer).
     @Prop ({ default: 0 })
     confirmedAttendees!: number;
+
+    // Tel net RSVP's wat werklik ingeteken is (checkedIn:true op die Rsvp-
+    // dokument) -- word inkrementeer in rsvp.service.ts se checkInRsvp/scanRsvp,
+    // presies soos confirmedAttendees vir skepping.
+    @Prop ({ default: 0 })
+    checkedInCount!: number;
 
     @Prop ({ default: 0, min: 0 })
     budget!: number;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -17,6 +17,7 @@ import {
   formatEventTime,
 } from '../lib/event-status';
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
+import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getEvent, createEvent, type EventResponse } from '../api/events';
 import { createRsvp } from '../api/rsvp';
@@ -32,7 +33,7 @@ type Route = RouteProp<RootStackParamList, 'EventDetail'>;
 export function EventDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDark = useIsDark();
@@ -120,7 +121,7 @@ export function EventDetailScreen() {
         <View style={styles.errorWrap}>
           <Feather name="alert-circle" size={32} color={colors.textSubtle} />
           <Text style={styles.errorText}>Funksie nie gevind nie</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => safeGoBack(navigation)}>
             <Text style={styles.backBtnText}>Terug</Text>
           </TouchableOpacity>
         </View>
@@ -176,7 +177,7 @@ export function EventDetailScreen() {
       {/* ── Back + header ── */}
       <ScreenHeader
         title="Funksie Detail"
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation)}
         right={
           <View style={[styles.statusPill, { backgroundColor: pillColor.bg }]}>
             <Text style={[styles.statusPillText, { color: pillColor.text }]}>
@@ -199,7 +200,7 @@ export function EventDetailScreen() {
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{event.confirmedAttendees}</Text>
+            <Text style={styles.statValue}>{event.checkedInCount}</Text>
             <Text style={styles.statLabel}>Bygewoon</Text>
           </View>
           <View style={styles.statDivider} />
@@ -313,7 +314,7 @@ export function EventDetailScreen() {
           </>
         )}
 
-        {!canManageCheckIns(role) && (status === 'upcoming' || status === 'ongoing') && (
+        {(status === 'upcoming' || status === 'ongoing') && (
           event.sellsTickets ? (
             <PaymentModal event={event} />
           ) : (
@@ -360,6 +361,9 @@ function CreateEventForm({
   const [location, setLocation] = useState('');
   const [maxCapacity, setMaxCapacity] = useState('');
   const [budget, setBudget] = useState('');
+  const [sellsTickets, setSellsTickets] = useState(false);
+  const [ticketPrice, setTicketPrice] = useState('');
+  const [ticketsAvailable, setTicketsAvailable] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -456,6 +460,21 @@ function CreateEventForm({
       }
     }
 
+    let ticketPriceNum: number | undefined;
+    let ticketsAvailableNum: number | undefined;
+    if (sellsTickets) {
+      ticketPriceNum = Number(ticketPrice);
+      if (!ticketPrice.trim() || isNaN(ticketPriceNum) || ticketPriceNum <= 0) {
+        setError('Gee asseblief \'n geldige kaartjieprys.');
+        return;
+      }
+      ticketsAvailableNum = Number(ticketsAvailable);
+      if (!ticketsAvailable.trim() || isNaN(ticketsAvailableNum) || ticketsAvailableNum <= 0) {
+        setError('Gee asseblief \'n geldige aantal kaartjies.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -482,8 +501,11 @@ function CreateEventForm({
         location: location.trim(),
         maxCapacity: cap,
         budget: budgetNum,
+        sellsTickets,
+        ticketPrice: sellsTickets ? ticketPriceNum : undefined,
+        ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
       });
-      navigation.goBack();
+      safeGoBack(navigation);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
       const raw = axiosErr?.response?.data?.message;
@@ -503,7 +525,7 @@ function CreateEventForm({
     <SafeAreaView style={styles.safe}>
       <ScreenHeader
         title="Nuwe Funksie"
-        onBack={() => navigation.goBack()}
+        onBack={() => safeGoBack(navigation)}
         backDisabled={isSubmitting}
       />
 
@@ -653,6 +675,49 @@ function CreateEventForm({
             keyboardType="number-pad"
             returnKeyType="done"
           />
+
+          <View style={styles.ticketToggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Verkoop kaartjies</Text>
+              <Text style={styles.fieldHint}>Gaste moet betaal om in te skryf</Text>
+            </View>
+            <Switch
+              value={sellsTickets}
+              onValueChange={setSellsTickets}
+              disabled={isSubmitting}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+
+          {sellsTickets && (
+            <View style={styles.ticketRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Kaartjieprys (R) *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="bv. 150"
+                  placeholderTextColor={colors.textSubtle}
+                  value={ticketPrice}
+                  onChangeText={setTicketPrice}
+                  editable={!isSubmitting}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Aantal kaartjies *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="bv. 100"
+                  placeholderTextColor={colors.textSubtle}
+                  value={ticketsAvailable}
+                  onChangeText={setTicketsAvailable}
+                  editable={!isSubmitting}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+          )}
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -738,7 +803,7 @@ function CreateEventForm({
 
         <TouchableOpacity
           style={[styles.secondaryBtn, { marginTop: 10 }]}
-          onPress={() => navigation.goBack()}
+          onPress={() => safeGoBack(navigation)}
           disabled={isSubmitting}
         >
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
@@ -960,6 +1025,18 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       color: colors.textSubtle,
       marginBottom: 6,
       letterSpacing: 0.3,
+    },
+    fieldHint: { fontSize: 16, color: colors.textSubtle },
+    ticketToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 14,
+      gap: 10,
+    },
+    ticketRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
     },
     textInput: {
       backgroundColor: colors.background,

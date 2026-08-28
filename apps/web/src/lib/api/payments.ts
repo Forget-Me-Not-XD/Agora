@@ -56,7 +56,7 @@ export async function initiatePayment(eventId: string): Promise<InitiatePaymentR
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body:  JSON.stringify({ eventId }),
+        body:  JSON.stringify({ eventId, platform: 'web' }),
         cache: 'no-store',
     });
 

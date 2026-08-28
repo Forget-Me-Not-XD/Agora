@@ -23,6 +23,7 @@ export class EventResponseDto {
     photographerInstructions!: string;
     assignedTo!: string | null;
     confirmedAttendees!: number;
+    checkedInCount!: number;
     intendedAttendance!: Role;
     type!: EventType;
     sellsTickets!: boolean;
@@ -46,6 +47,7 @@ export class EventResponseDto {
             photographerInstructions:   event.photographerInstructions,
             assignedTo:                 event.assignedTo ? event.assignedTo.toString() : null,
             confirmedAttendees:         event.confirmedAttendees,
+            checkedInCount:             event.checkedInCount,
             intendedAttendance:         event.intendedAttendance,
             type:                       event.type,
             sellsTickets:               event.sellsTickets,

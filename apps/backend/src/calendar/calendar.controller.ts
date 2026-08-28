@@ -12,8 +12,11 @@ import { MicrosoftCalendarService } from './services/microsoft-calendar.service'
 import { CalendarStatusDto } from './dto/calendar-status.dto';
 import { CalendarExceptionFilter } from './filters/calendar-exception.filter';
 
+type Platform = 'web' | 'mobile';
+
 interface StatePayload {
     sub: string;
+    platform: Platform;
 }
 
 @Controller('calendar')
@@ -41,9 +44,22 @@ export class CalendarController {
     @Get('google/connect')
     @UseGuards(JwtAuthGuard)
     @UseFilters(CalendarExceptionFilter)
-    connectGoogle(@CurrentUser() authUser: JwtPayload, @Res() res: Response): void {
-        const state = this.jwtService.sign({ sub: authUser.sub });
-        res.redirect(this.googleCalendarService.buildAuthUrl(state));
+    connectGoogle(
+        @CurrentUser() authUser: JwtPayload,
+        @Query('platform') platform: Platform | undefined,
+        @Res() res: Response,
+    ): void {
+        const state = this.jwtService.sign({ sub: authUser.sub, platform: platform ?? 'web' });
+        const url = this.googleCalendarService.buildAuthUrl(state);
+
+        // Mobiel kan nie 'n rou 302-herleiding betroubaar onderskep nie (React Native
+        // se netwerklaag volg dit outomaties voor JS dit ooit sien) -- gee dus die
+        // regte Google-URL as JSON terug, en laat die app self die blaaiersessie oopmaak.
+        if (platform === 'mobile') {
+            res.json({ url });
+        } else {
+            res.redirect(url);
+        }
     }
 
     @Get('google/callback')
@@ -53,7 +69,7 @@ export class CalendarController {
         @Query('state') state: string,
         @Res() res: Response,
     ): Promise<void> {
-        const userId = this.verifyState(state);
+        const { sub: userId, platform } = this.verifyState(state);
         const tokens = await this.googleCalendarService.exchangeCode(code);
 
         await this.usersService.updateGoogleCalendarConnection(userId, {
@@ -64,7 +80,7 @@ export class CalendarController {
             tokenExpiresAt: tokens.expiryDate,
         });
 
-        res.redirect(`${this.config.get<string>('frontendUrl')}/profile?calendar=google_connected`);
+        res.redirect(this.buildLandingUrl(platform, 'calendar=google_connected'));
     }
 
     @Delete('google')
@@ -77,9 +93,19 @@ export class CalendarController {
     @Get('microsoft/connect')
     @UseGuards(JwtAuthGuard)
     @UseFilters(CalendarExceptionFilter)
-    connectMicrosoft(@CurrentUser() authUser: JwtPayload, @Res() res: Response): void {
-        const state = this.jwtService.sign({ sub: authUser.sub });
-        res.redirect(this.microsoftCalendarService.buildAuthUrl(state));
+    connectMicrosoft(
+        @CurrentUser() authUser: JwtPayload,
+        @Query('platform') platform: Platform | undefined,
+        @Res() res: Response,
+    ): void {
+        const state = this.jwtService.sign({ sub: authUser.sub, platform: platform ?? 'web' });
+        const url = this.microsoftCalendarService.buildAuthUrl(state);
+
+        if (platform === 'mobile') {
+            res.json({ url });
+        } else {
+            res.redirect(url);
+        }
     }
 
     @Get('microsoft/callback')
@@ -89,7 +115,7 @@ export class CalendarController {
         @Query('state') state: string,
         @Res() res: Response,
     ): Promise<void> {
-        const userId = this.verifyState(state);
+        const { sub: userId, platform } = this.verifyState(state);
         const tokens = await this.microsoftCalendarService.exchangeCode(code);
 
         await this.usersService.updateOutlookCalendarConnection(userId, {
@@ -100,7 +126,7 @@ export class CalendarController {
             tokenExpiresAt: tokens.expiryDate,
         });
 
-        res.redirect(`${this.config.get<string>('frontendUrl')}/profile?calendar=microsoft_connected`);
+        res.redirect(this.buildLandingUrl(platform, 'calendar=microsoft_connected'));
     }
 
     @Delete('microsoft')
@@ -110,12 +136,19 @@ export class CalendarController {
         return { ok: true };
     }
 
-    private verifyState(state: string): string {
+    private verifyState(state: string): StatePayload {
         try {
-            const payload = this.jwtService.verify<StatePayload>(state);
-            return payload.sub;
+            return this.jwtService.verify<StatePayload>(state);
         } catch {
             throw new BadRequestException('Invalid or expired calendar connection request');
         }
+    }
+
+    private buildLandingUrl(platform: Platform, query: string): string {
+        if (platform === 'mobile') {
+            const mobileScheme = this.config.get<string>('oauth.mobileScheme');
+            return `${mobileScheme}://calendar-callback?${query}`;
+        }
+        return `${this.config.get<string>('frontendUrl')}/profile?${query}`;
     }
 }

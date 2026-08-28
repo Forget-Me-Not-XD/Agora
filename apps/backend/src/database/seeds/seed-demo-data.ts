@@ -442,7 +442,17 @@ async function seed(): Promise<void> {
     // geleenthede moet reeds tydens generering weet hoeveel mense werklik
     // kwalifiseer vir 'n gegewe sigbaarheidsvlak.
     const ROLE_LEVEL: Record<string, number> = { GAS: 1, STUDENT: 2, DOSENT: 3, ADMIN: 4 };
-    const attendeePool = [...students, ...gasUsers, ...dosents, admin];
+
+    // Die genoemde admin- en dosent-rekenings (seed-admin@, seed-dosent@) word
+    // doelbewus UITGESLUIT van hierdie poel. Hoe hoër 'n geleentheid se
+    // vereiste sigbaarheidsvlak (intendedAttendance), hoe kleiner die
+    // kwalifiserende poel -- vir 'n ADMIN-vlak geleentheid is admin die ENIGSTE
+    // kwalifiserende gebruiker, wat sou beteken elke ewekansige trekking hom
+    // gewaarborg kies. Sonder hulle in die poel begin hierdie twee
+    // aanmeld-rekenings met nul RSVP's, presies soos enige regte nuwe
+    // gebruiker sou -- die res van die dosente (extraDosents) bly wel in sodat
+    // DOSENT-vlak geleenthede steeds realistiese bywoningsdata kry.
+    const attendeePool = [...students, ...gasUsers, ...extraDosents];
 
     console.log('Generating events…');
     const NUM_EVENTS = 1000;
@@ -469,6 +479,7 @@ async function seed(): Promise<void> {
         photographers: Types.ObjectId[];
         photographerInstructions: string;
         confirmedAttendees: number;
+        checkedInCount: number;
         intendedAttendance: string;
         type: string;
         sellsTickets: boolean;
@@ -519,6 +530,7 @@ async function seed(): Promise<void> {
             photographers: assignedPhotographer ? [assignedPhotographer._id] : [],
             photographerInstructions: assignedPhotographer ? pick(PHOTO_INSTRUCTIONS) : '',
             confirmedAttendees: 0, // filled in after RSVPs are generated below
+            checkedInCount: 0, // filled in after RSVPs are generated below
             intendedAttendance,
             type: pick(EVENT_TYPES),
             sellsTickets,
@@ -535,6 +547,7 @@ async function seed(): Promise<void> {
 
     const rsvpDocs: object[] = [];
     const confirmedCountByEvent = new Map<string, number>();
+    const checkedInCountByEvent = new Map<string, number>();
 
     for (let i = 0; i < eventDocs.length; i++) {
         const event = eventDocs[i];
@@ -549,6 +562,7 @@ async function seed(): Promise<void> {
         const selected = pickUniqueIndices(eligible.length, rsvpCount).map((idx) => eligible[idx]);
 
         let confirmedForEvent = 0;
+        let checkedInForEvent = 0;
 
         for (const user of selected) {
             const status = isPastEvent ? weightedPastRsvpStatus() : weightedRsvpStatus();
@@ -556,6 +570,7 @@ async function seed(): Promise<void> {
             if (confirmed) confirmedForEvent++;
 
             const checkedIn = confirmed && isPastEvent && Math.random() < 0.85;
+            if (checkedIn) checkedInForEvent++;
 
             rsvpDocs.push({
                 _id: new Types.ObjectId(),
@@ -571,6 +586,7 @@ async function seed(): Promise<void> {
         }
 
         confirmedCountByEvent.set(event._id.toString(), confirmedForEvent);
+        checkedInCountByEvent.set(event._id.toString(), checkedInForEvent);
 
         if ((i + 1) % 200 === 0) {
             process.stdout.write(`\r  ${i + 1}/${eventDocs.length} events processed, ${rsvpDocs.length} RSVPs so far…`);
@@ -613,6 +629,9 @@ async function seed(): Promise<void> {
             if (confirmed) {
                 const key = event._id.toString();
                 confirmedCountByEvent.set(key, (confirmedCountByEvent.get(key) ?? 0) + 1);
+                if (checkedIn) {
+                    checkedInCountByEvent.set(key, (checkedInCountByEvent.get(key) ?? 0) + 1);
+                }
             }
         }
     }
@@ -692,6 +711,9 @@ async function seed(): Promise<void> {
             if (confirmed) {
                 const key = event._id.toString();
                 confirmedCountByEvent.set(key, (confirmedCountByEvent.get(key) ?? 0) + 1);
+                if (checkedIn) {
+                    checkedInCountByEvent.set(key, (checkedInCountByEvent.get(key) ?? 0) + 1);
+                }
             }
             soldForEvent++;
         }
@@ -709,6 +731,7 @@ async function seed(): Promise<void> {
     
     for (const event of eventDocs) {
         event.confirmedAttendees = confirmedCountByEvent.get(event._id.toString()) ?? 0;
+        event.checkedInCount = checkedInCountByEvent.get(event._id.toString()) ?? 0;
     }
     await eventsCol.insertMany(eventDocs);
     console.log(`✓ Inserted ${eventDocs.length} events.\n`);

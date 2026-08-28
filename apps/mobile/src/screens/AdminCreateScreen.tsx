@@ -12,6 +12,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { adminCreateUser, CreateUserPayload } from '../api/auth';
 import { useThemeColors } from '../theme/theme';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { safeGoBack } from '../lib/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminCreateUser'>;
 
@@ -72,7 +73,7 @@ export function AdminCreateUserScreen({ navigation }: Props) {
 
     return (
     <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="Skep gebruiker" onBack={() => navigation.goBack()} />
+        <ScreenHeader title="Skep gebruiker" onBack={() => safeGoBack(navigation)} />
         <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
