@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
@@ -10,6 +10,7 @@ import { useThemeColors } from '../theme/theme';
 import { listEvents, type EventResponse } from '../api/events';
 import { getPrediction, type PredictionResult } from '../api/analytics';
 import { formatEventTime } from '../lib/event-status';
+
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -34,31 +35,33 @@ export function AiScreen() {
   const role = user?.role ?? 'STUDENT';
   const canViewAi = role === 'ADMIN' || role === 'DOSENT';
 
-  useEffect(() => {
-    if (!canViewAi) return;
-    let active = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const allUpcoming = await listEvents(new Date().toISOString());
-        const ownUpcoming = role === 'DOSENT'
-          ? allUpcoming.filter((e) => e.createdBy === user?.id)
-          : allUpcoming;
-        const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
-        const results = await Promise.allSettled(upcoming.map((e) => getPrediction(e.id)));
-        if (!active) return;
-        setForecasts(
-          upcoming.map((event, i) => ({
-            event,
-            prediction: results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<PredictionResult>).value : null,
-          })),
-        );
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [canViewAi, role, user?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!canViewAi) return;
+      let active = true;
+      (async () => {
+        setLoading(true);
+        try {
+          const allUpcoming = await listEvents(new Date().toISOString());
+          const ownUpcoming = role === 'DOSENT'
+            ? allUpcoming.filter((e) => e.createdBy === user?.id)
+            : allUpcoming;
+          const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
+          const results = await Promise.allSettled(upcoming.map((e) => getPrediction(e.id)));
+          if (!active) return;
+          setForecasts(
+            upcoming.map((event, i) => ({
+              event,
+              prediction: results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<PredictionResult>).value : null,
+            })),
+          );
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => { active = false; };
+    }, [canViewAi, role, user?.id]),
+  );
 
   if (!canViewAi) {
     return (

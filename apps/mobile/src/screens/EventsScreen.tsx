@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
@@ -27,6 +27,8 @@ import {
   type EventStatus,
 } from '../lib/event-status';
 import { canCreateEvents } from '../lib/rbac';
+import { useCallback } from 'react';
+
 
 const STATUS_PILL_COLORS: Record<EventStatus, { bg: string; text: string }> = {
   upcoming: { bg: '#E0F2FE', text: '#0369A1' },
@@ -63,22 +65,24 @@ export function EventsScreen() {
 
   // Rol-gebaseerde sigbaarheid word reeds backend-kant afgedwing (events.service.ts),
   // so ons wys eenvoudig net wat die API teruggee.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const result = await listEvents();
-        if (active) setEvents(result);
-      } catch {
-        if (active) setLoadError('Kon nie funksies laai nie.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+          const result = await listEvents();
+          if (active) setEvents(result);
+        } catch {
+          if (active) setLoadError('Kon nie funksies laai nie.');
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => { active = false; };
+    }, []),
+  );
 
   const filtered = useMemo(() => {
     return events.filter((e) => {

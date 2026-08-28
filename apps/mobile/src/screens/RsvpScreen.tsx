@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
@@ -26,6 +26,7 @@ import {
   type RsvpWithEvent,
   type RsvpStatus,
 } from '../api/rsvp';
+import { useCallback } from 'react';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -66,28 +67,30 @@ export function RsvpScreen() {
   const [qrLoadingId, setQrLoadingId] = useState<string | null>(null);
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        if (isManager) {
-          const data = await listEvents();
-          if (active) setEvents(data);
-        } else {
-          const data = await getMyRsvps();
-          if (active) setRsvps(data);
+  
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+          if (isManager) {
+            const data = await listEvents();
+            if (active) setEvents(data);
+          } else {
+            const data = await getMyRsvps();
+            if (active) setRsvps(data);
+          }
+        } catch {
+          if (active) setLoadError(isManager ? 'Kon nie funksies laai nie.' : 'Kon nie jou RSVPs laai nie.');
+        } finally {
+          if (active) setLoading(false);
         }
-      } catch {
-        if (active) setLoadError(isManager ? 'Kon nie funksies laai nie.' : 'Kon nie jou RSVPs laai nie.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [isManager]);
+      })();
+      return () => { active = false; };
+    }, [isManager]),
+  );
 
   const filteredRsvps = useMemo(
     () => (filter === 'alles' ? rsvps : rsvps.filter((r) => r.status === filter)),

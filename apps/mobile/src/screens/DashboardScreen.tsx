@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -13,6 +13,7 @@ import { listEvents, type EventResponse } from '../api/events';
 import { getMyRsvps, type RsvpWithEvent } from '../api/rsvp';
 import { getPrediction, type PredictionResult } from '../api/analytics';
 import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from '../lib/event-status';
+import { useCallback } from 'react';
 
 export function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -29,42 +30,44 @@ export function DashboardScreen() {
 
   const isStaff = user?.role === 'ADMIN' || user?.role === 'DOSENT';
 
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
+  useFocusEffect(
+    useCallback(() => {
+      if (!user) return;
+      let active = true;
 
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const eventList = await listEvents();
-        if (!active) return;
-        setEvents(eventList);
+      (async () => {
+        setLoading(true);
+        setLoadError(null);
+        try {
+          const eventList = await listEvents();
+          if (!active) return;
+          setEvents(eventList);
 
-        if (!isStaff) {
-          const rsvpList = await getMyRsvps();
-          if (active) setMyRsvps(rsvpList);
-        }
-
-        const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
-        if (isStaff && upcoming.length > 0) {
-          try {
-            const pred = await getPrediction(upcoming[0].id);
-            if (active) setPrediction(pred);
-          } catch {
-            if (active) setPrediction(null);
+          if (!isStaff) {
+            const rsvpList = await getMyRsvps();
+            if (active) setMyRsvps(rsvpList);
           }
+
+          const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
+          if (isStaff && upcoming.length > 0) {
+            try {
+              const pred = await getPrediction(upcoming[0].id);
+              if (active) setPrediction(pred);
+            } catch {
+              if (active) setPrediction(null);
+            }
+          }
+        } catch {
+          if (active) setLoadError('Kon nie paneelbord-data laai nie.');
+        } finally {
+          if (active) setLoading(false);
         }
-      } catch {
-        if (active) setLoadError('Kon nie paneelbord-data laai nie.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
+      })();
 
-    return () => { active = false; };
-  }, [user?.id, isStaff]);
-
+      return () => { active = false; };
+    }, [user?.id, isStaff]),
+  );
+  
   if (!user) return null;
 
   const upcomingEvents = events.filter((e) => getEventStatus(e) !== 'past');

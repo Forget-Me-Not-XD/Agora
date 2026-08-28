@@ -25,11 +25,15 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
     const [errorId, setErrorId] = useState<string | null>(null);
     const [highlightEventId, setHighlightEventId] = useState<string | null>(null);
 
+    // Refresh
+    useEffect(() => {
+        setRsvps(initialRsvps);
+    }, [initialRsvps]);
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const highlight = params.get('highlight');
         if (!highlight) return;
-
         setHighlightEventId(highlight);
         document.getElementById(`rsvp-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
