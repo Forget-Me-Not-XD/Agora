@@ -16,6 +16,7 @@ import TicketRevenueTrendChart from '@/components/charts/TicketRevenueTrendChart
 import RecentBookingsTable from '@/components/charts/RecentBookingTable';
 import DosentDashboard from '@/components/dashboard/DosentDashboard';
 import AttendeeDashboard from '@/components/dashboard/AttendeeDashboard';
+import AutoRefresh from '@/components/AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,16 +115,15 @@ async function AdminDashboard() {
     const ticketRevenueSummary = ticketRevenueSummaryRes.status === 'fulfilled' ? ticketRevenueSummaryRes.value : null;
     const revenuePerEvent = revenuePerEventRes.status === 'fulfilled' ? revenuePerEventRes.value : [];
     const revenuePerMonth = revenuePerMonthRes.status === 'fulfilled' ? revenuePerMonthRes.value : [];
-    const eventsTrend = eventsTrendRes.status === 'fulfilled' ? eventsTrendRes.value : null;
-    const rsvpsTrend = rsvpsTrendRes.status === 'fulfilled' ? rsvpsTrendRes.value : null;
-    const budgetTrend = budgetTrendRes.status === 'fulfilled' ? budgetTrendRes.value : null;
-    const revenueTrend = revenueTrendRes.status === 'fulfilled' ? revenueTrendRes.value : null;
-
     const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
     const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);
     const monthlyTicketRevenue = mergeSingleMonthlySeries(revenuePerMonth);
 
     return (
+
+        <>
+            <AutoRefresh /> 
+
         <div className="space-y-6">
             {/* Stat cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -241,6 +241,7 @@ async function AdminDashboard() {
             </div>
 
         </div>
+        </>
     );
 }
 

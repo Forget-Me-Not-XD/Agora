@@ -14,6 +14,7 @@ import { RsvpDocument } from './schemas/rsvp.schema';
 import { ScanRsvpDto } from './dto/scan-rsvp.dto';
 import { RsvpResponseDto } from './dto/rsvp-response.dto';
 import { UserDocument } from '../users/schemas/user.schema';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('rsvp')
 @UseGuards(JwtAuthGuard)
@@ -53,6 +54,8 @@ export class RsvpController {
     }
 
     @Get('my')
+    @UseGuards(ThrottlerGuard)
+    @Throttle({ polling: { limit: 60, ttl: 60000 } })
     async findMyRsvps(
         @CurrentUser() user: JwtPayload,
     ): Promise <RsvpDocument[]> {

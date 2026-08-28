@@ -41,11 +41,21 @@ import { HealthModule } from '../health/health.module';
     }),
 
     // ========== Throttler Module for Requests ==========
+    // 'default' bly streng - vir sensitiewe aksies soos login/registrasie.
+    // 'polling' is ruimer - vir periodieke leesroetes wat AutoRefresh (web)
+    // en useFocusEffect (mobile) elke 60s herhaal, moontlik oor verskeie
+    // gelyktydige panele/kaarte op een bladsy (bv. Insights).
     ThrottlerModule.forRoot({
         throttlers: [
             {
+                name: 'default',
                 ttl: 60000,
                 limit: 10,
+            },
+            {
+                name: 'polling',
+                ttl: 60000,
+                limit: 60,
             },
         ],
     }),

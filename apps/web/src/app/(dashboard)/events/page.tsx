@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
@@ -70,13 +70,14 @@ export default function EventsPage() {
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
     //
-    // Bo-grens: einde van volgende maand,  verder-in-die-toekoms geleenthede
+    // Bo-grens: einde van volgende maand, verder-in-die-toekoms geleenthede
     // bly die kalenderbladsy se werk. Geen onder-grens nie: verby geleenthede
     // word steeds gehaal sodat die "Verby"-statusfilter hulle kan wys, hulle
     // word net client-kant (matchesStatus hieronder) by verstek weggesteek.
-    useEffect(() => {
-        let active = true;
-        (async () => {
+    const loadEvents = useCallback(async (showLoading = false) => {
+        if (showLoading) setLoading(true);
+
+        try {
             const now = new Date();
             const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
@@ -84,19 +85,47 @@ export default function EventsPage() {
                 listEventsAction({ to: endOfNextMonth.toISOString() }),
                 getMyRsvpsAction(),
             ]);
-            if (!active) return;
-            if (eventsResult.error) setLoadError(eventsResult.error);
-            else setEvents(eventsResult.events ?? []);
+
+            if (eventsResult.error) {
+                if (showLoading) setLoadError(eventsResult.error);
+            } else {
+                setLoadError(null);
+                setEvents(eventsResult.events ?? []);
+            }
 
             const activeEventIds = (rsvpsResult.rsvps ?? [])
                 .filter((r) => r.status !== 'GEKANSELLEER' && r.event)
                 .map((r) => r.event!._id);
             setRsvpdEventIds(new Set(activeEventIds));
+            
+        } catch {
+            if (showLoading) setLoadError('Kon nie geleenthede laai nie.');
 
+        } finally {
             setLoading(false);
-        })();
-        return () => { active = false; };
+        }
     }, []);
+
+    useEffect(() => {
+     let active = true;
+
+        const initialLoad = async () => {
+         if (!active) return;
+         await loadEvents(true);
+     };
+
+    initialLoad();
+
+    const interval = setInterval(() => {
+        if (active) {
+            loadEvents(false);
+        }
+    }, 60000);
+
+    return () => {active = false; 
+        clearInterval(interval);
+    };
+}, [loadEvents]);
 
     const filtered = events
         .filter((event) => {

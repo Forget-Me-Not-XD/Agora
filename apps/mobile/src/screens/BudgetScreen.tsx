@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { getBudgetPerMonth, type BudgetPerMonth } from '../api/analytics';
+import { useFocusEffect } from '@react-navigation/native';
 
 const MONTHS_AF = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -27,28 +28,30 @@ export function BudgetScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const result = await getBudgetPerMonth();
-        if (active) setData(result);
-      } catch (err: unknown) {
-        if (!active) return;
-        const axiosErr = err as { response?: { status?: number } };
-        setError(
-          axiosErr?.response?.status === 403
-            ? 'Jy het nie toegang tot begrotingsdata nie.'
-            : 'Kon nie begrotingsdata laai nie.',
-        );
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          const result = await getBudgetPerMonth();
+          if (active) setData(result);
+        } catch (err: unknown) {
+          if (!active) return;
+          const axiosErr = err as { response?: { status?: number } };
+          setError(
+            axiosErr?.response?.status === 403
+              ? 'Jy het nie toegang tot begrotingsdata nie.'
+              : 'Kon nie begrotingsdata laai nie.',
+          );
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+      return () => { active = false; };
+    }, []),
+  );
 
   const totalBudget = data.reduce((sum, m) => sum + m.total, 0);
   const avgPerMonth = data.length > 0 ? totalBudget / data.length : 0;

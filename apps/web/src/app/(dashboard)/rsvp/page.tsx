@@ -1,6 +1,7 @@
 import { AlertCircle } from 'lucide-react';
 import { getMyRsvps } from '@/lib/api/rsvp';
 import MyRsvpList from '@/components/MyRsvpList';
+import AutoRefresh from '@/components/AutoRefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,9 @@ export default async function MyRsvpsPage() {
         const rsvps = await getMyRsvps();
 
         return (
+            <>
+            <AutoRefresh />
+
             <div className="space-y-6">
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--color-text)]">My RSVP&apos;s</h1>
@@ -21,6 +25,8 @@ export default async function MyRsvpsPage() {
 
                 <MyRsvpList initialRsvps={rsvps} />
             </div>
+            
+            </>
         );
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Onbekende fout het voorgekom';
