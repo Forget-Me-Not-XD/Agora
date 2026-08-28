@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
@@ -81,33 +81,75 @@ export default function EventsPage() {
 
     // Haal die geleenthede van die backend. Rol-sigbaarheid word reeds
     // backend-kant afgedwing, so wys net wat teruggekom het.
-    useEffect(() => {
-        let active = true;
-        (async () => {
+    //
+    // Bo-grens: einde van volgende maand, verder-in-die-toekoms geleenthede
+    // bly die kalenderbladsy se werk. Geen onder-grens nie: verby geleenthede
+    // word steeds gehaal sodat die "Verby"-statusfilter hulle kan wys, hulle
+    // word net client-kant (matchesStatus hieronder) by verstek weggesteek.
+    const loadEvents = useCallback(async (showLoading = false) => {
+        if (showLoading) setLoading(true);
+
+        try {
+            const now = new Date();
+            const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
+
             const [eventsResult, rsvpsResult] = await Promise.all([
-                listEventsAction(),
+                listEventsAction({ to: endOfNextMonth.toISOString() }),
                 getMyRsvpsAction(),
             ]);
-            if (!active) return;
-            if (eventsResult.error) setLoadError(eventsResult.error);
-            else setEvents(eventsResult.events ?? []);
+
+            if (eventsResult.error) {
+                if (showLoading) setLoadError(eventsResult.error);
+            } else {
+                setLoadError(null);
+                setEvents(eventsResult.events ?? []);
+            }
 
             const activeEventIds = (rsvpsResult.rsvps ?? [])
                 .filter((r) => r.status !== 'GEKANSELLEER' && r.event)
                 .map((r) => r.event!._id);
             setRsvpdEventIds(new Set(activeEventIds));
+            
+        } catch {
+            if (showLoading) setLoadError('Kon nie geleenthede laai nie.');
 
+        } finally {
             setLoading(false);
-        })();
-        return () => { active = false; };
+        }
     }, []);
+
+    useEffect(() => {
+     let active = true;
+
+        const initialLoad = async () => {
+         if (!active) return;
+         await loadEvents(true);
+     };
+
+    initialLoad();
+
+    const interval = setInterval(() => {
+        if (active) {
+            loadEvents(false);
+        }
+    }, 60000);
+
+    return () => {active = false; 
+        clearInterval(interval);
+    };
+}, [loadEvents]);
 
     const filtered = events
         .filter((event) => {
             const matchesSearch =
                 event.title.toLowerCase().includes(search.toLowerCase()) ||
                 event.description.toLowerCase().includes(search.toLowerCase());
-            const matchesStatus = statusFilter === 'all' || deriveStatus(event) === statusFilter;
+            // 'Alle Status' beteken hier alle nie-verby geleenthede, 'n verby
+            // geleentheid wys slegs as die 'Verby'-status spesifiek gekies is.
+            const matchesStatus =
+                statusFilter === 'all'
+                    ? deriveStatus(event) !== 'past'
+                    : deriveStatus(event) === statusFilter;
             const matchesType = typeFilter === 'all' || event.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
         })

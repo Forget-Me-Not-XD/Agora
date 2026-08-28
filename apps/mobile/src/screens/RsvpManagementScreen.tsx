@@ -138,6 +138,8 @@ export function RsvpManagementScreen() {
 
           {rsvps.length === 0 ? (
             <Text style={styles.emptyText}>Nog geen RSVPs vir hierdie funksie nie.</Text>
+          ) : activeRsvps.length === 0 ? (
+            <Text style={styles.emptyText}>Geen aktiewe RSVPs nie.</Text>
           ) : (
             rsvps.map((rsvp) => {
               const statusColors = getRsvpStatusColors(rsvp.status, isDark);

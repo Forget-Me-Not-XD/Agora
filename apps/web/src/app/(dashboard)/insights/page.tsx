@@ -10,6 +10,7 @@ import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 import PredictionAccuracyPanel from '@/components/PredictionAccuracyPanel';
+import AutoRefresh from '@/components/AutoRefresh';
 
 function attendanceColors(rate: number): { tone: Tone; bar: string } {
     if (rate >= 80) return { tone: 'green', bar: 'bg-green-500' };
@@ -77,6 +78,10 @@ export default async function InsightsPage() {
         .sort((a, b) => (b.avgRate ?? 0) - (a.avgRate ?? 0));
 
     return (
+        <>
+        
+            <AutoRefresh />
+
         <div className="space-y-6">
 
             {/* ── Header ── */}
@@ -212,6 +217,7 @@ export default async function InsightsPage() {
                 </div>
             )}
         </div>
+        </>
     );
 }
 

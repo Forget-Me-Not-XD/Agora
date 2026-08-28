@@ -24,6 +24,7 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { EventResponseDto } from './dto/event-response.dto';
 import { FindEventsQueryDto } from './dto/find-events-query.dto';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('events')
 @UseGuards(JwtAuthGuard)
@@ -31,6 +32,8 @@ export class EventsController {
     constructor(private readonly eventsService: EventsService) {}
 
     @Get()
+    @UseGuards(ThrottlerGuard)
+    @Throttle({ polling: { limit: 60, ttl: 60000 } })
     async findAll(
         @CurrentUser() user: JwtPayload,
         @Query() query: FindEventsQueryDto,

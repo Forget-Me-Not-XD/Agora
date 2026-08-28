@@ -11,6 +11,7 @@ import { TYPE_LABELS, TYPE_TONE } from '@/lib/event-view';
 import { Pill, type Tone } from '@/components/ui/Pill';
 import { IconChip } from '@/components/ui/IconChip';
 import BudgetTrendChart from '@/components/charts/BudgetTrendChart';
+import AutoRefresh from '@/components/AutoRefresh';
 
 function fmtRand(v: number): string {
     return `R${Math.round(v).toLocaleString('af-ZA')}`;
@@ -87,6 +88,8 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
 
         return (
             <>
+                <AutoRefresh />
+                
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <KpiCard
                         icon={<Wallet size={20} />}

@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 import { Ticket, X, Calendar, Clock, Users, CalendarCheck } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
-import { eventDateKey, eventTime } from '@/lib/event-view';
+import { deriveStatus, eventDateKey, eventTime } from '@/lib/event-view';
 import { rsvpToEventAction } from '@/lib/actions/rsvp.actions';
 import successAnim from '@/assets/Success.json';
 import warningAnim from '@/assets/Warning_Status.json';
@@ -18,6 +19,7 @@ interface RsvpModalProps {
 }
 
 export default function RsvpModal({ event }: RsvpModalProps) {
+    const router = useRouter();
     const [open, setOpen]                   = useState(false);
     const [loading, setLoading]             = useState(false);
     const [qrDataUri, setQrDataUri]         = useState<string | null>(null);
@@ -26,6 +28,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
     const [syncedToOutlook, setSyncedOutlook] = useState(false);
 
     const isFull = event.confirmedAttendees >= event.maxCapacity;
+    const isPast = deriveStatus(event) === 'past';
     const availableSpots = Math.max(event.maxCapacity - event.confirmedAttendees, 0);
 
     // Maak toe en herstel toestand
@@ -54,14 +57,15 @@ export default function RsvpModal({ event }: RsvpModalProps) {
 
     // asset volgens backend boodskap
     const isFullError  = error?.includes('vol bespreek') ?? false;      // oranje
+    const isPastError  = error?.includes('reeds afgehandel') ?? false;  // oranje, stuur terug na /events
     const errorMessage = error?.replace(/^\[\d+\]\s*/, '') ?? '';       // rooi
 
     return (
         <>
-            {/* Skryf In-knoppie — gedeaktiveer (dowwer, nie klikbaar) as die geleentheid vol is */}
+            {/* Skryf In-knoppie — gedeaktiveer (dowwer, nie klikbaar) as die geleentheid vol of verby is */}
             <button
                 onClick={() => setOpen(true)}
-                disabled={isFull}
+                disabled={isFull || isPast}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 <Ticket size={15} />
@@ -128,15 +132,15 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                             ) : error ? (
                                 // fout
                                 <div className="flex flex-col items-center text-center space-y-3">
-                                    <Lottie animationData={isFullError ? warningAnim : errorAnim} loop={false} style={{ width: 96, height: 96 }} />
-                                    <p className={`text-sm font-medium ${isFullError ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    <Lottie animationData={isFullError || isPastError ? warningAnim : errorAnim} loop={false} style={{ width: 96, height: 96 }} />
+                                    <p className={`text-sm font-medium ${isFullError || isPastError ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
                                         {errorMessage}
                                     </p>
                                     <button
-                                        onClick={close}
+                                        onClick={() => (isPastError ? router.push('/events') : close())}
                                         className="w-full px-4 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
                                     >
-                                        Maak toe
+                                        {isPastError ? 'Terug na Geleenthede' : 'Maak toe'}
                                     </button>
                                 </div>
                             ) : (
