@@ -45,16 +45,17 @@ NUM_FEATURES = 6    #<-- [maxCapacity, dayOfWeek (0-6), month (1-12), daysInAdva
 NUM_OUTPUTS = 2    #<-- [fillRate, noShowRate] Multi output regression - both values gets determined simultaneously
 LSTM_UNITS = 64   #<-- Size of the LSTM's hidden state ('working memory')
 DENSE_UNITS = 32    #<-- The intermediate Dense layer compresses the 64 LSTM outputs to 32 numbers before final prediction layer
-DROPOUT_RATE = 0.35    #<-- After the LSTM and the Dense layer, we randomly zero out this fraction of activations during training - LSTM can't rely on a single neuron
+DROPOUT_RATE = 0.2    #<-- After the LSTM and the Dense layer, we randomly zero out this fraction of activations during training - LSTM can't rely on a single neuron
 LEARNING_RATE = 0.001    #<-- Step size for weight updates - If training unstable increase to 0.005
 BATCH_SIZE = 32    #<-- How many sequences are processed before weights are updated once.
 MAX_EPOCHS = 300    #<-- Hard cap on training iterations
 PATIENCE = 25    #<-- Early stopping: id val_liss hasn't improved for this many epochs.
 VAL_SPLIT = 0.20    #<-- 20% Of events are held back for validation - never used in training
-HUBER_DELTA = 0.1    #<-- Residuals bigger than this (fill/no-show rate units) get linear instead of quadratic loss - dampens outlier historical events
+HUBER_DELTA = 0.3    #<-- Residuals bigger than this (fill/no-show rate units) get linear instead of quadratic loss - dampens outlier historical events
 FAR_FUTURE_THRESHOLD_DAYS = 45    #<-- Validation events at/after this many days-in-advance get their own MAE/RMSE breakdown
 SAMPLE_WEIGHT_SCALE = 30.0    #<-- Every this-many days of daysInAdvance adds +1.0 to a training sample's weight
 SAMPLE_WEIGHT_CAP_DAYS = 120    #<-- daysInAdvance is capped at this value before computing weight, so one extreme outlier can't dominate a batch
+MIN_VALID_CAPACITY = 10    #<-- Events with a smaller maxCapacity than this look like test/junk data, not real venues, and are dropped before training
 
 # ============================================================
 # DATA LOADING:
@@ -76,6 +77,35 @@ def load_from_file(path: str) -> list:
         items = json.load(f)
     print(f"Loaded {len(items)} events.\n")
     return items
+
+
+def clean_items(items: list) -> list:
+    """
+    Drops events that look like test/junk data rather than real bookings:
+        - maxCapacity below MIN_VALID_CAPACITY (placeholder/test events, not real venues)
+        - fillRate above 1.0 (confirmedAttendees exceeded maxCapacity - an impossible
+        target for the sigmoid output layer, and a sign the capacity value itself
+        isn't trustworthy for that event)
+    """
+    cleaned = []
+    dropped_capacity = 0
+    dropped_fillrate = 0
+    for e in items:
+        capacity = e['features'][0]
+        fill_rate = e['labels']['fillRate']
+        if capacity < MIN_VALID_CAPACITY:
+            dropped_capacity += 1
+            continue
+        if fill_rate > 1.0:
+            dropped_fillrate += 1
+            continue
+        cleaned.append(e)
+
+    print(
+        f"Data cleaning: dropped {dropped_capacity} events with capacity < {MIN_VALID_CAPACITY}, "
+        f"{dropped_fillrate} events with fillRate > 1.0  ({len(cleaned)}/{len(items)} kept)\n"
+    )
+    return cleaned
 
 
 def parse_items(items: list) -> tuple:
@@ -130,7 +160,7 @@ def fit_and_save_scaler(X_train: np.ndarray, output_dir: str) -> MinMaxScaler:
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
     print(f"Scaler saved -> {path}")
-    labels = ['capacity', 'dow_sin', 'dow_cos', 'motn_sin', 'month_cos', 'daysInAdvance_log1p']
+    labels = ['capacity', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos', 'daysInAdvance_log1p']
     for label, lo, hi in zip(labels, scaler.data_min_, scaler.data_max_):
         print(f"{label:15s}: [{lo:.0f}, {hi:.0f}] -> scaled to [0, 1]")
     print()
@@ -188,7 +218,7 @@ def build_model() -> keras.Model:
     
     model.compile(
         optimizer = keras.optimizers.Adam(learning_rate = LEARNING_RATE, clipnorm = 1.0),
-        loss = keras.losses.Huber(delte = HUBER_DELTA),
+        loss = keras.losses.Huber(delta = HUBER_DELTA),
         metrics = ['mae'],
     )
     return model
@@ -267,19 +297,19 @@ def convert_to_tflite(model: keras.Model, output_dir: str) -> None:
 # EVALUATION:
 # ============================================================
 def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_adnvance: np.ndarray, history=None) -> dict:
-    preds = model.predict(X_val, verbos=0)    # shape (n_val, 2)
+    preds = model.predict(X_val, verbose=0)    # shape (n_val, 2)
     
     def mae(a, b): return float(np.mean(np.abs(a - b)))
     def rmse(a, b): return float(np.sqrt(np.mean((a - b) ** 2)))
     
     fill_mae    =   mae(preds[:, 0], y_val[:, 0])
     noshow_mae  =   mae(preds[:, 1], y_val[:, 1])
-    fill_rmse   =   mae(preds[:, 2], y_val[:, 2])
-    noshow_rmse =   mae(preds[:, 3], y_val[:, 3])
+    fill_rmse   =   rmse(preds[:, 0], y_val[:, 0])
+    noshow_rmse =   rmse(preds[:, 1], y_val[:, 1])
     
     far_mask = val_days_adnvance >= FAR_FUTURE_THRESHOLD_DAYS
     n_far = int(far_mask.sum())
-    if n_far >= 0:
+    if n_far > 0:
         far_fill_mae    = mae(preds[far_mask, 0], y_val[far_mask, 0])
         far_noshow_mae  = mae(preds[far_mask, 1], y_val[far_mask, 1])
         far_fill_rmse   = rmse(preds[far_mask, 0], y_val[far_mask, 0])
@@ -324,7 +354,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
         import matplotlib.pyplot as plt
     except ImportError:
         print("(matplotlib not installed - skipping training curve plot)")
-        return fill_mae, noshow_mae
+        return metrics
 
     if history is not None:
         _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -348,7 +378,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
         print(f"Training curve saved → {chart_path}")
         plt.close()
 
-    return fill_mae, noshow_mae
+    return metrics
 
 
 # ============================================================
@@ -374,7 +404,8 @@ def main() -> None:
     
     # == LOAD ============================================================
     items = load_from_api(args.api, args.token) if args.api else load_from_file(args.json)
-    
+    items = clean_items(items)
+
     min_required = math.ceil(SEQUENCE_LENGTH / VAL_SPLIT)
     if len(items) < min_required:
         print(f"ERROR: Need at least {min_required} events. Got {len(items)}.")
@@ -389,7 +420,7 @@ def main() -> None:
     split = int((1 - VAL_SPLIT) * len(X_raw))
     X_train_raw, X_val_raw = X_raw[:split], X_raw[split:]
     y_train_raw, y_val_raw = y_raw[:split], y_raw[split:]
-    days_advance_train, days_advance_val = days_advance_raw[:split], days_advance_raw[:split]
+    days_advance_train, days_advance_val = days_advance_raw[:split], days_advance_raw[split:]
     print(f"Chronological split: {len(X_train_raw)} train / {len(X_val_raw)} val events\n")
 
     # == Normalise ============================================================

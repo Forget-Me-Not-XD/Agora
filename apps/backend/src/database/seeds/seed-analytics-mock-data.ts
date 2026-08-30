@@ -33,7 +33,7 @@
  *   npx ts-node src/database/seeds/seed-analytics-mock-data.ts
  *
  * Idempotent: re-running is a no-op if sentinel user already exists.
- * To wipe and re-seed, delete the user with email seed-admin@akademia.edu.za
+ * To wipe and re-seed, delete the user with email seed-admin@akademia.ac.za
  * and all events/rsvps whose createdBy is that user's _id.
  */
 
@@ -250,9 +250,9 @@ async function seed(): Promise<void> {
     const rsvpsCol  = mongoose.connection.collection('rsvps');
 
     // Idempotency guard — skip everything if the sentinel admin already exists
-    if (await usersCol.findOne({ email: 'seed-admin@akademia.edu.za' })) {
+    if (await usersCol.findOne({ email: 'seed-admin@akademia.ac.za' })) {
         console.log('Seed data already present (sentinel user found). Skipping.');
-        console.log('To re-seed, delete the user seed-admin@akademia.edu.za first.');
+        console.log('To re-seed, delete the user seed-admin@akademia.ac.za first.');
         await mongoose.disconnect();
         return;
     }
@@ -266,7 +266,7 @@ async function seed(): Promise<void> {
     const adminDoc = {
         _id: new Types.ObjectId(),
         name: 'Saad', surname: 'Administrateur',
-        email: 'seed-admin@akademia.edu.za',
+        email: 'seed-admin@akademia.ac.za',
         passwordHash, role: 'ADMIN', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'NONE',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -275,7 +275,7 @@ async function seed(): Promise<void> {
     const dosentDocs = Array.from({ length: 5 }, (_, i) => ({
         _id: new Types.ObjectId(),
         name: 'Prof', surname: `Dosent${i + 1}`,
-        email: `dosent.seed.${i + 1}@akademia.edu.za`,
+        email: `dosent.seed.${i + 1}@akademia.ac.za`,
         passwordHash, role: 'DOSENT', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'Dr',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -287,7 +287,7 @@ async function seed(): Promise<void> {
     const studentDocs = Array.from({ length: NUM_STUDENTS }, (_, i) => ({
         _id: new Types.ObjectId(),
         name: 'Student', surname: `Saad${String(i).padStart(4, '0')}`,
-        email: `student.seed.${i}@studs.akademia.edu.za`,
+        email: `student.seed.${i}@studs.akademia.ac.za`,
         passwordHash, role: 'STUDENT', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'NONE',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),

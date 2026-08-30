@@ -31,8 +31,8 @@ import sys
 import numpy as np
 
 try:
-    import ai_edge_litert.interpreter as tflite          # Pi: lightweight runtime (tflite-runtime's successor;
-                                                          # required for op versions emitted by TF 2.15+ converters)
+    import ai_edge_litert.interpreter as tflite         # Pi: lightweight runtime (tflite-runtime's successor;
+                                                        # required for op versions emitted by TF 2.15+ converters)
 except ImportError:
     try:
         import tflite_runtime.interpreter as tflite      # older Pi installs pinned to tflite-runtime
@@ -51,7 +51,7 @@ except ImportError:
 
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape
 SEQUENCE_LENGTH = 10    # timesteps the LSTM expects per sample
-NUM_FEATURES = 4    # [maxCapacity, dayOfWeek, month, daysInAdvance]
+NUM_FEATURES = 6    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), log1p(daysInAdvance)]
 
 
 # ============================================================
@@ -82,6 +82,28 @@ def load_artifacts(script_dir: str):
         scaler = pickle.load(f)
         
     return scaler, model_path
+
+# ============================================================
+# FEATURE ENGINEERING: must catch train.py's engineer_features() EXACTLY
+# ============================================================
+
+def engineer_features(raw: np.ndarray) -> np.ndarray:
+    capacity        =   raw[:, 0]
+    day_of_week     =   raw[:, 1]
+    month           =   raw[:, 2]
+    days_advance    =   raw[:, 3]
+    
+    dow_angle = 2.0 * np.pi * day_of_week / 7.0
+    month_angle = 2.0 * np.pi * (month - 1.0) / 12.0
+    
+    return np.column_stack([
+        capacity,
+        np.sin(dow_angle),
+        np.cos(dow_angle),
+        np.sin(month_angle),
+        np.cos(month_angle),
+        np.log1p(days_advance),
+    ]).astype(np.float32)
 
 
 # ============================================================
@@ -282,8 +304,11 @@ def main() -> None:
         dtype = np.float32,
     )    # Shape (1, 4)
     
-    # Scale using the same MinMaxScaler that was fir on training data
-    scaled = scaler.transform(raw_features)
+    # Expand to the 6 engineered features the model was trained on:
+    engineered = engineer_features(raw_features)    # shape(1, 6)
+    
+    # Scale using the same MinMaxScaler that was used first on training data:
+    scaled = scaler.transform(engineered)
     
     # == Filling the LSTM window: ====================
     input_array = np.repeat(

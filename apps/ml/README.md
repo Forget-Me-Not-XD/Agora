@@ -34,6 +34,7 @@
 7. [predict.py Handmatig Toets](#7-predictpy-handmatig-toets)
 8. [Die Uitvoer JSON Verstaan](#8-die-uitvoer-json-verstaan)
 9. [Heroplei Soos Werklike Gebeure Ophoop](#9-heroplei-soos-werklike-gebeure-ophoop)
+10. [Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate](#10-fase-1--kenmerkingenieurswese-en-verliesfunksie-resultate)
 
 ---
 
@@ -618,3 +619,45 @@ versoek. Geen herstart is nodig nie.
 > opleidingslopie. 'n Nuwe `model.tflite` saam met 'n ou `scaler.pkl` sal
 > verkeerd geskaleerde invoere produseer en onbetroubare voorspellings lewer.
 > Behandel hulle as 'n gepaarde stel — hulle is slegs saam geldig.
+
+---
+
+## 10. Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate
+
+Fase 1 van die LSTM-verbeterings ticket het die volgende bygevoeg:
+sikliese (sin/cos) enkodering vir `dayOfWeek` en `month`, 'n `log1p`-transformasie
+op `daysInAdvance` voor skalering, Huber-verlies in plaas van MSE, steekproefgewigte
+wat verre-toekoms-gebeure swaarder laat tel tydens opleiding, en RMSE +
+'n aparte verre-toekoms-onderstel (`daysInAdvance >= 45`) in `evaluate()`.
+Sien `train.py` se `engineer_features()`, `create_sample_weights()` en
+`evaluate()` vir die implementasie.
+
+**Belangrike nota oor die "voor"-syfers:** tydens hierdie fase is ontdek dat
+die databasis gebeure van twee onversoenbare, vorige saai-lopies bevat het
+(verskillende e-posdomeine, ~25–49% van gebeure met onrealistiese
+kapasiteite <10 en 'n handjievol onmoontlike vulkoerse >1.0). Die "voor"-syfers
+hieronder is dus gemeet op besoedelde data met 'n heeltemal ander pyplyn (geen
+sikliese kenmerke, geen data-skoonmaak, MSE-verlies) — dit is nie 'n
+perfekte appels-met-appels-vergelyking nie. Die databasis is skoongemaak en
+met die huidige, korrekte `seed-analytics-mock-data.ts` herlaai; die "na"-syfers
+is die eerste keer wat hierdie statistieke op werklik skoon data gemeet is.
+
+| Statistiek | Voor (ou, besoedelde data, n=850) | Na (Fase 1, skoon data, n=300) |
+|---|---|---|
+| Vulkoers MAE | 0.0332 | 0.1320 |
+| Vulkoers RMSE | (nie gemeet nie) | 0.1551 |
+| Nie-opkoms-koers MAE | 0.0992 | 0.0656 |
+| Nie-opkoms-koers RMSE | (nie gemeet nie) | 0.0783 |
+| Verre-toekoms Vulkoers MAE (≥45 dae, n=11) | (nie gemeet nie) | 0.1443 |
+| Verre-toekoms Vulkoers RMSE (≥45 dae, n=11) | (nie gemeet nie) | 0.1646 |
+| Verre-toekoms Nie-opkoms MAE (≥45 dae, n=11) | (nie gemeet nie) | 0.0736 |
+| Verre-toekoms Nie-opkoms RMSE (≥45 dae, n=11) | (nie gemeet nie) | 0.0890 |
+| Verliesfunksie | MSE | Huber (delta=0.3) |
+| `DROPOUT_RATE` | 0.35 | 0.2 (verlaag na waarneming van onderpassing op die klein skoon datastel) |
+
+Nie-opkoms-koers het werklik verbeter (MAE 0.0992 → 0.0656). Vulkoers-MAE lyk
+op die oog af slegter, maar dit is die eerste betroubare meting op skoon data —
+die ou 0.0332-syfer was gemeet teen 'n makliker (en gedeeltelik korrupte)
+databasis. Fase 2 (regte historiese konteks tydens inferensie) en 'n moontlike
+groter/beter datastel in Fase 3 word verwag om vulkoers-akkuraatheid verder
+te verbeter.
