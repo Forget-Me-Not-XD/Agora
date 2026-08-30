@@ -389,6 +389,7 @@ def main() -> None:
     split = int((1 - VAL_SPLIT) * len(X_raw))
     X_train_raw, X_val_raw = X_raw[:split], X_raw[split:]
     y_train_raw, y_val_raw = y_raw[:split], y_raw[split:]
+    days_advance_train, days_advance_val = days_advance_raw[:split], days_advance_raw[:split]
     print(f"Chronological split: {len(X_train_raw)} train / {len(X_val_raw)} val events\n")
 
     # == Normalise ============================================================
@@ -402,6 +403,12 @@ def main() -> None:
     # == Build sequences ============================================================
     X_train_seq, y_train_seq = create_sequences(X_train_scaled, y_train_raw)
     X_val_seq,   y_val_seq   = create_sequences(X_val_scaled,   y_val_raw)
+    
+    train_sample_weights = create_sample_weights(days_advance_train)
+    val_target_days = np.array(
+        [days_advance_val[i + SEQUENCE_LENGTH - 1] for i in range(len(X_val_seq))],
+        dtype=np.float32,
+    )
 
     print(f"Sequences: {len(X_train_seq)} train / {len(X_val_seq)} val")
     print(f"  X_train shape : {X_train_seq.shape}  (sequences × timesteps × features)")
@@ -415,13 +422,13 @@ def main() -> None:
     print("(This is tiny — good for Pi inference. Full ResNet-50 has 25 million.)\n")
 
     # == Train ======================================================================
-    history = train_model(model, X_train_seq, y_train_seq, X_val_seq, y_val_seq)
+    history = train_model(model, X_train_seq, y_train_seq, X_val_seq, y_val_seq, sample_weight=train_sample_weights)
     best_epoch    = int(np.argmin(history.history['val_loss'])) + 1
     best_val_loss = float(min(history.history['val_loss']))
     print(f"\nBest epoch : {best_epoch}  |  best val_loss : {best_val_loss:.6f}\n")
 
     # == Evaluate ======================================================================
-    fill_mae, noshow_mae = evaluate(model, X_val_seq, y_val_seq, history)
+    metrics = evaluate(model, X_val_seq, y_val_seq, val_target_days, history)
 
     # == Convert to TFLite ============================================================
     convert_to_tflite(model, output_dir)
@@ -432,8 +439,8 @@ def main() -> None:
         "n_events":      len(X_raw),
         "best_epoch":    best_epoch,
         "best_val_loss": round(best_val_loss, 6),
-        "fill_mae":      round(fill_mae, 4),
-        "noshow_mae":    round(noshow_mae, 4)
+        "loss_function": "huber",
+        **metrics,
     }
     meta_path = os.path.join(output_dir, 'model_meta.json')
     with open(meta_path, 'w') as f:
