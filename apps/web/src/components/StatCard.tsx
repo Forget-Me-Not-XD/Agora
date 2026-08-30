@@ -8,6 +8,7 @@ interface StatCardProps {
     sub?: string;
     icon: LucideIcon;
     deltaPct?: number | null;
+    deltaLabel?: string;
     color?: 'blue' | 'green' | 'orange' | 'red';
 }
 
@@ -17,6 +18,7 @@ export default function StatCard({
     sub,
     icon: Icon,
     deltaPct,
+    deltaLabel = 'vs. verlede maand',
     color = 'blue',
 }: StatCardProps) {
     return (
@@ -27,9 +29,14 @@ export default function StatCard({
                 </IconChip>
                 <span className="text-xs text-[var(--color-text-subtle)]">{label}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className="text-2xl font-bold text-[var(--color-text)]">{value}</p>
-                {deltaPct !== undefined && <DeltaBadge value={deltaPct} />}
+                {deltaPct !== undefined && (
+                    <span className="flex items-center gap-1.5">
+                        <DeltaBadge value={deltaPct} />
+                        <span className="text-[11px] text-[var(--color-text-subtle)]">{deltaLabel}</span>
+                    </span>
+                )}
             </div>
             {sub && <p className="text-xs text-[var(--color-text-subtle)] mt-1">{sub}</p>}
         </div>
