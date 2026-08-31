@@ -23,6 +23,7 @@ export default function CreateEventPage() {
                     description: '',
                     date: '',
                     time: '',
+                    endTime: '',
                     location: '',
                     type: 'public',
                     intendedAttendance: 'GAS',

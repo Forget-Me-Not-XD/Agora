@@ -43,6 +43,7 @@ export default async function EditEventPage({ params }: { params: { id: string }
     }
 
     const { date, time } = toDateTimeInputs(event.date);
+    const { time: endTime } = event.endDate ? toDateTimeInputs(event.endDate) : { time: '' };
 
     // Los die vertoonnaam van die toegekende Finansies-gebruiker op vir die soekveld
     const assignee = event.assignedTo
@@ -71,6 +72,7 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     description: event.description,
                     date,
                     time,
+                    endTime,
                     location: event.location,
                     type: event.type,
                     intendedAttendance: event.intendedAttendance,
