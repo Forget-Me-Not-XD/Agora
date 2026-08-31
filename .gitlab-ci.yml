@@ -8,18 +8,19 @@ stages:
     - name: docker:27-dind
       command: ["--mtu=1450"]
   variables:
-    DOCKER_HOST: tcp://localhost:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_TLS_VERIFY: "1"
-    DOCKER_CERT_PATH: "/certs/client"
+    DOCKER_HOST: tcp://localhost:2375
+    DOCKER_TLS_CERTDIR: ""
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     # Cross-arch build support (this repo targets arm64 Raspberry Pis; GitLab
     # shared runners are typically amd64) — same QEMU technique used locally.
+    # TLS between build/dind is disabled: they're sibling containers in the
+    # same pod talking over localhost, so it never leaves the pod's network
+    # namespace — and it avoids a cert-generation race that reliably lost on
+    # the Pi's slower CPUs (dind hadn't finished writing /certs/client yet).
     - docker run --rm --privileged tonistiigi/binfmt --install arm64
-    - docker context create tls-environment --docker "host=tcp://localhost:2376,ca=/certs/client/ca.pem,cert=/certs/client/cert.pem,key=/certs/client/key.pem"
-    - docker buildx create tls-environment --use
+    - docker buildx create --use
     - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
 build-backend:
