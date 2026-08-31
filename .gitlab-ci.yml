@@ -19,6 +19,17 @@ stages:
     # same pod talking over localhost, so it never leaves the pod's network
     # namespace — and it avoids a cert-generation race that reliably lost on
     # the Pi's slower CPUs (dind hadn't finished writing /certs/client yet).
+    #
+    # Kubernetes marks svc-0 "ready" as soon as the container starts, not
+    # once dockerd is actually listening — on the Pi's CPU that startup can
+    # take a few seconds, so wait for the daemon before using it.
+    - |
+      for i in $(seq 1 30); do
+        docker info > /dev/null 2>&1 && break
+        echo "Waiting for docker daemon..."
+        sleep 2
+      done
+      docker info > /dev/null 2>&1 || (echo "Docker daemon never became available" && exit 1)
     - docker run --rm --privileged tonistiigi/binfmt --install arm64
     - docker buildx create --use
     - echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
