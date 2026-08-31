@@ -2,10 +2,6 @@
 import { Injectable, ServiceUnavailableException, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { existsSync } from 'fs';
-import { join } from 'path';
 import { stringify } from 'csv-stringify/sync';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
@@ -15,8 +11,6 @@ import { Role } from '../common/enums/role.enums';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService } from './lstm.service';
 import { Trend, TrendDirection } from './dto/trend.dto';
-
-const execFileAsync = promisify(execFile);
 
 export interface RsvpPerEvent {
     eventTitle: string;
@@ -523,32 +517,10 @@ async getRecentRsvps(limit: number): Promise<RecentRsvp[]> {
         return '\uFEFF' + 'sep=,\r\n' + stringify(rows);
     }
 
-    // Calls predict.py as a child process and returns a typed attendance prediction.
-    // Degrades gracefully (503) when the model artefact is missing or Python is unavailable.
+    // Delegates to LstmService, which owns the venv interpreter path and the
+    // real-history sequence building - avoids a second, divergent spawn implementation.
     async predictAttendance(eventId: string): Promise<AttendancePrediction> {
-        // getTrainingData throws NotFoundException (via EventsService.findById) if eventId doesn't exist
-        const [trainingItem] = await this.lstmService.getTrainingData(eventId);
-
-        const mlDir = join(__dirname, '..', '..', '..', 'ml');
-        const modelPath = join(mlDir, 'model.tflite');
-        const scriptPath = join(mlDir, 'predict.py');
-
-        if (!existsSync(modelPath)) {
-            throw new ServiceUnavailableException('Voorspellingsdiens nie beskikbaar nie');
-        }
-
-        let result: { predictedFillRate: number; estimatedAttendees: number };
-        try {
-            const { stdout } = await execFileAsync('python', [
-                scriptPath,
-                ...trainingItem.features.map(String),
-            ]);
-            result = JSON.parse(stdout);
-        } catch {
-            // Covers: Python not installed (ENOENT), predict.py exiting non-zero, malformed stdout
-            throw new ServiceUnavailableException('Voorspellingsdiens nie beskikbaar nie');
-        }
-
+        const result = await this.lstmService.predictAttendance(eventId);
         return {
             predictedFillRate: result.predictedFillRate,
             predictedAttendance: result.estimatedAttendees,
