@@ -51,7 +51,7 @@ except ImportError:
 
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape
 SEQUENCE_LENGTH = 10    # timesteps the LSTM expects per sample
-NUM_FEATURES = 6    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), log1p(daysInAdvance)]
+NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), sin(dom), cos(dom), log1p(daysInAdvance)]
 
 
 # ============================================================
@@ -91,10 +91,12 @@ def engineer_features(raw: np.ndarray) -> np.ndarray:
     capacity        =   raw[:, 0]
     day_of_week     =   raw[:, 1]
     month           =   raw[:, 2]
-    days_advance    =   raw[:, 3]
+    day_of_month    =   raw[:, 3]
+    days_advance    =   raw[:, 4]
     
     dow_angle = 2.0 * np.pi * day_of_week / 7.0
     month_angle = 2.0 * np.pi * (month - 1.0) / 12.0
+    dom_angle = 2.0 * np.pi * (day_of_month - 1.0) / 31.0
     
     return np.column_stack([
         capacity,
@@ -102,6 +104,8 @@ def engineer_features(raw: np.ndarray) -> np.ndarray:
         np.cos(dow_angle),
         np.sin(month_angle),
         np.cos(month_angle),
+        np.sin(dom_angle),
+        np.cos(dom_angle),
         np.log1p(days_advance),
     ]).astype(np.float32)
 
@@ -306,7 +310,7 @@ def main() -> None:
         sys.exit(1)
 
     for row in sequence:
-        if not isinstance(row, list) or len(row) != 4:
+        if not isinstance(row, list) or len(row) != 5:
             sys.stderr.write("ERROR: each sequence row must have exactly 4 values [capacity, dayOfWeek, month, daysInAdvance]\n")
             sys.exit(1)
 
@@ -329,7 +333,7 @@ def main() -> None:
 
     # The target event is always the LAST row of the sequence - use its own raw
     # values for the budget estimate and reasoning strings, not any historical row.
-    target_capacity, target_dow, target_month, target_days_advance = sequence[-1]
+    target_capacity, target_dow, target_month, _target_dom, target_days_advance = sequence[-1]
     target_capacity = int(target_capacity)
     target_dow = int(target_dow)
     target_month = int(target_month)

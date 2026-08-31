@@ -1,16 +1,16 @@
 {
-  "trained_at": "2026-08-30T14:33:03.307860Z",
+  "trained_at": "2026-08-31T08:05:38.429950Z",
   "n_events": 300,
-  "best_epoch": 111,
-  "best_val_loss": 0.007527,
+  "best_epoch": 73,
+  "best_val_loss": 0.005685,
   "loss_function": "huber",
-  "fill_mae": 0.132,
-  "fill_rmse": 0.1551,
-  "noshow_mae": 0.0656,
-  "noshow_rmse": 0.0783,
-  "far_future_n": 11,
-  "far_future_fill_mae": 0.1443,
-  "far_future_fill_rmse": 0.1646,
-  "far_future_noshow_mae": 0.0736,
-  "far_future_noshow_rmse": 0.089
+  "fill_mae": 0.1145,
+  "fill_rmse": 0.1382,
+  "noshow_mae": 0.0478,
+  "noshow_rmse": 0.0614,
+  "far_future_n": 16,
+  "far_future_fill_mae": 0.1213,
+  "far_future_fill_rmse": 0.145,
+  "far_future_noshow_mae": 0.0457,
+  "far_future_noshow_rmse": 0.062
 }

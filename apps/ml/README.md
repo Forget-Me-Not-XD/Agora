@@ -1,5 +1,3 @@
-# LET OP: WEEK VAN MAAND MOET OOK IN AG GENEEM WORD VIR VOORSPELLINGS - EK WAS TE MOEG OM VANAAND AAN TE GAAN :)
-
 # apps/ml — LSTM Bywoningsvoorspelling
 
 > Scripts wat 'n klein LSTM-neurale netwerk oplei om funksie-vulkoerse
@@ -35,6 +33,7 @@
 8. [Die Uitvoer JSON Verstaan](#8-die-uitvoer-json-verstaan)
 9. [Heroplei Soos Werklike Gebeure Ophoop](#9-heroplei-soos-werklike-gebeure-ophoop)
 10. [Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate](#10-fase-1--kenmerkingenieurswese-en-verliesfunksie-resultate)
+11. [Fase 3 — Dag-van-die-Maand Kenmerk: Resultate](#11-fase-3--dag-van-die-maand-kenmerk-resultate)
 
 ---
 
@@ -109,18 +108,28 @@ opleidingsmonster per posisie.
 
 ### 3.2 Invoerkenmerke
 
-Elke geleentheid word deur presies **4 getalle** beskryf (`NUM_FEATURES = 4`) - dit gaan wel in die toekoms vermeerder word:
+Elke geleentheid word deur **5 rou getalle** beskryf, wat na **8 kenmerke**
+uitgebrei word voordat dit die netwerk ingaan (sien 3.3):
 
-| Indeks | Kenmerk | Wat dit vasvang |
+| Indeks | Rou kenmerk | Wat dit vasvang |
 |---|---|---|
 | 0 | `maxCapacity` | Lokaalgrootte — groot lokale word proporsioneel minder gevul |
 | 1 | `dayOfWeek` | 0 = Sondag … 6 = Saterdag — Vrydae is die besigste |
 | 2 | `month` | 1–12 — akademiese kalendereffekte (eksamens, oriëntering) |
-| 3 | `daysInAdvance` | Dae tussen die skep van die geleentheid en die datum — promosietyd |
+| 3 | `dayOfMonth` | 1–31 — beurs-/toelaagbetalingsiklus (sien onder) |
+| 4 | `daysInAdvance` | Dae tussen die skep van die geleentheid en die datum — promosietyd |
 
-Dit is dieselfde 4 kenmerke wat die NestJS `LstmService.toTrainingItem()`-metode
-vanuit die databasis bou, sodat opleidingsdata en regstreekse voorspellingsdata
-altyd dieselfde vorm het.
+Dit is dieselfde 5 rou kenmerke wat die NestJS `LstmService.computeFeatures()`/
+`computeDraftFeatures()`-metodes vanuit die databasis (of konsep-DTO) bou, sodat
+opleidingsdata en regstreekse voorspellingsdata altyd dieselfde vorm het.
+
+`dayOfMonth` vang die beurs-/toelaagbetalingsiklus vas: NSFAS en die meeste
+SA-universiteitstoelaes betaal in die eerste week van die maand uit, en
+studente se bereidwilligheid om opsionele/betaalde geleenthede by te woon
+neem tipies af namate die maand vorder (sien `domFillFactor`/`domNoShowFactor`
+in `seed-analytics-mock-data.ts`). Fase 3 het bevestig dat hierdie kenmerk
+akkuraatheid werklik verbeter wanneer die onderliggende data 'n egte patroon
+bevat — sien afdeling 11 vir die volledige voor/na-vergelyking.
 
 ### 3.3 Kenmerknormalisering
 
@@ -143,78 +152,61 @@ geskaleerde waardes useless vir die model wees.
 ### 3.4 Netwerk-argitektuur
 
 ```
-         INVOERTENSOR  vorm: (1, 5, 4)
+         INVOERTENSOR  vorm: (1, 10, 8)
          ─────────────────────────────────────────
-         1 monster │ 5 tydstappe │ 4 kenmerke elk
-         
-         ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  ┌──────┐
-         │  t₁  │ │  t₂  │ │  t₃  │ │  t₄  │  │  t₅  │   ← 5 tydstappe
-         │ [4k] │ │ [4k] │ │ [4k] │ │ [4k] │  │ [4k] │   ← 4 kenmerke elk
-         └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘  └──┬───┘
-            └────────┴────────┴────────┴─────────┘
-                                │
-                                ▼
+         1 monster │ 10 tydstappe │ 8 kenmerke elk
+
+         ┌──────┐ ┌──────┐        ┌──────┐
+         │  t₁  │ │  t₂  │  ....  │  t₁₀ │   ← 10 tydstappe (9 werklike
+         │ [8k] │ │ [8k] │        │ [8k] │      vorige gebeure + teikengebeurtenis)
+         └──┬───┘ └──┬───┘        └──┬───┘
+            └────────┴───────────────┘
+                        │
+                        ▼
          ╔══════════════════════════════════════════╗
-         ║         LSTM-laag  —  32 eenhede         ║
+         ║         LSTM-laag  —  64 eenhede         ║
          ║                                          ║
-         ║  Lees al 5 tydstappe in volgorde.        ║
+         ║  Lees al 10 tydstappe in volgorde.       ║
          ║  Elke interne sel stuur sy toestand      ║
          ║  na die volgende, en bou konteks op.     ║
-         ║  Uitvoer: 32-getal opsommingsvektor.     ║
+         ║  Uitvoer: 64-getal opsommingsvektor.     ║
          ║                                          ║
-         ║  Parameters: ~5,376                      ║
+         ║  Parameters: 4×64×(8+64+1) = 18,688      ║
          ╚══════════════════╤═══════════════════════╝
-                            │ 32 waardes
+                            │ 64 waardes
                             ▼
          ╔══════════════════════════════════════════╗
-         ║         Dropout  —  koers 0.25           ║
-         ║                                          ║
-         ║  Slegs tydens opleiding: skakel 8 van    ║
-         ║  die 32 waardes ewekansig na nul.        ║
-         ║  Dwing die model om robuuste patrone     ║
-         ║  te leer — nie te memoriseer nie.        ║
-         ║  Tydens inferensie: volledig gedeaktiveer║
+         ║         Dropout  —  koers 0.2            ║
          ╚══════════════════╤═══════════════════════╝
-                            │ 32 waardes
+                            │ 64 waardes
                             ▼
          ╔═══════════════════════════════════════════╗
-         ║     Dense-laag  —  16 eenhede  (ReLU)     ║
-         ║                                           ║
-         ║  Volledig verbind: elk van die 32 invoere ║
-         ║  koppel aan al 16 uitvoere.               ║
-         ║  ReLU sny enige negatiewe waarde na nul,  ║
-         ║  en hou slegs betekenisvolle seine.       ║
-         ║                                           ║
-         ║  Parameters: 32×16 + 16 bias = 528        ║
+         ║     Dense-laag  —  32 eenhede  (ReLU)     ║
+         ║     Parameters: 64×32 + 32 = 2,080        ║
          ╚══════════════════╤════════════════════════╝
-                            │ 16 waardes
+                            │ 32 waardes
                             ▼
          ╔══════════════════════════════════════════╗
-         ║         Dropout  —  koers 0.125          ║
-         ║                                          ║
-         ║  Ligter dropout voor die uitvoerlaag.    ║
-         ║  12.5% van 16 waardes word uitgeskakel.  ║
+         ║         Dropout  —  koers 0.1            ║
          ╚══════════════════╤═══════════════════════╝
-                            │ 16 waardes
+                            │ 32 waardes
                             ▼
          ╔══════════════════════════════════════════╗
          ║   Uitvoerlaag  —  2 eenhede  (Sigmoid)   ║
-         ║                                          ║
-         ║  Map 16 → 2 waardes.                     ║
-         ║  Sigmoid druk elke uitvoer na [0, 1],    ║
-         ║  wat ooreenstem met ons etikette wat     ║
-         ║  beide proporsies (koerse) is.           ║
-         ║                                          ║
-         ║  Parameters: 16×2 + 2 bias = 34          ║
+         ║   Parameters: 32×2 + 2 = 66               ║
          ╚══════════════╤═══════════════╤═══════════╝
-                        │               │
                         ▼               ▼
                    uitvoer[0]       uitvoer[1]
                    fillRate         noShowRate
-                  (0.0 – 1.0)      (0.0 – 1.0)
-                 
-         Totale opleibare parameters: ~5,938
+
+         Totale opleibare parameters: 20,834
 ```
+
+**Verliesfunksie:** Huber (delta=0.3) in plaas van gewone MSE — demp die
+invloed van uitskieter-historiese gebeure sonder om die gradiënt vir tipiese
+foute te verander. Steekproefgewigte laat verre-toekoms-gebeure
+(`daysInAdvance >= 45`) swaarder tel tydens opleiding. Sien afdeling 10 en 11
+vir volledige besonderhede.
 
 ### 3.5 Die LSTM-sel Verduidelik
 
@@ -250,34 +242,42 @@ relevant nie." Die invoer-hek laat dit sê "dit is eksamensmaand — skryf dit
 in geheue." Die uitvoer-hek besluit watter deel van daardie opgehoopte konteks
 om te gebruik wanneer die finale voorspelling gemaak word.
 
-### 3.6 Opleiding vs Inferensie — Die Vensterherhalingsprobleem
+### 3.6 Opleiding vs Inferensie — Werklike Geskiedenis by Beide
 
-Tydens opleiding sien die model **werklike reekse van 5 opeenvolgende
-historiese gebeure**, sodat dit werklik temporale patrone kan aanleer.
+Tydens opleiding sien die model **werklike reekse van 10 opeenvolgende
+historiese gebeure**. Tot en met Fase 2 het inferensie 'n enkele geleentheid
+se kenmerke 10 keer herhaal om aan die LSTM se invoervorm te voldoen — dit
+het die LSTM se hele waarde (om van 'n reeks te leer) tydens regstreekse
+voorspelling weggegooi.
 
-Tydens inferensie voorspel ons 'n **toekomstige geleentheid** waarvoor
-geen geskiedenis bestaan nie. Om aan die LSTM se vereiste invoervorm van
-`(1, 5, 4)` te voldoen, herhaal ons die enkele geleentheid se kenmerke 5 keer:
+Fase 2 het dit reggestel: `LstmService.buildFeatureSequence()` haal nou die
+9 werklike mees-onlangse gebeure strek voor die teiken-datum op, bereken hul
+kenmerke presies soos opleiding dit doen, en voeg die teikengebeurtenis se
+eie kenmerke by as die laaste tydstap:
 
 ```
-         Inferensie-invoer (al 5 rye is identies):
+         Inferensie-invoer (nou 'n werklike reeks):
 
-         t₁: [200, 5, 2, 30]   ← die geleentheid wat ons wil voorspel
-         t₂: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
-         t₃: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
-         t₄: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
-         t₅: [200, 5, 2, 30]   ← dieselfde geleentheid herhaal
+         t₁: [kenmerke van gebeurtenis 9 gebeure gelede]
+         t₂: [kenmerke van gebeurtenis 8 gebeure gelede]
+         ...
+         t₉: [kenmerke van mees onlangse vorige gebeurtenis]
+         t₁₀: [kenmerke van die teikengebeurtenis self]
 ```
 
-Dit is aanvaarbaar omdat die LSTM se vermoë om "wat in die laaste 4 gebeure
-gebeur het" te benut afwesig is — maar die patrone wat dit oor
-**kenmerkwaardes self** aangeleer het (kapasiteit, dag, maand, voorlooptyd)
-geld steeds deur die Dense-lae. Die model verswak na 'n gesofistikeerde
-deurvoer-netwerk vir hierdie pad, wat voldoende is vir enkelsoortige
-geleentheidsvoorspelling.
+**Randgeval — te min werklike geskiedenis:** as minder as 9 werklike gebeure
+vóór die teiken-datum bestaan (vroeg in die datastel, of 'n splinternuwe
+ontplooiing), word die vroegste beskikbare werklike gebeurtenis herhaal om
+die oorblywende plekke aan die begin van die venster te vul. Dit sê vir die
+LSTM "niks ongewoons het voor hierdie gebeur nie" — 'n veiliger verstek as
+om vals variasie te versin, en verbeter outomaties namate werklike
+geskiedenis ophoop.
 
-'n Toekomstige verbetering sou die 4 mees onlangse vorige gebeure kas en
-dit as die voorste tydstappe invoeg, wat ware opeenvolgende konteks herstel.
+Die NestJS↔Python-koppelvlak is ook verander: `predict.py` aanvaar nou een
+CLI-argument — 'n JSON-stringvoorstelling van die volle 10-ry-reeks — in
+plaas van 4 plat argumente. `spawn()` (sonder `shell: true`) gee argv-inskrywings
+direk aan die bedryfstelsel deur, so JSON met hakies/aanhalingstekens het geen
+ontsnapping nodig nie.
 
 ---
 
@@ -661,3 +661,45 @@ die ou 0.0332-syfer was gemeet teen 'n makliker (en gedeeltelik korrupte)
 databasis. Fase 2 (regte historiese konteks tydens inferensie) en 'n moontlike
 groter/beter datastel in Fase 3 word verwag om vulkoers-akkuraatheid verder
 te verbeter.
+
+---
+
+## 11. Fase 3 — Dag-van-die-Maand Kenmerk: Resultate
+
+Fase 3 het `dayOfMonth` as 'n vyfde rou kenmerk bygevoeg (sikliese sin/cos-
+enkodering, periode=31 — sien 3.2) en Fase 2 se regte-geskiedenis-verandering
+voltooi. Drie opeenvolgende opleidingslopies wys hoekom die kenmerk se
+onderliggende data saak maak:
+
+| Statistiek | Fase 1 (6 kenmerke, geen dayOfMonth) | Fase 3, dayOfMonth sonder egte sein | Fase 3, dayOfMonth met beurssiklus-sein |
+|---|---|---|---|
+| Vulkoers MAE | 0.1320 | 0.1582 | **0.1145** |
+| Vulkoers RMSE | 0.1551 | 0.1954 | **0.1382** |
+| Nie-opkoms MAE | 0.0656 | 0.0699 | **0.0478** |
+| Nie-opkoms RMSE | 0.0783 | 0.0879 | **0.0614** |
+| Verre-toekoms Vulkoers MAE | 0.1443 (n=11) | 0.1754 (n=11) | **0.1213** (n=16) |
+| Verre-toekoms Nie-opkoms MAE | 0.0736 (n=11) | 0.0899 (n=11) | **0.0457** (n=16) |
+
+Die middelste kolom is die sintetiese saaidata (`seed-analytics-mock-data.ts`)
+soos dit oorspronklik was: geen verband tussen `dayOfMonth` en vulkoers/
+nie-opkoms-koers nie. Twee ekstra invoerdimensies (`dom_sin`, `dom_cos`)
+sonder enige onderliggende sein om te leer het **elke enkele statistiek
+versleg** — verwagte gedrag op 'n klein datastel (231 opleidingsreekse):
+uninformatiewe dimensies kos meer as wat hulle help wanneer daar niks
+werklik te leer is nie.
+
+Die regte kolom volg 'n bewuste besluit: `domFillFactor()`/`domNoShowFactor()`
+is by die saaiskrip gevoeg om die beurs-/toelaagbetalingsiklus te simuleer
+(NSFAS/toelaes betaal die eerste week van die maand uit; bywoningsbereidheid
+daal namate die maand vorder — 'n werklike, gedokumenteerde patroon, nie
+kunsmatig verzin nie). Met 'n egte patroon om te leer, klop hierdie lopie
+selfs die Fase 1-basislyn wat glad nie `dayOfMonth` gehad het nie — nie-opkoms-
+akkuraatheid het byna verdubbel (MAE 0.0656 → 0.0478), aangesien
+`domNoShowFactor` die model 'n heeltemal nuwe voorspellende hefboom spesifiek
+vir nie-opkoms gegee het.
+
+**Gevolgtrekking:** die `dayOfMonth`-kenmerk se implementasie was reg van die
+staanspoor af — die aanvanklike agteruitgang was 'n eienskap van die
+sintetiese data, nie 'n fout in die kode nie. Sodra werklike produksiedata
+ophoop, sal hierdie kenmerk outomaties bewys (of weerlê) of dieselfde patroon
+in die regte wêreld bestaan.

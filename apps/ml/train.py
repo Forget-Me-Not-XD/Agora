@@ -41,7 +41,7 @@ from tensorflow import keras
 # ============================================================
 
 SEQUENCE_LENGTH = 10    #<-- How many consecutive events the LSTM "reads" before making a prediction. (Short Term memory window)
-NUM_FEATURES = 6    #<-- [maxCapacity, dayOfWeek (0-6), month (1-12), daysInAdvance]
+NUM_FEATURES = 8    #<-- engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), sin(dom), cos(dom), log1p(daysInAdvance)]
 NUM_OUTPUTS = 2    #<-- [fillRate, noShowRate] Multi output regression - both values gets determined simultaneously
 LSTM_UNITS = 64   #<-- Size of the LSTM's hidden state ('working memory')
 DENSE_UNITS = 32    #<-- The intermediate Dense layer compresses the 64 LSTM outputs to 32 numbers before final prediction layer
@@ -125,17 +125,19 @@ def parse_items(items: list) -> tuple:
 
 def engineer_features(raw: np.ndarray) -> np.ndarray:
     """
-    Expands the 4 raw features NestJS sends into the 6 features the model trains on.
+    Expands the 5 raw features NestJS sends into the 8 features the model trains on.
     Pure function of the raw values - no fitting involved - so it's safe to apply before
     the train/val split without any data leakage.
     """
     capacity        =   raw[:, 0]
-    day_of_week    =   raw[:, 1]
+    day_of_week     =   raw[:, 1]
     month           =   raw[:, 2]
-    days_advance    =   raw[:, 3]
+    day_of_month    =   raw[:, 3]
+    days_advance    =   raw[:, 4]
     
     dow_angle = 2.0 * np.pi * day_of_week / 7.0
     month_angle = 2.0 * np.pi * (month - 1.0) / 12.0
+    dom_angle = 2.0 * np.pi * (day_of_month - 1.0) / 31.0
     
     return np.column_stack([
         capacity,
@@ -143,6 +145,8 @@ def engineer_features(raw: np.ndarray) -> np.ndarray:
         np.cos(dow_angle),
         np.sin(month_angle),
         np.cos(month_angle),
+        np.sin(dom_angle),
+        np.cos(dom_angle),
         np.log1p(days_advance),
     ]).astype(np.float32)
     
@@ -160,7 +164,7 @@ def fit_and_save_scaler(X_train: np.ndarray, output_dir: str) -> MinMaxScaler:
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
     print(f"Scaler saved -> {path}")
-    labels = ['capacity', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos', 'daysInAdvance_log1p']
+    labels = ['capacity', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos', 'dom_sin', 'dom_cos', 'daysInAdvance_log1p']
     for label, lo, hi in zip(labels, scaler.data_min_, scaler.data_max_):
         print(f"{label:15s}: [{lo:.0f}, {hi:.0f}] -> scaled to [0, 1]")
     print()
@@ -412,7 +416,7 @@ def main() -> None:
         sys.exit(1)
 
     X_raw, y_raw = parse_items(items)
-    days_advance_raw = X_raw[:, 3].copy()    # keep pre-engineering, needed for sample weights + far-future eval
+    days_advance_raw = X_raw[:, 4].copy()    # keep pre-engineering, needed for sample weights + far-future eval
     X_raw = engineer_features(X_raw)
     print(f"Dataset: {len(X_raw)} events  |  X {X_raw.shape}  |  y {y_raw.shape}\n")
 

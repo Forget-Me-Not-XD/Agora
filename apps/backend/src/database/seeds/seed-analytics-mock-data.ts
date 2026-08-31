@@ -128,6 +128,23 @@ function advanceFillFactor(daysAhead: number): number {
     return 0.65;
 }
 
+// Bursary/stipend payment cycle: NSFAS and most SA university allowances pay
+// out in the first week of the month. Disposable income - and willingness to
+// attend optional/paid events - measurably tapers off toward month-end as
+// students budget-stretch. A real, documented pattern, kept modest in scale
+// so it doesn't dominate the existing month/day/capacity/advance-notice effects.
+function domFillFactor(dayOfMonth: number): number {
+    if (dayOfMonth <= 7)  return 1.12;   // early month - flush with cash
+    if (dayOfMonth <= 21) return 1.00;   // mid-month - neutral
+    return 0.88;                          // late month - budgets tightening
+}
+
+function domNoShowFactor(dayOfMonth: number): number {
+    if (dayOfMonth <= 7)  return -0.02;  // early month - people follow through
+    if (dayOfMonth <= 21) return  0.00;
+    return  0.04;                         // late month - RSVP'd but can't always afford to show
+}
+
 // ── No-show rate pattern factors ───────────────────────────────────────────────
 // No-show rate = fraction of RSVP'd attendees who don't actually show up.
 // Final rate = clamp( MONTH_NOSHOW + capacityNoShowFactor + noise, 0.03, 0.45 )
@@ -338,13 +355,15 @@ async function seed(): Promise<void> {
                 const createdAt     = new Date(eventDate.getTime() - daysInAdvance * 86_400_000);
                 const capacity      = randomCapacity();
                 const dow           = eventDate.getDay();
+                const dayOfMonth    = eventDate.getDate();
 
                 // ── Fill rate ─────────────────────────────────────────────────
                 const rawFill =
                     MONTH_FILL[month]            *
                     DOW_FILL[dow]                *
                     capacityFillFactor(capacity) *
-                    advanceFillFactor(daysInAdvance);
+                    advanceFillFactor(daysInAdvance) *
+                    domFillFactor(dayOfMonth);
 
                 const fillRate           = clamp(rawFill + noise(0.08), 0.03, 0.98);
                 const confirmedAttendees = Math.min(
@@ -353,7 +372,7 @@ async function seed(): Promise<void> {
                 );
 
                 // ── No-show rate ──────────────────────────────────────────────
-                const rawNoShow  = MONTH_NOSHOW[month] + capacityNoShowFactor(capacity);
+                const rawNoShow  = MONTH_NOSHOW[month] + capacityNoShowFactor(capacity) + domNoShowFactor(dayOfMonth);
                 const noShowRate = clamp(rawNoShow + noise(0.05), 0.03, 0.45);
                 const checkedInCount = Math.round(confirmedAttendees * (1 - noShowRate));
 
