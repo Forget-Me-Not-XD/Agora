@@ -14,12 +14,15 @@ import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 // This interface is the boundary between the NestJS world and the Python world
 // ============================================================
 
+// Raw feature tuple: [maxCapacity, dayOfWeek, month, dayOfMonth, daysInAdvance]
+type EventFeatures = [number, number, number, number, number];
+
 export interface TrainingDataItem {
     eventId: string;
     title: string;
     date: string;
-    // Tuple [ MaxCapacity, dayOfWeek, month, daysInAdvance ]
-    features: [number, number, number, number];
+    // Tuple [ MaxCapacity, dayOfWeek, month, dayOfMonth, daysInAdvance ]
+    features: EventFeatures;
     labels: {
         fillRate: number;    // confirmedAttendees / maxCapacity
         noShowRate: number;    // 1 - (checkedIn / confirmedAttendees)
@@ -48,6 +51,10 @@ export interface PredictionAccuracyItem {
     predictedAttendees:  number;
     actualAttendees:     number;
 }
+
+// Must match SEQUENCE_LENGTH in apps/ml/train.py and apps/ml/predict.py EXACTLY
+// the saved model was compiled for this many timestamps and cannot accept any other shape.
+const SEQUENCE_LENGTH = 10;
 
 @Injectable()
 export class LstmService {
@@ -104,7 +111,7 @@ export class LstmService {
         };
     }
 
-    private computeFeatures(event: EventDocument): [number, number, number, number] {
+    private computeFeatures(event: EventDocument): EventFeatures {
         // Feature: days in advance:
         // Previously used implementation can result in negative values for past events - causes Neural Network result unstability:
         const createdAt = event.createdAt ?? event.date;
@@ -117,11 +124,12 @@ export class LstmService {
             event.maxCapacity,              //<-- Seats available
             event.date.getDay(),            //<-- 0 = Sunday, 1 = Monday, 2 = Tuesday, ...
             event.date.getMonth() + 1,      //<-- 1 = Jan, 2 = Feb, 3 = Mar, ...
+            event.date.getDate(),           //<-- Day of the month, 1, ..., 31
             daysInAdvance,                  // Planning Lead Time
         ];
     }
 
-    private computeDraftFeatures(dto: PredictDraftEventDto): [number, number, number, number] {
+    private computeDraftFeatures(dto: PredictDraftEventDto): EventFeatures {
         const eventDate = new Date(dto.date);
         const now = new Date();
         const daysInAdvance = Math.max(
@@ -133,8 +141,53 @@ export class LstmService {
             dto.maxCapacity,
             eventDate.getDay(),
             eventDate.getMonth() + 1,
+            eventDate.getDate(),
             daysInAdvance,
         ];
+    }
+
+    // Fetches the SEQUENCE_LENGTH - 1 most recent real events strictly before targetDate,
+    // computes their features the same way training does, and appends the target event's
+    // own features as the final timestep - giving predict.py a genuine temporal window
+    // instead of one event repeated.
+    private async buildFeatureSequence(
+        targetFeatures: EventFeatures,
+        targetDate: Date,
+        excludeEventId?: string,
+    ): Promise<EventFeatures[]> {
+        const historyNeeded = SEQUENCE_LENGTH - 1;
+
+        const candidates = await this.eventsService.findAll(
+            Role.ADMIN,
+            '',
+            undefined,
+            targetDate.toISOString(),
+        );
+
+        // findAll's `to` filter is inclusive and returns events sorted ascending by date -
+        // keep only events strictly before the target, and defensively exclude the target's
+        // own id in case of an exact date collision.
+        const strictlyPast = candidates.filter(e =>
+            e.date.getTime() < targetDate.getTime() &&
+            (excludeEventId === undefined || e._id.toString() !== excludeEventId),
+        );
+
+        const mostRecent = strictlyPast.slice(-historyNeeded);
+        let historyFeatures = mostRecent.map(e => this.computeFeatures(e));
+
+        if (historyFeatures.length < historyNeeded) {
+            if (historyFeatures.length === 0) {
+                // No real history at all yet - fall back to the old repeat-the-target
+                // behaviour, since there's nothing else to pad with.
+                historyFeatures = Array(historyNeeded).fill(targetFeatures);
+            } else {
+                const earliest = historyFeatures[0];
+                const padding = Array(historyNeeded - historyFeatures.length).fill(earliest);
+                historyFeatures = [...padding, ...historyFeatures];
+            }
+        }
+
+        return [...historyFeatures, targetFeatures];
     }
 
     // 'n Geleentheid is "verby" sodra sy einde (of, as daar geen einde is nie, 3 uur
@@ -161,10 +214,11 @@ export class LstmService {
             );
         }
 
-        const [capacity, dayOfWeek, month, daysInAdvance] = this.computeFeatures(event);
+        const targetFeatures = this.computeFeatures(event);
+        const sequence = await this.buildFeatureSequence(targetFeatures, event.date, event._id.toString());
 
         try {
-            return await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
+            return await this.runPredictScript(sequence);
         } catch (err) {
             throw new ServiceUnavailableException(
                 `Attendance prediction is currently unavailable: ${(err as Error).message}`,
@@ -191,11 +245,12 @@ export class LstmService {
 
             if (!this.isEventPast(event)) return null;
 
-            const [capacity, dayOfWeek, month, daysInAdvance] = this.computeFeatures(event);
+            const targetFeatures = this.computeFeatures(event);
+            const sequence = await this.buildFeatureSequence(targetFeatures, event.date, event._id.toString());
 
             let prediction: PredictionResult;
             try {
-                prediction = await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
+                prediction = await this.runPredictScript(sequence);
             } catch {
                 return null;
             }
@@ -220,10 +275,12 @@ export class LstmService {
     // Same as predictAttendance, but for an event that doesn't exist yet -
     // used by the "create event" form to preview a prediction before submitting.
     async predictDraft(dto: PredictDraftEventDto): Promise<PredictionResult> {
-        const [capacity, dayOfWeek, month, daysInAdvance] = this.computeDraftFeatures(dto);
+        const targetFeatures = this.computeDraftFeatures(dto);
+        const eventDate = new Date(dto.date);
+        const sequence = await this.buildFeatureSequence(targetFeatures, eventDate);
 
         try {
-            return await this.runPredictScript(capacity, dayOfWeek, month, daysInAdvance);
+            return await this.runPredictScript(sequence);
         } catch (err) {
             throw new ServiceUnavailableException(
                 `Attendance prediction is currently unavailable: ${(err as Error).message}`,
@@ -232,10 +289,7 @@ export class LstmService {
     }
 
     private runPredictScript(
-        capacity: number,
-        dayOfWeek: number,
-        month: number,
-        daysInAdvance: number,
+        sequence: EventFeatures[],
     ): Promise<PredictionResult> {
         // apps/ml is a sibling of apps/backend; dist/ mirrors src/ (see tsconfig rootDir/outDir),
         // so this relative depth holds for both ts-node dev and the compiled build.
@@ -246,7 +300,9 @@ export class LstmService {
         const pythonPath = process.platform === 'win32'
             ? path.join(mlDir, 'venv', 'Scripts', 'python.exe')
             : path.join(mlDir, 'venv', 'bin', 'python');
-        const args = [scriptPath, String(capacity), String(dayOfWeek), String(month), String(daysInAdvance)];
+        // spawn() (no shell: true) passes argv entries directly to the OS - no shell
+        // parsing occurs, so JSON containing spaces/brackets/quotes needs no escaping.
+        const args = [scriptPath, JSON.stringify(sequence)];
 
         return new Promise((resolve, reject) => {
             const child = spawn(pythonPath, args);

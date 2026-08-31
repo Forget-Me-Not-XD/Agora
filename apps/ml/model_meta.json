@@ -1,8 +1,16 @@
 {
-  "trained_at": "2026-07-08T23:00:19.238695Z",
-  "n_events": 850,
-  "best_epoch": 6,
-  "best_val_loss": 0.016495,
-  "fill_mae": 0.0332,
-  "noshow_mae": 0.0992
+  "trained_at": "2026-08-31T08:05:38.429950Z",
+  "n_events": 300,
+  "best_epoch": 73,
+  "best_val_loss": 0.005685,
+  "loss_function": "huber",
+  "fill_mae": 0.1145,
+  "fill_rmse": 0.1382,
+  "noshow_mae": 0.0478,
+  "noshow_rmse": 0.0614,
+  "far_future_n": 16,
+  "far_future_fill_mae": 0.1213,
+  "far_future_fill_rmse": 0.145,
+  "far_future_noshow_mae": 0.0457,
+  "far_future_noshow_rmse": 0.062
 }

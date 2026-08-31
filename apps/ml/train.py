@@ -41,16 +41,21 @@ from tensorflow import keras
 # ============================================================
 
 SEQUENCE_LENGTH = 10    #<-- How many consecutive events the LSTM "reads" before making a prediction. (Short Term memory window)
-NUM_FEATURES = 4    #<-- [maxCapacity, dayOfWeek (0-6), month (1-12), daysInAdvance]
+NUM_FEATURES = 8    #<-- engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), sin(dom), cos(dom), log1p(daysInAdvance)]
 NUM_OUTPUTS = 2    #<-- [fillRate, noShowRate] Multi output regression - both values gets determined simultaneously
 LSTM_UNITS = 64   #<-- Size of the LSTM's hidden state ('working memory')
 DENSE_UNITS = 32    #<-- The intermediate Dense layer compresses the 64 LSTM outputs to 32 numbers before final prediction layer
-DROPOUT_RATE = 0.35    #<-- After the LSTM and the Dense layer, we randomly zero out this fraction of activations during training - LSTM can't rely on a single neuron
+DROPOUT_RATE = 0.2    #<-- After the LSTM and the Dense layer, we randomly zero out this fraction of activations during training - LSTM can't rely on a single neuron
 LEARNING_RATE = 0.001    #<-- Step size for weight updates - If training unstable increase to 0.005
 BATCH_SIZE = 32    #<-- How many sequences are processed before weights are updated once.
 MAX_EPOCHS = 300    #<-- Hard cap on training iterations
 PATIENCE = 25    #<-- Early stopping: id val_liss hasn't improved for this many epochs.
 VAL_SPLIT = 0.20    #<-- 20% Of events are held back for validation - never used in training
+HUBER_DELTA = 0.3    #<-- Residuals bigger than this (fill/no-show rate units) get linear instead of quadratic loss - dampens outlier historical events
+FAR_FUTURE_THRESHOLD_DAYS = 45    #<-- Validation events at/after this many days-in-advance get their own MAE/RMSE breakdown
+SAMPLE_WEIGHT_SCALE = 30.0    #<-- Every this-many days of daysInAdvance adds +1.0 to a training sample's weight
+SAMPLE_WEIGHT_CAP_DAYS = 120    #<-- daysInAdvance is capped at this value before computing weight, so one extreme outlier can't dominate a batch
+MIN_VALID_CAPACITY = 10    #<-- Events with a smaller maxCapacity than this look like test/junk data, not real venues, and are dropped before training
 
 # ============================================================
 # DATA LOADING:
@@ -74,6 +79,35 @@ def load_from_file(path: str) -> list:
     return items
 
 
+def clean_items(items: list) -> list:
+    """
+    Drops events that look like test/junk data rather than real bookings:
+        - maxCapacity below MIN_VALID_CAPACITY (placeholder/test events, not real venues)
+        - fillRate above 1.0 (confirmedAttendees exceeded maxCapacity - an impossible
+        target for the sigmoid output layer, and a sign the capacity value itself
+        isn't trustworthy for that event)
+    """
+    cleaned = []
+    dropped_capacity = 0
+    dropped_fillrate = 0
+    for e in items:
+        capacity = e['features'][0]
+        fill_rate = e['labels']['fillRate']
+        if capacity < MIN_VALID_CAPACITY:
+            dropped_capacity += 1
+            continue
+        if fill_rate > 1.0:
+            dropped_fillrate += 1
+            continue
+        cleaned.append(e)
+
+    print(
+        f"Data cleaning: dropped {dropped_capacity} events with capacity < {MIN_VALID_CAPACITY}, "
+        f"{dropped_fillrate} events with fillRate > 1.0  ({len(cleaned)}/{len(items)} kept)\n"
+    )
+    return cleaned
+
+
 def parse_items(items: list) -> tuple:
     """Convert the raw JSON list into numpy arrays, sorted chronologically"""
     items = sorted(items, key=lambda e: e.get('date', ''))
@@ -84,6 +118,38 @@ def parse_items(items: list) -> tuple:
         dtype=np.float32,
     )
     return x, y
+
+# ============================================================
+# FEATURE ENGINEERING: cyclical encoding + log compression
+# ============================================================
+
+def engineer_features(raw: np.ndarray) -> np.ndarray:
+    """
+    Expands the 5 raw features NestJS sends into the 8 features the model trains on.
+    Pure function of the raw values - no fitting involved - so it's safe to apply before
+    the train/val split without any data leakage.
+    """
+    capacity        =   raw[:, 0]
+    day_of_week     =   raw[:, 1]
+    month           =   raw[:, 2]
+    day_of_month    =   raw[:, 3]
+    days_advance    =   raw[:, 4]
+    
+    dow_angle = 2.0 * np.pi * day_of_week / 7.0
+    month_angle = 2.0 * np.pi * (month - 1.0) / 12.0
+    dom_angle = 2.0 * np.pi * (day_of_month - 1.0) / 31.0
+    
+    return np.column_stack([
+        capacity,
+        np.sin(dow_angle),
+        np.cos(dow_angle),
+        np.sin(month_angle),
+        np.cos(month_angle),
+        np.sin(dom_angle),
+        np.cos(dom_angle),
+        np.log1p(days_advance),
+    ]).astype(np.float32)
+    
 
 
 # ============================================================
@@ -98,7 +164,7 @@ def fit_and_save_scaler(X_train: np.ndarray, output_dir: str) -> MinMaxScaler:
     with open(path, 'wb') as f:
         pickle.dump(scaler, f)
     print(f"Scaler saved -> {path}")
-    labels = ['capacity', 'dayOfWeek', 'month', 'daysInAdvance']
+    labels = ['capacity', 'dow_sin', 'dow_cos', 'month_sin', 'month_cos', 'dom_sin', 'dom_cos', 'daysInAdvance_log1p']
     for label, lo, hi in zip(labels, scaler.data_min_, scaler.data_max_):
         print(f"{label:15s}: [{lo:.0f}, {hi:.0f}] -> scaled to [0, 1]")
     print()
@@ -115,6 +181,26 @@ def create_sequences(X: np.ndarray, y: np.ndarray) -> tuple:
         X_out.append(X[i : i + SEQUENCE_LENGTH])    # (SEQUENCE LENGTH, 4)
         y_out.append(y[i + SEQUENCE_LENGTH - 1])    # Labels of last event
     return np.array(X_out, dtype=np.float32), np.array(y_out, dtype=np.float32)
+
+# ============================================================
+# SAMPLE WEIGHTING: make far-future events count more
+# ============================================================
+
+def create_sample_weights(days_advance_raw: np.ndarray) -> np.ndarray:
+    """
+    One weight per training sequence, aligned with the create_sequence()'s 
+    y_out indexing (the target event is always the last timestep, at index i + SEQUENCE_LENGTH - 1).
+    Near-term events dominate by sheer count in real historical data, so plain average loss barely
+    "notices" the far-future examples - this makes each one count more.
+    """
+    n_seq = len(days_advance_raw) - SEQUENCE_LENGTH + 1
+    target_days = np.array(
+        [days_advance_raw[i + SEQUENCE_LENGTH - 1] for i in range(n_seq)],
+        dtype = np.float32,
+    )
+    capped = np.minimum(target_days, SAMPLE_WEIGHT_CAP_DAYS)
+    return (1.0 + capped / SAMPLE_WEIGHT_SCALE).astype(np.float32)
+    
 
 
 # ============================================================
@@ -136,7 +222,7 @@ def build_model() -> keras.Model:
     
     model.compile(
         optimizer = keras.optimizers.Adam(learning_rate = LEARNING_RATE, clipnorm = 1.0),
-        loss = 'mse',
+        loss = keras.losses.Huber(delta = HUBER_DELTA),
         metrics = ['mae'],
     )
     return model
@@ -146,7 +232,7 @@ def build_model() -> keras.Model:
 # TRAINING WITH CALLBACKS:
 # ============================================================
 
-def train_model(model, X_train, y_train, X_val, y_val):
+def train_model(model, X_train, y_train, X_val, y_val, sample_weight=None):
     callbacks = [
         # EarlyStopping - Most important safeguard against overfitting
         # Monitors val_loss. If it hasn't improved for PATIENCE consecutive expochs, training stops
@@ -170,6 +256,7 @@ def train_model(model, X_train, y_train, X_val, y_val):
     print(f"Training: {len(X_train)} sequences | Validation: {len(X_val)} sequences")
     history = model.fit(
         X_train, y_train,
+        sample_weight = sample_weight,
         validation_data = (X_val, y_val),
         epochs = MAX_EPOCHS,
         batch_size = BATCH_SIZE,
@@ -213,16 +300,49 @@ def convert_to_tflite(model: keras.Model, output_dir: str) -> None:
 # ============================================================
 # EVALUATION:
 # ============================================================
-def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=None) -> None:
-    preds = model.predict(X_val, verbose=0)    # shape(n_val, 2)
+def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_adnvance: np.ndarray, history=None) -> dict:
+    preds = model.predict(X_val, verbose=0)    # shape (n_val, 2)
     
-    fill_mae = float(np.mean(np.abs(preds[:, 0] - y_val[:, 0])))
-    noshow_mae = float(np.mean(np.abs(preds[:, 1] - y_val[:, 1])))
+    def mae(a, b): return float(np.mean(np.abs(a - b)))
+    def rmse(a, b): return float(np.sqrt(np.mean((a - b) ** 2)))
     
+    fill_mae    =   mae(preds[:, 0], y_val[:, 0])
+    noshow_mae  =   mae(preds[:, 1], y_val[:, 1])
+    fill_rmse   =   rmse(preds[:, 0], y_val[:, 0])
+    noshow_rmse =   rmse(preds[:, 1], y_val[:, 1])
+    
+    far_mask = val_days_adnvance >= FAR_FUTURE_THRESHOLD_DAYS
+    n_far = int(far_mask.sum())
+    if n_far > 0:
+        far_fill_mae    = mae(preds[far_mask, 0], y_val[far_mask, 0])
+        far_noshow_mae  = mae(preds[far_mask, 1], y_val[far_mask, 1])
+        far_fill_rmse   = rmse(preds[far_mask, 0], y_val[far_mask, 0])
+        far_noshow_rmse = rmse(preds[far_mask, 1], y_val[far_mask, 1])
+    else:
+        far_fill_mae = far_noshow_mae = far_fill_rmse = far_noshow_rmse = None
+        
     print("== Validation Metrics ========================================")
-    print(f" Fill Rate MAE: {fill_mae:.4f} ({fill_mae * 100:.1f} percentage points avg error)")
-    print(f" No-Show Rate MAE: {noshow_mae:.4f} ({noshow_mae * 100:.1f} percentage points avg error)")
+    print(f" Fill Rate    MAE: {fill_mae:.4f}   RMSE: {fill_rmse:.4f}")
+    print(f" No-Show Rate MAE: {noshow_mae:.4f}   RMSE: {noshow_rmse:.4f}")
     print()
+    print(f"== Far-future subset (daysInAdvance >= {FAR_FUTURE_THRESHOLD_DAYS}, n={n_far}) ====")
+    if n_far > 0:
+        print(f" Fill Rate    MAE: {far_fill_mae:.4f}   RMSE: {far_fill_rmse:.4f}")
+        print(f" No-Show Rate MAE: {far_noshow_mae:.4f}   RMSE: {far_noshow_rmse:.4f}")
+    else:
+        print(" (no far-future validation events in this split)")
+    print()
+
+    metrics = {
+        "fill_mae": round(fill_mae, 4), "fill_rmse": round(fill_rmse, 4),
+        "noshow_mae": round(noshow_mae, 4), "noshow_rmse": round(noshow_rmse, 4),
+        "far_future_n": n_far,
+        "far_future_fill_mae": round(far_fill_mae, 4) if n_far > 0 else None,
+        "far_future_fill_rmse": round(far_fill_rmse, 4) if n_far > 0 else None,
+        "far_future_noshow_mae": round(far_noshow_mae, 4) if n_far > 0 else None,
+        "far_future_noshow_rmse": round(far_noshow_rmse, 4) if n_far > 0 else None,
+    }
+    
     print("== Sample predictions vs actual (first 8 validation sequences) ==")
     print(f"  {'fill actual':>12}  {'fill pred':>10}  {'noshow actual':>14}  {'noshow pred':>12}")
     for i in range(min(8, len(y_val))):
@@ -238,7 +358,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
         import matplotlib.pyplot as plt
     except ImportError:
         print("(matplotlib not installed - skipping training curve plot)")
-        return fill_mae, noshow_mae
+        return metrics
 
     if history is not None:
         _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -262,7 +382,7 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, history=N
         print(f"Training curve saved → {chart_path}")
         plt.close()
 
-    return fill_mae, noshow_mae
+    return metrics
 
 
 # ============================================================
@@ -288,19 +408,23 @@ def main() -> None:
     
     # == LOAD ============================================================
     items = load_from_api(args.api, args.token) if args.api else load_from_file(args.json)
-    
+    items = clean_items(items)
+
     min_required = math.ceil(SEQUENCE_LENGTH / VAL_SPLIT)
     if len(items) < min_required:
         print(f"ERROR: Need at least {min_required} events. Got {len(items)}.")
         sys.exit(1)
 
     X_raw, y_raw = parse_items(items)
+    days_advance_raw = X_raw[:, 4].copy()    # keep pre-engineering, needed for sample weights + far-future eval
+    X_raw = engineer_features(X_raw)
     print(f"Dataset: {len(X_raw)} events  |  X {X_raw.shape}  |  y {y_raw.shape}\n")
 
     # == Chronological train / val split ==================================================
     split = int((1 - VAL_SPLIT) * len(X_raw))
     X_train_raw, X_val_raw = X_raw[:split], X_raw[split:]
     y_train_raw, y_val_raw = y_raw[:split], y_raw[split:]
+    days_advance_train, days_advance_val = days_advance_raw[:split], days_advance_raw[split:]
     print(f"Chronological split: {len(X_train_raw)} train / {len(X_val_raw)} val events\n")
 
     # == Normalise ============================================================
@@ -314,6 +438,12 @@ def main() -> None:
     # == Build sequences ============================================================
     X_train_seq, y_train_seq = create_sequences(X_train_scaled, y_train_raw)
     X_val_seq,   y_val_seq   = create_sequences(X_val_scaled,   y_val_raw)
+    
+    train_sample_weights = create_sample_weights(days_advance_train)
+    val_target_days = np.array(
+        [days_advance_val[i + SEQUENCE_LENGTH - 1] for i in range(len(X_val_seq))],
+        dtype=np.float32,
+    )
 
     print(f"Sequences: {len(X_train_seq)} train / {len(X_val_seq)} val")
     print(f"  X_train shape : {X_train_seq.shape}  (sequences × timesteps × features)")
@@ -327,13 +457,13 @@ def main() -> None:
     print("(This is tiny — good for Pi inference. Full ResNet-50 has 25 million.)\n")
 
     # == Train ======================================================================
-    history = train_model(model, X_train_seq, y_train_seq, X_val_seq, y_val_seq)
+    history = train_model(model, X_train_seq, y_train_seq, X_val_seq, y_val_seq, sample_weight=train_sample_weights)
     best_epoch    = int(np.argmin(history.history['val_loss'])) + 1
     best_val_loss = float(min(history.history['val_loss']))
     print(f"\nBest epoch : {best_epoch}  |  best val_loss : {best_val_loss:.6f}\n")
 
     # == Evaluate ======================================================================
-    fill_mae, noshow_mae = evaluate(model, X_val_seq, y_val_seq, history)
+    metrics = evaluate(model, X_val_seq, y_val_seq, val_target_days, history)
 
     # == Convert to TFLite ============================================================
     convert_to_tflite(model, output_dir)
@@ -344,8 +474,8 @@ def main() -> None:
         "n_events":      len(X_raw),
         "best_epoch":    best_epoch,
         "best_val_loss": round(best_val_loss, 6),
-        "fill_mae":      round(fill_mae, 4),
-        "noshow_mae":    round(noshow_mae, 4)
+        "loss_function": "huber",
+        **metrics,
     }
     meta_path = os.path.join(output_dir, 'model_meta.json')
     with open(meta_path, 'w') as f:

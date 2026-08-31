@@ -3,21 +3,21 @@ predict.py - LSTM Inference Script: Event Attendance Prediction
 ======================================================================
 
 What this script will do:
-1. Accepts 4 raw feature values as CLI arguments
-2. Loads Scaler.pkl (MinMaxScaler from training) and normalises the inputs
-3. Repeats the single event 5 times to satisfy the LSTM's window shape ( 1, 5, 4 )
-4. Runs the TFLite interpreter to obtain fillRate and noShowRate predictions
-5. Computes a cost estimate from the predictions
-6. Geenerates rules-based reasoning strings
-7. Prints a single JSON object to stdout (NestJS reads via spawn)
+1. Accepts a JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, daysInAdvance]
+   rows as a single CLI argument - oldest event first, target event last
+2. Loads scaler.pkl (MinMaxScaler from training) and normalises the sequence
+3. Runs the TFLite interpreter on the real sequence to obtain fillRate and noShowRate
+4. Computes a cost estimate from the predictions
+5. Generates rules-based reasoning strings from the target event's own features
+6. Prints a single JSON object to stdout (NestJS reads via spawn)
 
 Usage:
-    python predict.py <capacity> <dayOfWeek> <month> <daysInAdvance>
-    
+    python predict.py '<JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, daysInAdvance] rows>'
+
 Example:
-    python predict.py 200 5 2 30
-    (200 seats, Friday, February, 30 days in advance)
-    
+    python predict.py '[[180,3,2,40],[220,5,2,35],...,[200,5,2,30]]'
+    (10 rows: 9 real preceding events, then the target event as the final row)
+
     Exit code 0 on success, non-zero on any error
     Errors go to stderr; only the JSON result goes to stdout.
 """
@@ -31,8 +31,8 @@ import sys
 import numpy as np
 
 try:
-    import ai_edge_litert.interpreter as tflite          # Pi: lightweight runtime (tflite-runtime's successor;
-                                                          # required for op versions emitted by TF 2.15+ converters)
+    import ai_edge_litert.interpreter as tflite         # Pi: lightweight runtime (tflite-runtime's successor;
+                                                        # required for op versions emitted by TF 2.15+ converters)
 except ImportError:
     try:
         import tflite_runtime.interpreter as tflite      # older Pi installs pinned to tflite-runtime
@@ -51,7 +51,7 @@ except ImportError:
 
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape
 SEQUENCE_LENGTH = 10    # timesteps the LSTM expects per sample
-NUM_FEATURES = 4    # [maxCapacity, dayOfWeek, month, daysInAdvance]
+NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), sin(dom), cos(dom), log1p(daysInAdvance)]
 
 
 # ============================================================
@@ -83,6 +83,32 @@ def load_artifacts(script_dir: str):
         
     return scaler, model_path
 
+# ============================================================
+# FEATURE ENGINEERING: must catch train.py's engineer_features() EXACTLY
+# ============================================================
+
+def engineer_features(raw: np.ndarray) -> np.ndarray:
+    capacity        =   raw[:, 0]
+    day_of_week     =   raw[:, 1]
+    month           =   raw[:, 2]
+    day_of_month    =   raw[:, 3]
+    days_advance    =   raw[:, 4]
+    
+    dow_angle = 2.0 * np.pi * day_of_week / 7.0
+    month_angle = 2.0 * np.pi * (month - 1.0) / 12.0
+    dom_angle = 2.0 * np.pi * (day_of_month - 1.0) / 31.0
+    
+    return np.column_stack([
+        capacity,
+        np.sin(dow_angle),
+        np.cos(dow_angle),
+        np.sin(month_angle),
+        np.cos(month_angle),
+        np.sin(dom_angle),
+        np.cos(dom_angle),
+        np.log1p(days_advance),
+    ]).astype(np.float32)
+
 
 # ============================================================
 # TFLITE INFERENCE
@@ -96,7 +122,7 @@ def run_inference(model_path: str, input_array: np.ndarray) -> tuple:
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
     
-    # Copy our ( 1, 5, 4 ) input array into the model's input buffer
+    # Copy our (1, SEQUENCE_LENGTH, NUM_FEATURES) input array into the model's input buffer
     interpreter.set_tensor(input_details[0]['index'], input_array)
     
     # Run the Model:
@@ -264,48 +290,63 @@ def generate_reasoning(capacity: int, dow: int, month: int, days_in_advance: int
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description = "LSTM inference: predict fill rate and no show rate"
+        description = "LSTM inference: predict fill rate and no show rate from a real event sequence"
     )
-    parser.add_argument('capacity', type = int, help ='Maximum venue capacity (seats)')
-    parser.add_argument('dayOfWeek', type = int, help ='Day of week: 0 = Sunday, 1 = Monday, 2 = Tuesday, ...')
-    parser.add_argument('month', type = int, help = 'Month: 1 = January, 2 = February, 3 = March, ...')
-    parser.add_argument('daysInAdvance', type = int, help = 'Days between event creation and event date')
+    parser.add_argument(
+        'sequence', type = str,
+        help = f'JSON array of exactly {SEQUENCE_LENGTH} [capacity, dayOfWeek, month, daysInAdvance] rows, oldest first, target event last',
+    )
     args = parser.parse_args()
-    
+
+    try:
+        sequence = json.loads(args.sequence)
+    except json.JSONDecodeError as exc:
+        sys.stderr.write(f"ERROR: sequence argument is not valid JSON: {exc}\n")
+        sys.exit(1)
+
+    if not isinstance(sequence, list) or len(sequence) != SEQUENCE_LENGTH:
+        got = len(sequence) if isinstance(sequence, list) else type(sequence).__name__
+        sys.stderr.write(f"ERROR: sequence must be a JSON array with exactly {SEQUENCE_LENGTH} rows, got {got}\n")
+        sys.exit(1)
+
+    for row in sequence:
+        if not isinstance(row, list) or len(row) != 5:
+            sys.stderr.write("ERROR: each sequence row must have exactly 4 values [capacity, dayOfWeek, month, daysInAdvance]\n")
+            sys.exit(1)
+
     # Resolve the dir this script lives in:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     scaler, model_path = load_artifacts(script_dir)
-    
-    # Build the raw (unsacled) feature vector:
-    raw_features = np.array(
-        [[args.capacity, args.dayOfWeek, args.month, args.daysInAdvance]],
-        dtype = np.float32,
-    )    # Shape (1, 4)
-    
-    # Scale using the same MinMaxScaler that was fir on training data
-    scaled = scaler.transform(raw_features)
-    
-    # == Filling the LSTM window: ====================
-    input_array = np.repeat(
-        scaled.reshape(1, 1, NUM_FEATURES),
-        SEQUENCE_LENGTH,
-        axis = 1
-    ).astype(np.float32)    # final shape: (1, 5, 4)
-    
+
+    # Build the raw sequence, engineer + scale it exactly like training:
+    raw_features = np.array(sequence, dtype = np.float32)      # Shape (SEQUENCE_LENGTH, 4)
+    engineered = engineer_features(raw_features)                # Shape (SEQUENCE_LENGTH, 6)
+    scaled = scaler.transform(engineered)                       # Shape (SEQUENCE_LENGTH, 6)
+
+    input_array = scaled.reshape(1, SEQUENCE_LENGTH, NUM_FEATURES).astype(np.float32)
+
     fill_rate, no_show_rate = run_inference(model_path, input_array)
-    
+
     # Sigmoid output is theoretically [0, 1]
     fill_rate = max(0.0, min(1.0, fill_rate))
     no_show_rate = max(0.0, min(1.0, no_show_rate))
-    
+
+    # The target event is always the LAST row of the sequence - use its own raw
+    # values for the budget estimate and reasoning strings, not any historical row.
+    target_capacity, target_dow, target_month, _target_dom, target_days_advance = sequence[-1]
+    target_capacity = int(target_capacity)
+    target_dow = int(target_dow)
+    target_month = int(target_month)
+    target_days_advance = int(target_days_advance)
+
     estimated_rsvps, estimated_attendees, budget = compute_budget(
-        fill_rate, no_show_rate, args.capacity
+        fill_rate, no_show_rate, target_capacity
     )
-    
+
     reasoning = generate_reasoning(
-        args.capacity, args.dayOfWeek, args.month, args.daysInAdvance
+        target_capacity, target_dow, target_month, target_days_advance
     )
-    
+
     result = {
         "predictedFillRate": round(fill_rate, 4),
         "estimatedRsvps": estimated_rsvps,

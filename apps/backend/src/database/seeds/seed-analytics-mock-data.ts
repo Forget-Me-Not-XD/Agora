@@ -33,7 +33,7 @@
  *   npx ts-node src/database/seeds/seed-analytics-mock-data.ts
  *
  * Idempotent: re-running is a no-op if sentinel user already exists.
- * To wipe and re-seed, delete the user with email seed-admin@akademia.edu.za
+ * To wipe and re-seed, delete the user with email seed-admin@akademia.ac.za
  * and all events/rsvps whose createdBy is that user's _id.
  */
 
@@ -126,6 +126,23 @@ function advanceFillFactor(daysAhead: number): number {
     if (daysAhead >= 21) return 1.00;
     if (daysAhead >=  7) return 0.85;
     return 0.65;
+}
+
+// Bursary/stipend payment cycle: NSFAS and most SA university allowances pay
+// out in the first week of the month. Disposable income - and willingness to
+// attend optional/paid events - measurably tapers off toward month-end as
+// students budget-stretch. A real, documented pattern, kept modest in scale
+// so it doesn't dominate the existing month/day/capacity/advance-notice effects.
+function domFillFactor(dayOfMonth: number): number {
+    if (dayOfMonth <= 7)  return 1.12;   // early month - flush with cash
+    if (dayOfMonth <= 21) return 1.00;   // mid-month - neutral
+    return 0.88;                          // late month - budgets tightening
+}
+
+function domNoShowFactor(dayOfMonth: number): number {
+    if (dayOfMonth <= 7)  return -0.02;  // early month - people follow through
+    if (dayOfMonth <= 21) return  0.00;
+    return  0.04;                         // late month - RSVP'd but can't always afford to show
 }
 
 // ── No-show rate pattern factors ───────────────────────────────────────────────
@@ -250,9 +267,9 @@ async function seed(): Promise<void> {
     const rsvpsCol  = mongoose.connection.collection('rsvps');
 
     // Idempotency guard — skip everything if the sentinel admin already exists
-    if (await usersCol.findOne({ email: 'seed-admin@akademia.edu.za' })) {
+    if (await usersCol.findOne({ email: 'seed-admin@akademia.ac.za' })) {
         console.log('Seed data already present (sentinel user found). Skipping.');
-        console.log('To re-seed, delete the user seed-admin@akademia.edu.za first.');
+        console.log('To re-seed, delete the user seed-admin@akademia.ac.za first.');
         await mongoose.disconnect();
         return;
     }
@@ -266,7 +283,7 @@ async function seed(): Promise<void> {
     const adminDoc = {
         _id: new Types.ObjectId(),
         name: 'Saad', surname: 'Administrateur',
-        email: 'seed-admin@akademia.edu.za',
+        email: 'seed-admin@akademia.ac.za',
         passwordHash, role: 'ADMIN', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'NONE',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -275,7 +292,7 @@ async function seed(): Promise<void> {
     const dosentDocs = Array.from({ length: 5 }, (_, i) => ({
         _id: new Types.ObjectId(),
         name: 'Prof', surname: `Dosent${i + 1}`,
-        email: `dosent.seed.${i + 1}@akademia.edu.za`,
+        email: `dosent.seed.${i + 1}@akademia.ac.za`,
         passwordHash, role: 'DOSENT', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'Dr',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -287,7 +304,7 @@ async function seed(): Promise<void> {
     const studentDocs = Array.from({ length: NUM_STUDENTS }, (_, i) => ({
         _id: new Types.ObjectId(),
         name: 'Student', surname: `Saad${String(i).padStart(4, '0')}`,
-        email: `student.seed.${i}@studs.akademia.edu.za`,
+        email: `student.seed.${i}@studs.akademia.ac.za`,
         passwordHash, role: 'STUDENT', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'NONE',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -338,13 +355,15 @@ async function seed(): Promise<void> {
                 const createdAt     = new Date(eventDate.getTime() - daysInAdvance * 86_400_000);
                 const capacity      = randomCapacity();
                 const dow           = eventDate.getDay();
+                const dayOfMonth    = eventDate.getDate();
 
                 // ── Fill rate ─────────────────────────────────────────────────
                 const rawFill =
                     MONTH_FILL[month]            *
                     DOW_FILL[dow]                *
                     capacityFillFactor(capacity) *
-                    advanceFillFactor(daysInAdvance);
+                    advanceFillFactor(daysInAdvance) *
+                    domFillFactor(dayOfMonth);
 
                 const fillRate           = clamp(rawFill + noise(0.08), 0.03, 0.98);
                 const confirmedAttendees = Math.min(
@@ -353,7 +372,7 @@ async function seed(): Promise<void> {
                 );
 
                 // ── No-show rate ──────────────────────────────────────────────
-                const rawNoShow  = MONTH_NOSHOW[month] + capacityNoShowFactor(capacity);
+                const rawNoShow  = MONTH_NOSHOW[month] + capacityNoShowFactor(capacity) + domNoShowFactor(dayOfMonth);
                 const noShowRate = clamp(rawNoShow + noise(0.05), 0.03, 0.45);
                 const checkedInCount = Math.round(confirmedAttendees * (1 - noShowRate));
 
