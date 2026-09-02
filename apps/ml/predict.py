@@ -29,6 +29,7 @@ import os
 import pickle
 import sys
 import numpy as np
+import explain
 
 try:
     import ai_edge_litert.interpreter as tflite         # Pi: lightweight runtime (tflite-runtime's successor;
@@ -114,26 +115,23 @@ def engineer_features(raw: np.ndarray) -> np.ndarray:
 # TFLITE INFERENCE
 # ============================================================
 
-def run_inference(model_path: str, input_array: np.ndarray) -> tuple:
-    # Load the TFLite model and run one forward pass - Returns (fillRate, noShowRate) as plain python floats
+def load_interpreter(model_path: str):
+    # Load model.tflite from disk ONCE and allocate its tensor buffers - this is the expensive step,
+    # thus it must not be repeated for every occlusion swap.
     interpreter = tflite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
-    
+    return interpreter
+
+def invoke(interpreter, input_array: np.ndarray) -> tuple:
+    # Run one forward pass on an already loaded interpreter - Return (fillRate, noShowRate)
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
     
-    # Copy our (1, SEQUENCE_LENGTH, NUM_FEATURES) input array into the model's input buffer
     interpreter.set_tensor(input_details[0]['index'], input_array)
-    
-    # Run the Model:
     interpreter.invoke()
     
-    # Read the (1, 2) output - [[fillRate, noShowRate]]
     output = interpreter.get_tensor(output_details[0]['index'])
-    fill_rate = float(output[0][0])
-    no_show_rate = float(output[0][1])
-    
-    return fill_rate, no_show_rate
+    return float(output[0][0]), float(output[0][1])
 
 
 # ============================================================
@@ -325,7 +323,8 @@ def main() -> None:
 
     input_array = scaled.reshape(1, SEQUENCE_LENGTH, NUM_FEATURES).astype(np.float32)
 
-    fill_rate, no_show_rate = run_inference(model_path, input_array)
+    interpreter = load_interpreter(model_path)
+    fill_rate, no_show_rate = invoke(interpreter, input_array)
 
     # Sigmoid output is theoretically [0, 1]
     fill_rate = max(0.0, min(1.0, fill_rate))
@@ -343,9 +342,15 @@ def main() -> None:
         fill_rate, no_show_rate, target_capacity
     )
 
-    reasoning = generate_reasoning(
-        target_capacity, target_dow, target_month, target_days_advance
+    reasoning = explain.compute_occlusion_reasoning(
+        raw_features, fill_rate, no_show_rate, scaler, engineer_features, lambda arr: invoke(interpreter, arr),
     )
+    
+    if reasoning is None:
+        # No real recent history to compare against (new deployment, or a far-future draft whose sequence was padded by repeating the target itself)
+        reasoning = generate_reasoning(
+            target_capacity, target_dow, target_month, target_days_advance
+        )
 
     result = {
         "predictedFillRate": round(fill_rate, 4),

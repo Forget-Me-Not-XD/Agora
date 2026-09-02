@@ -186,6 +186,14 @@ export function AiScreen() {
                     <Text style={styles.progressCaption}>
                       {prediction.estimatedAttendees} verwag van {event.maxCapacity} kapasiteit
                     </Text>
+                    {prediction.reasoning.length > 0 && (
+                      <View style={styles.topReasonRow}>
+                        <Feather name="zap" size={11} color={colors.primary} />
+                        <Text style={styles.topReasonText} numberOfLines={2}>
+                          {prediction.reasoning[0]}
+                        </Text>
+                      </View>
+                    )}
                   </>
                 ) : (
                   <Text style={styles.emptyText}>Voorspelling nie beskikbaar vir hierdie funksie nie.</Text>
@@ -384,6 +392,19 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       backgroundColor: colors.primary,
     },
     progressCaption: { ...typography.caption, color: colors.textSubtle },
+
+    topReasonRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+      marginTop: 4,
+    },
+    topReasonText: {
+      ...typography.caption,
+      flex: 1,
+      color: colors.textSubtle,
+      lineHeight: 15,
+    },
 
     howCard: {
       backgroundColor: colors.surface,

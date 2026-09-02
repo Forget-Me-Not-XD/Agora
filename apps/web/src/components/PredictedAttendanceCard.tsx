@@ -112,6 +112,20 @@ export default function PredictedAttendanceCard() {
                     <p className="text-xs text-[var(--color-text-subtle)]">
                         {prediction.estimatedAttendees} / {selectedEvent.maxCapacity}
                     </p>
+
+                    <div className="pt-2 border-t border-[var(--color-border)]">
+                        <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">
+                            Waarom hierdie voorspelling?
+                        </p>
+                        <ul className="space-y-1.5">
+                            {prediction.reasoning.map((reason, i) => (
+                                <li key={i} className="text-xs text-[var(--color-text)] flex gap-2">
+                                    <span className="text-[var(--color-primary)]">•</span>
+                                    {reason}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
             )}
         </div>
