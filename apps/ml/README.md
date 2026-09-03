@@ -34,22 +34,25 @@
 9. [Heroplei Soos Werklike Gebeure Ophoop](#9-heroplei-soos-werklike-gebeure-ophoop)
 10. [Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate](#10-fase-1--kenmerkingenieurswese-en-verliesfunksie-resultate)
 11. [Fase 3 — Dag-van-die-Maand Kenmerk: Resultate](#11-fase-3--dag-van-die-maand-kenmerk-resultate)
+12. [Fase 4 — Data-gedrewe Verduidelikings (Occlusion-analise)](#12-fase-4--data-gedrewe-verduidelikings-occlusion-analise)
 
 ---
 
 ## 1. Oorsig
 
-Twee Python-skrips hanteer die volledige ML-lewensiklus:
+Drie Python-skrips hanteer die volledige ML-lewensiklus:
 
 | Skrip | Loop op | Doel |
 |---|---|---|
 | `train.py` | Ontwikkelingsmasjien | Haal historiese geleentheiddata van die NestJS API, lei die LSTM op, stoor `model.tflite` en `scaler.pkl` |
 | `predict.py` | Raspberry Pi 5 | Word deur die NestJS-backend as 'n kindproses gelaai; lees die gestoorde artefakte en gee 'n JSON-voorspelling terug |
+| `explain.py` | Raspberry Pi 5 | Deur `predict.py` ingevoer (nie self uitvoerbaar nie) — bereken die `reasoning`-lys deur die regte model herhaaldelik te bevraagteken (occlusion-analise, sien afdeling 12) |
 
-Opleiding is doelbewus van inferensie geskei. Die Pi laat slegs
-`predict.py` loop — dit lei nooit op nie. Opleiding gebeur op 'n
-ontwikkelingsmasjien met volledige TensorFlow geïnstalleer, en produseer twee
-klein artefaklêers wat dan na die Pi gekopieer word.
+Opleiding is doelbewus van inferensie geskei. Die Pi laat slegs `predict.py`
+(en die module wat dit invoer, `explain.py`) loop — dit lei nooit op nie.
+Opleiding gebeur op 'n ontwikkelingsmasjien met volledige TensorFlow
+geïnstalleer, en produseer twee klein artefaklêers wat dan na die Pi
+gekopieer word.
 
 ---
 
@@ -487,34 +490,37 @@ python -c "import sklearn; print('scikit-learn OK')"
 ## 7. predict.py Handmatig Toets
 
 Loop vanuit die `apps/ml/`-gids op die Pi (of ontwikkelingsmasjien as
-artefakte daar is):
+artefakte daar is). Sedert Fase 2 aanvaar `predict.py` **een CLI-argument**:
+'n JSON-string van presies `SEQUENCE_LENGTH` (10) rye, elk
+`[capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]` — oudste
+gebeurtenis eerste, teikengebeurtenis laaste:
 
 ```bash
-# python predict.py <kapasiteit> <dagVanWeek> <maand> <daeVooruit>
 # dayOfWeek: 0=Sondag, 1=Maandag, 2=Dinsdag, 3=Woensdag, 4=Donderdag,
 #            5=Vrydag, 6=Saterdag
 
-python predict.py 200 5 2 30
+python predict.py "[[300,1,3,10,60],[300,1,3,10,55],[300,1,3,10,50],[300,1,3,10,45],[300,1,3,10,40],[300,1,3,10,35],[300,1,3,10,30],[300,1,3,10,25],[300,1,3,10,20],[200,5,2,10,30]]"
 ```
 
-Dit simuleer 'n 200-sitplek geleentheid op 'n Vrydag in Februarie, 30 dae
-vooruit geskep.
+Dit simuleer 9 tipiese vorige gebeure (300 sitplekke, Maandae, Maart) gevolg
+deur 'n teikengebeurtenis: 200-sitplek geleentheid op 'n Vrydag in Februarie,
+30 dae vooruit geskep.
 
 **Om randgevalle te toets:**
 
 ```bash
-# Klein laaste-minuut geleentheid op 'n Sondag in eksamensmaand
-python predict.py 30 0 5 2
-
-# Groot lokaal, goed vooruit, middelsemester Donderdag
-python predict.py 800 4 3 60
+# Al 10 rye identies — simuleer 'n splinternuwe ontplooiing met geen
+# werklike geskiedenis nie. compute_occlusion_reasoning() se afgeleide waardes
+# is dan ~0 vir elke kenmerk, en predict.py val terug op generate_reasoning().
+python predict.py "[[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3],[80,0,5,2,3]]"
 ```
 
 **Om fouthantering te bevestig (model ontbreek):**
 
 ```bash
 mv model.tflite model.tflite.bak
-python predict.py 200 5 2 30   # moet met kode 1 uitsluit en fout na stderr skryf
+python predict.py "[[300,1,3,10,60],[300,1,3,10,55],[300,1,3,10,50],[300,1,3,10,45],[300,1,3,10,40],[300,1,3,10,35],[300,1,3,10,30],[300,1,3,10,25],[300,1,3,10,20],[200,5,2,10,30]]"
+# moet met kode 1 uitsluit en fout na stderr skryf
 mv model.tflite.bak model.tflite
 ```
 
@@ -532,10 +538,9 @@ mv model.tflite.bak model.tflite
   "estimatedAttendees":  144,
   "estimatedBudgetZAR":  36700,
   "reasoning": [
-    "Februarie is oriënteringweek - histories hoë bywoning word verwag",
-    "Vrydag-geleentheid - die besigste dag vir studentebywoning op kampus",
-    "Medium-grootte lokaal - goeie vulkoers word verwag met behoorlike promosie",
-    "30 dae vooraf aangekondig - redelike promosietyd is beskikbaar"
+    "Kapasiteit van 200 sitplekke (teenoor 300 tipies by onlangse geleenthede) het die verwagte vulkoers met 3 persentasiepunte verhoog",
+    "Vrydag-geleentheid (onlangse gemiddeld was eerder Maandag) het die vulkoers met 8 persentasiepunte verhoog",
+    "30 dae vooraf beplan (onlangse tipiese waarde: 40 dae) het die vulkoers met 2 persentasiepunte verlaag"
   ]
 }
 ```
@@ -547,7 +552,7 @@ mv model.tflite.bak model.tflite
 | `predictedNoShowRate` | LSTM uitvoer[1] | Breukdeel van bevestigde byeeners wat verwag word om nie op te daag nie (0–1) |
 | `estimatedAttendees` | `rsvps × (1 - noShowRate)` | Getal mense wat verwag word om fisies aan te kom |
 | `estimatedBudgetZAR` | `byeeners×R250 + lokaalverhuur` | Beraamde geleentheidskostes in Suid-Afrikaanse Rand |
-| `reasoning` | Reëlgebaseerde enjin | Gewone Afrikaanse verduidelikings afgelei van invoerkenmerkwaardes |
+| `reasoning` | `explain.py` (occlusion), met `generate_reasoning()` in `predict.py` as terugval | 1–3 Afrikaanse sinne wat elk 'n **gemete** effek beskryf: hoeveel die voorspelling regtig verander het toe een kenmerk van die teikengebeurtenis vervang is met wat tipies was vir die 9 voorafgaande werklike gebeure. Sien afdeling 12. |
 
 **Begrotingsuiteensetting:**
 
@@ -703,3 +708,95 @@ staanspoor af — die aanvanklike agteruitgang was 'n eienskap van die
 sintetiese data, nie 'n fout in die kode nie. Sodra werklike produksiedata
 ophoop, sal hierdie kenmerk outomaties bewys (of weerlê) of dieselfde patroon
 in die regte wêreld bestaan.
+
+---
+
+## 12. Fase 4 — Data-gedrewe Verduidelikings (Occlusion-analise)
+
+### 12.1 Die probleem met die oorspronklike `generate_reasoning()`
+
+Tot en met Fase 4 het `predict.py`'s `generate_reasoning()` **elke** sin in
+`reasoning` geproduseer uit 'n hardgekodeerde `if`/`elif`-leer, geskryf op
+grond van aannames ("Februarie = oriënteringweek, hoë bywoning verwag"). Die
+sinne het nooit na die model se werklike uitvoer of enige regte data gekyk
+nie — dieselfde maand/dag/kapasiteitskombinasie het altyd dieselfde
+sin gekry, ongeag wat die LSTM self voorspel het. `explain.py` vervang dit
+met redes wat regtig gemeet is teen die ontplooide model.
+
+### 12.2 Occlusion: die kernidee
+
+Vir 'n swart-boks-funksie `f` (hier: kenmerkingenieurswese → skalering →
+LSTM) en 'n invoer `x`, word die effek van een kenmerk `x_i` geskat as:
+
+```
+effect_i = f(x) − f(x met x_i vervang deur 'n verwysingswaarde)
+```
+
+Dit is 'n eindige-verskil-benadering van 'n afgeleide — dieselfde idee as 'n
+numeriese gradiënt (`(f(x+h) − f(x)) / h`), behalwe dat, in plaas van 'n
+oneindig klein stappie, een betekenisvolle, verstaanbare stap geneem word:
+"wat as hierdie kenmerk sy tipiese onlangse waarde gehad het in plaas van sy
+werklike waarde?" Dit vereis **geen toegang tot die model se binnekant nie**
+— slegs die vermoë om dit twee keer aan te roep — wat presies is wat 'n
+TFLite-`interpreter.invoke()` bied. Dit is dus die enigste tegniek wat op die
+Pi se ontplooide `model.tflite` werk: gradiënt-gebaseerde metodes (Integrated
+Gradients, SHAP se DeepExplainer) vereis terugpropagering deur 'n
+differensieerbare grafiek, wat 'n plat TFLite-interpreteerder nie bied nie.
+
+### 12.3 Implementasie-besonderhede (`explain.py`)
+
+Vir die teikengebeurtenis (altyd die laaste van die 10 rye) word elk van sy 5
+rou kenmerke (`capacity, dayOfWeek, month, dayOfMonth, daysInAdvance`) om die
+beurt vervang met die **mediaan van daardie kenmerk oor die 9 voorafgaande
+werklike rye** — "wat tipies is vir hierdie gebeurtenis se onlangse
+geskiedenis." Die model word met elke vervanging herloop op **dieselfde reeds-
+gelaaide interpreteerder** (`predict.py`'s `load_interpreter()`/`invoke()`
+verdeling laat dit toe om 6 keer aangeroep te word — 1 werklike + 5
+teenfeitelikes — sonder om `model.tflite` 6 keer van skyf af te herlaai).
+
+Die vervanging gebeur in **rou kenmerkruimte**, nie in die geïngenieerde
+sin/cos-ruimte nie: `engineer_features()` verwag geldige punte op die
+eenheidsirkel (`sin² + cos² = 1`), en enige onafhanklike aanpassing van `sin`
+en `cos` sal waarskynlik van die sirkel afval — 'n invoer wat die model nooit
+tydens opleiding gesien het nie. Deur eerder die rou heelgetal (bv.
+`dayOfWeek`) te vervang en dit weer deur `engineer_features()` te stuur, is
+elke teenfeitelike 'n geldige, werklike kalenderdatum.
+
+Elk van die 5 kenmerke se impak word bereken as
+`|Δvulkoers| × 0.7 + |Δnie-opkoms| × 0.3` (vulkoers weeg swaarder — dit dryf
+`estimatedAttendees`/`estimatedBudgetZAR` direk), en van hoog na laag gesorteer.
+'n Kandidaat word slegs vertoon as dit **twee** hekke deurkom: die impak moet
+bo `MIN_REASONING_IMPACT` (opsetlik baie klein — regte enkele-kenmerk-effekte
+op regte data is dikwels ver onder 1 persentasiepunt, en steeds die moeite
+werd om te rapporteer) wees, **en** die vulkoers-Δ moet tot minstens 1
+heelgetal-persentasiepunt afrond (`round(|Δvulkoers| × 100) >= 1`) — sonder
+hierdie tweede hek kon 'n kenmerk wat sy impak grotendeels uit `Δnie-opkoms`
+put, terwyl sy eie `Δvulkoers` na 0 afrond, 'n onsinnige sin soos "...het die
+vulkoers met 0 persentasiepunte verhoog" laat druk. Die top 1–3 wat oorbly
+word in Afrikaanse sinne omgeskakel.
+
+### 12.4 Die terugvalgeval
+
+`LstmService.buildFeatureSequence()` (NestJS) vul ontbrekende geskiedenis deur
+die vroegste bekende gebeurtenis te herhaal, of — as daar **glad geen** werklike
+geskiedenis is nie (splinternuwe ontplooiing, of 'n konsepvoorspelling ver in
+die toekoms) — die teikengebeurtenis self. In laasgenoemde geval is elke
+"voorafgaande" ry identies aan die teiken, elke mediaan-verwysingswaarde is
+dus reeds die teiken se eie waarde, elke teenfeitelike is identies aan die
+werklike ry, en elke Δ is presies `0`. `compute_occlusion_reasoning()` gee dan
+`None` terug, en `predict.py` val terug op die oorspronklike
+`generate_reasoning()` — 'n eerlike "ons het nie genoeg onlangse konteks om
+'n rede te meet nie," eerder as om 'n 0%-effek voor te hou asof dit
+betekenisvol is.
+
+### 12.5 Verwantskap met Shapley-waardes / SHAP
+
+'n Volledige Shapley-waarde vir kenmerk `i` middel hierdie selfde
+vervang-en-meet-truuk oor **elke moontlike kombinasie** van die ander kenmerke
+wat teenwoordig of vervang is — `2⁵ = 32` kombinasies vir 5 kenmerke. Deur elke
+kenmerk onafhanklik te vervang terwyl al die ander op hul werklike waardes bly,
+bereken `explain.py` die enkele-kenmerk-spesiale-geval: 'n benadering wat
+aanneem dat kenmerke nie wesenlik interaktief is in hoe hulle die uitvoer
+beïnvloed nie. Dit is 'n reële vereenvoudiging (die LSTM kan wel interaksies
+oor die 10 tydstappe modelleer), maar 'n standaard, goed-verstane
+verhandelingspunt — 6 vorentoegange in plaas van tot 32.
