@@ -68,9 +68,21 @@ export function RsvpScreen() {
     }, []),
   );
 
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+    
   const filteredRsvps = useMemo(
-    () => (filter === 'alles' ? rsvps : rsvps.filter((r) => r.status === filter)),
-    [rsvps, filter],
+    () => rsvps
+      .filter((r) => filter === 'alles' || r.status === filter)
+      .filter((r) => !search || r.event.title.toLowerCase().includes(search.toLowerCase()))
+      .filter((r) => {
+        const d = new Date(r.event.date);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      }),
+    [rsvps, filter, search, dateFrom, dateTo],
   );
 
   async function toggleQr(rsvpId: string) {
