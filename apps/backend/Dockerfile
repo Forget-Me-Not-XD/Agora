@@ -32,7 +32,7 @@ COPY --from=builder /app/apps/backend/dist ./dist
 # apps/ml must land as a sibling of apps/backend (../ml from dist/<module>),
 # matching the local monorepo layout the path.resolve() calls assume.
 WORKDIR /app/apps/ml
-COPY apps/ml/predict.py apps/ml/model.tflite apps/ml/scaler.pkl apps/ml/model_meta.json ./
+COPY apps/ml/predict.py apps/ml/explain.py apps/ml/model.tflite apps/ml/scaler.pkl apps/ml/model_meta.json ./
 COPY apps/ml/requirements-infer.txt ./
 RUN python3 -m venv ./venv \
     && ./venv/bin/pip install --no-cache-dir --upgrade pip \
