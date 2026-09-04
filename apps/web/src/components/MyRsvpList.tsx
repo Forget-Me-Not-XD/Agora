@@ -17,7 +17,7 @@ const FILTERS: { value: RsvpStatus | 'alles'; label: string }[] = [
     { value: 'GEKANSELLEER', label: 'Gekanselleer' },
 ];
 
-export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] }) {
+export default function MyRsvpList({ initialRsvps, dateFilter }: { initialRsvps: MyRsvp[]; dateFilter?: React.ReactNode }) {
     const [rsvps, setRsvps] = useState(initialRsvps);
     const [filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -51,20 +51,14 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
     // Alle gekanseleerde RSVP's slegs in Gekanseleerde bladsy
 
     const [search, setSearch] = useState('');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+
 
     const filtered = (
         filter === 'alles'
             ? sorted.filter((r) => r.status !== 'GEKANSELLEER')
             : sorted.filter((r) => r.status === filter)
-    ).filter((r) => {
-        const matchesSearch = !search || r.event?.title.toLowerCase().includes(search.toLowerCase());
-        const eventDate = r.event ? new Date(r.event.date) : null;
-        const matchesFrom = !dateFrom || (eventDate && eventDate >= new Date(dateFrom));
-        const matchesTo   = !dateTo   || (eventDate && eventDate <= new Date(dateTo));
-        return matchesSearch && matchesFrom && matchesTo;
-    });
+    ).filter((r) => !search || r.event?.title.toLowerCase().includes(search.toLowerCase()));
+
 
     async function handleCancel(rsvpId: string) {
         setCancelingId(rsvpId);
@@ -119,19 +113,7 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                         className="bg-transparent text-xs text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none w-full"
                     />
                 </div>
-                <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs text-[var(--color-text)] outline-none"
-                />
-                <span className="text-xs text-[var(--color-text-subtle)]">tot</span>
-                <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-2 py-1 text-xs text-[var(--color-text)] outline-none"
-                />
+                {dateFilter}
             </div>
 
             <div className="flex flex-wrap gap-2">

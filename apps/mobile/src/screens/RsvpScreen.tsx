@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useThemeColors, useIsDark } from '../theme/theme';
 import { MONTHS_SHORT_AF } from '../lib/event-status';
 import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
@@ -44,45 +45,63 @@ export function RsvpScreen() {
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
-  // Almal (ook ADMIN/DOSENT) sien hier net hul eie RSVPs -- funksie-bestuur
-  // (Bestuur RSVPs / QR Skandeerder) sit reeds op elke funksie se eie skerm.
-  // Gekanselleerde RSVPs word nooit gewys nie (nie net dié wat in-app gekanselleer
-  // is nie, ook enige uit 'n vorige sessie) -- en laai elke keer wat die oortjie
-  // fokus kry, sodat 'n vars kaartjie-aankoop of -kansellasie altyd raakgesien word.
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      (async () => {
-        setLoading(true);
-        setLoadError(null);
-        try {
-          const data = await (takeMyRsvpsPrefetch() ?? getMyRsvps());
-          if (active) setRsvps(data.filter((r) => r.status !== 'GEKANSELLEER'));
-        } catch {
-          if (active) setLoadError('Kon nie jou RSVPs laai nie.');
-        } finally {
-          if (active) setLoading(false);
-        }
-      })();
-      return () => { active = false; };
-    }, []),
-  );
-
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
-    
+  const [showPicker, setShowPicker] = useState<'from' | 'to' | null>(null);
+
+  // Almal (ook ADMIN/DOSENT) sien hier net hul eie RSVPs -- funksie-bestuur
+  // (Bestuur RSVPs / QR Skandeerder) sit reeds op elke funksie se eie skerm.
+  // Gekanselleerde RSVPs word nooit gewys nie (nie net dié wat in-app gekanselleer
+  // is nie, ook enige uit 'n vorige sessie).
+  // Die datumreeks filter nou by die BACKEND (sien rsvp.service.ts se findMyRsvps) nie plaaslik nie
+  const fetchRsvps = useCallback((active: { current: boolean }) => {
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const hasDateFilter = !!(dateFrom || dateTo);
+        // Die prefetch-kas is net vir die ongefiltreerde standaardlys -- as 'n
+        // datumfilter aktief is, moet ons regtig 'n vars, gefiltreerde versoek stuur.
+        const prefetched = hasDateFilter ? null : takeMyRsvpsPrefetch();
+        const data = await (prefetched ?? getMyRsvps(
+          dateFrom ? dateFrom.toISOString() : undefined,
+          dateTo ? dateTo.toISOString() : undefined,
+        ));
+        if (active.current) setRsvps(data.filter((r) => r.status !== 'GEKANSELLEER'));
+      } catch {
+        if (active.current) setLoadError('Kon nie jou RSVPs laai nie.');
+      } finally {
+        if (active.current) setLoading(false);
+      }
+    })();
+  }, [dateFrom, dateTo]);
+
+  // Laai elke keer wat die oortjie fokus kry, sodat 'n vars kaartjie-aankoop
+  // of -kansellasie altyd raakgesien word.
+  useFocusEffect(
+    useCallback(() => {
+      const active = { current: true };
+      fetchRsvps(active);
+      return () => { active.current = false; };
+    }, [fetchRsvps]),
+  );
+
+  // Laai ook dadelik wanneer die datumreeks verander, sonder om vir 'n
+  // skerm-fokus te wag.
+  useEffect(() => {
+    const active = { current: true };
+    fetchRsvps(active);
+    return () => { active.current = false; };
+  }, [dateFrom, dateTo]);
+
+  // Teks-soek bly plaaslik (backend het nie teks-soek nie) datum is reeds
+  // deur die backend gefiltreer teen hierdie punt.
   const filteredRsvps = useMemo(
     () => rsvps
       .filter((r) => filter === 'alles' || r.status === filter)
-      .filter((r) => !search || r.event.title.toLowerCase().includes(search.toLowerCase()))
-      .filter((r) => {
-        const d = new Date(r.event.date);
-        if (dateFrom && d < dateFrom) return false;
-        if (dateTo && d > dateTo) return false;
-        return true;
-      }),
-    [rsvps, filter, search, dateFrom, dateTo],
+      .filter((r) => !search || r.event.title.toLowerCase().includes(search.toLowerCase())),
+    [rsvps, filter, search],
   );
 
   async function toggleQr(rsvpId: string) {
@@ -116,9 +135,6 @@ export function RsvpScreen() {
             setCancelingId(rsvpId);
             try {
               await cancelRsvp(rsvpId);
-              // Gekanselleerde RSVPs verdwyn dadelik uit hierdie lys -- die
-              // beskikbare plekke vir die geleentheid word backend-kant reeds
-              // vrygestel (sien rsvp.service.ts se cancelRsvp).
               setRsvps((prev) => prev.filter((r) => r._id !== rsvpId));
             } catch {
               Alert.alert('Kanselleer', 'Kon nie die RSVP kanselleer nie. Probeer asseblief weer.');
@@ -134,6 +150,11 @@ export function RsvpScreen() {
   function formatDate(dateStr: string): { day: number; month: string } {
     const d = new Date(dateStr);
     return { day: d.getDate(), month: MONTHS_SHORT_AF[d.getMonth()] };
+  }
+
+  function formatPickerLabel(d: Date | null, fallback: string): string {
+    if (!d) return fallback;
+    return d.toLocaleDateString('af-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
   return (
@@ -162,6 +183,54 @@ export function RsvpScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Datumreeks-filter */}
+      <View style={styles.dateFilterRow}>
+        <TouchableOpacity
+          style={styles.dateBtn}
+          onPress={() => setShowPicker('from')}
+          accessibilityLabel="Datum vanaf"
+        >
+          <Feather name="calendar" size={13} color={colors.textSubtle} />
+          <Text style={styles.dateBtnText}>{formatPickerLabel(dateFrom, 'Vanaf')}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.dateSep}>tot</Text>
+
+        <TouchableOpacity
+          style={styles.dateBtn}
+          onPress={() => setShowPicker('to')}
+          accessibilityLabel="Datum tot"
+        >
+          <Feather name="calendar" size={13} color={colors.textSubtle} />
+          <Text style={styles.dateBtnText}>{formatPickerLabel(dateTo, 'Tot')}</Text>
+        </TouchableOpacity>
+
+        {(dateFrom || dateTo) && (
+          <TouchableOpacity
+            style={styles.clearDatesBtn}
+            onPress={() => { setDateFrom(null); setDateTo(null); }}
+            accessibilityLabel="Maak datumfilter skoon"
+          >
+            <Feather name="x" size={13} color={colors.textSubtle} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {showPicker && (
+        <DateTimePicker
+          value={(showPicker === 'from' ? dateFrom : dateTo) ?? new Date()}
+          mode="date"
+          display="calendar"
+          onChange={(_, selected) => {
+            const picking = showPicker;
+            setShowPicker(null);
+            if (!selected) return;
+            if (picking === 'from') setDateFrom(selected);
+            else setDateTo(selected);
+          }}
+        />
+      )}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
@@ -286,6 +355,33 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     chipText: { fontSize: 16, fontWeight: '700', color: colors.textSubtle },
     chipTextActive: { color: colors.surface },
+
+    dateFilterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    },
+    dateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: colors.surface,
+    },
+    dateBtnText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
+    dateSep: { fontSize: 13, color: colors.textSubtle },
+    clearDatesBtn: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      padding: 6,
+    },
 
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 12 },
 

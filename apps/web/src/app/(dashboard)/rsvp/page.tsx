@@ -2,14 +2,17 @@ import { AlertCircle } from 'lucide-react';
 import { getMyRsvps } from '@/lib/api/rsvp';
 import MyRsvpList from '@/components/MyRsvpList';
 import AutoRefresh from '@/components/AutoRefresh';
+import RsvpDateFilter from '@/components/RsvpDateFilter';
 
 export const dynamic = 'force-dynamic';
 
-// Enige rol kan vir 'n geleentheid inteken (die "Skryf In"-knoppie word vir almal gewys),
-// so hierdie bladsy het geen rol-beperking nie -- dit wys net wat GET /rsvp/my terugstuur.
-export default async function MyRsvpsPage() {
+export default async function MyRsvpsPage({
+    searchParams,
+}: {
+    searchParams: { dateFrom?: string; dateTo?: string };
+}) {
     try {
-        const rsvps = await getMyRsvps();
+        const rsvps = await getMyRsvps(searchParams.dateFrom, searchParams.dateTo);
 
         return (
             <>
@@ -23,9 +26,9 @@ export default async function MyRsvpsPage() {
                     </p>
                 </div>
 
-                <MyRsvpList initialRsvps={rsvps} />
+                <MyRsvpList initialRsvps={rsvps} dateFilter={<RsvpDateFilter />} />
             </div>
-            
+
             </>
         );
     } catch (error) {
