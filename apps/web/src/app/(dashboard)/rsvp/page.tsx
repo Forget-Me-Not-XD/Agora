@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react';
 import { getMyRsvps } from '@/lib/api/rsvp';
+import { getSession } from '@/lib/session';
 import MyRsvpList from '@/components/MyRsvpList';
 import AutoRefresh from '@/components/AutoRefresh';
 
@@ -10,6 +11,8 @@ export const dynamic = 'force-dynamic';
 export default async function MyRsvpsPage() {
     try {
         const rsvps = await getMyRsvps();
+        const session = getSession();
+        const attendeeName = session ? `${session.name} ${session.surname}` : '';
 
         return (
             <>
@@ -23,9 +26,9 @@ export default async function MyRsvpsPage() {
                     </p>
                 </div>
 
-                <MyRsvpList initialRsvps={rsvps} />
+                <MyRsvpList initialRsvps={rsvps} attendeeName={attendeeName} />
             </div>
-            
+
             </>
         );
     } catch (error) {

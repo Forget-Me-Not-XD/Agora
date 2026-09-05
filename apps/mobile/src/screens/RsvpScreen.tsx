@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import ViewShot from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { useThemeColors, useIsDark } from '../theme/theme';
 import { MONTHS_SHORT_AF } from '../lib/event-status';
 import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
@@ -25,6 +27,7 @@ import {
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
 import { takeMyRsvpsPrefetch } from '../lib/prefetch';
+import { useAuthStore } from '../stores/auth.store';
 
 export function RsvpScreen() {
   const colors = useThemeColors();
@@ -43,6 +46,11 @@ export function RsvpScreen() {
   const [qrLoadingId, setQrLoadingId] = useState<string | null>(null);
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+
+  // Kaartjie-afskrifte per inskrywing, vir "Stoor Kaartjie"
+  const ticketRefs = useRef<Record<string, ViewShot | null>>({});
+  const user = useAuthStore((s) => s.user);
+  const attendeeName = user ? `${user.name} ${user.surname}` : '';
 
   // Almal (ook ADMIN/DOSENT) sien hier net hul eie RSVPs -- funksie-bestuur
   // (Bestuur RSVPs / QR Skandeerder) sit reeds op elke funksie se eie skerm.
@@ -89,6 +97,20 @@ export function RsvpScreen() {
       setOpenQrId(null);
     } finally {
       setQrLoadingId(null);
+    }
+  }
+
+  async function handleShareTicket(rsvpId: string) {
+    const ref = ticketRefs.current[rsvpId];
+    if (!ref?.capture) return;
+    try {
+      const uri = await ref.capture();
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Stoor of deel jou kaartjie' });
+      }
+    } catch {
+      Alert.alert('Kaartjie', 'Kon nie die kaartjie skep nie. Probeer asseblief weer.');
     }
   }
 
@@ -204,18 +226,28 @@ export function RsvpScreen() {
                 </View>
 
                 {showQr && (
-                  <View style={styles.qrBox}>
-                    {qrLoadingId === _id ? (
-                      <ActivityIndicator color={colors.primary} />
-                    ) : qrUriById[_id] ? (
-                      <Image
-                        source={{ uri: qrUriById[_id] }}
-                        style={styles.qrImage}
-                        resizeMode="contain"
-                        accessibilityLabel="Jou QR-kode"
-                      />
-                    ) : null}
-                  </View>
+                  <ViewShot
+                    ref={(r) => { ticketRefs.current[_id] = r; }}
+                    options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+                  >
+                    <View style={styles.ticketCard}>
+                      <Text style={styles.ticketEventTitle}>{event.title}</Text>
+                      <Text style={styles.ticketMeta}>{day} {month} · {event.location}</Text>
+                      <View style={styles.qrBox}>
+                        {qrLoadingId === _id ? (
+                          <ActivityIndicator color={colors.primary} />
+                        ) : qrUriById[_id] ? (
+                          <Image
+                            source={{ uri: qrUriById[_id] }}
+                            style={styles.qrImage}
+                            resizeMode="contain"
+                            accessibilityLabel="Jou QR-kode"
+                          />
+                        ) : null}
+                      </View>
+                      {attendeeName ? <Text style={styles.ticketAttendee}>{attendeeName}</Text> : null}
+                    </View>
+                  </ViewShot>
                 )}
 
                 <View style={styles.rsvpActions}>
@@ -227,6 +259,17 @@ export function RsvpScreen() {
                     <Feather name="maximize" size={13} color={colors.primary} />
                     <Text style={styles.qrBtnText}>{showQr ? 'Versteek QR' : 'Wys QR'}</Text>
                   </TouchableOpacity>
+
+                  {showQr && qrUriById[_id] && (
+                    <TouchableOpacity
+                      style={styles.qrBtn}
+                      onPress={() => handleShareTicket(_id)}
+                      accessibilityLabel="Stoor kaartjie"
+                    >
+                      <Feather name="download" size={13} color={colors.primary} />
+                      <Text style={styles.qrBtnText}>Stoor Kaartjie</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {status !== 'GEKANSELLEER' && (
                     <TouchableOpacity
@@ -359,5 +402,18 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       padding: 12,
     },
     qrImage: { width: '100%', height: '100%' },
+
+    ticketCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      alignItems: 'center',
+      gap: 8,
+    },
+    ticketEventTitle: { fontSize: 16, fontWeight: '900', color: '#111111', textAlign: 'center' },
+    ticketMeta: { fontSize: 13, fontWeight: '600', color: '#555555', textAlign: 'center' },
+    ticketAttendee: { fontSize: 13, fontWeight: '700', color: '#111111', marginTop: 4 },
   });
 }

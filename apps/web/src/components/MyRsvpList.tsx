@@ -17,7 +17,7 @@ const FILTERS: { value: RsvpStatus | 'alles'; label: string }[] = [
     { value: 'GEKANSELLEER', label: 'Gekanselleer' },
 ];
 
-export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] }) {
+export default function MyRsvpList({ initialRsvps, attendeeName }: { initialRsvps: MyRsvp[]; attendeeName: string }) {
     const [rsvps, setRsvps] = useState(initialRsvps);
     const [filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -178,6 +178,9 @@ export default function MyRsvpList({ initialRsvps }: { initialRsvps: MyRsvp[] })
                                     <RsvpQrButton
                                         rsvpId={r._id}
                                         eventTitle={r.event?.title ?? 'Geleentheid'}
+                                        eventDate={r.event ? formatDateLong(r.event.date) : ''}
+                                        eventLocation={r.event?.location ?? ''}
+                                        attendeeName={attendeeName}
                                         disabled={isCancelled}
                                     />
 
