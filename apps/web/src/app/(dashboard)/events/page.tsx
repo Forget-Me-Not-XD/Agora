@@ -5,6 +5,7 @@ import { Search, PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import EventCard from '@/components/EventCard';
 import InfoModal from '@/components/InfoModal';
+import DateRangePicker from '@/components/DateRangePicker';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
@@ -55,6 +56,13 @@ export default function EventsPage() {
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
 
+    // Datumreeks-filter as 'yyyy-mm-dd'-sleutels. dateTo bly leeg solank net een
+    // dag gekies is -- dan geld daardie enkele dag as die hele reeks.
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo]     = useState('');
+
+    const rangeActive = Boolean(dateFrom);
+
     const searchParams = useSearchParams();
     const router = useRouter();
     const [newEventId, setNewEventId] = useState<string | null>(null);
@@ -86,6 +94,10 @@ export default function EventsPage() {
     // bly die kalenderbladsy se werk. Geen onder-grens nie: verby geleenthede
     // word steeds gehaal sodat die "Verby"-statusfilter hulle kan wys, hulle
     // word net client-kant (matchesStatus hieronder) by verstek weggesteek.
+    //
+    // 'n Gekose datumreeks vervang daardie verstek-venster heeltemal (dit gaan as
+    // from/to na die backend toe), sodat die gebruiker ook verder terug in die
+    // verlede of verder in die toekoms as die verstek kan kyk.
     const loadEvents = useCallback(async (showLoading = false) => {
         if (showLoading) setLoading(true);
 
@@ -93,8 +105,18 @@ export default function EventsPage() {
             const now = new Date();
             const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
+            // Van die oggend van die eerste dag tot die laaste minuut van die laaste
+            // dag, in die gebruiker se eie tydsone. Is net een dag gekies, is daardie
+            // dag self albei grense.
+            const filters = dateFrom
+                ? {
+                      from: new Date(`${dateFrom}T00:00:00.000`).toISOString(),
+                      to:   new Date(`${dateTo || dateFrom}T23:59:59.999`).toISOString(),
+                  }
+                : { to: endOfNextMonth.toISOString() };
+
             const [eventsResult, rsvpsResult] = await Promise.all([
-                listEventsAction({ to: endOfNextMonth.toISOString() }),
+                listEventsAction(filters),
                 getMyRsvpsAction(),
             ]);
 
@@ -116,7 +138,7 @@ export default function EventsPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [dateFrom, dateTo]);
 
     useEffect(() => {
      let active = true;
@@ -146,9 +168,11 @@ export default function EventsPage() {
                 event.description.toLowerCase().includes(search.toLowerCase());
             // 'Alle Status' beteken hier alle nie-verby geleenthede, 'n verby
             // geleentheid wys slegs as die 'Verby'-status spesifiek gekies is.
+            // Uitsondering: het die gebruiker self 'n datumreeks gekies, dan is die
+            // verby geleenthede binne daardie reeks juis wat hy gevra het.
             const matchesStatus =
                 statusFilter === 'all'
-                    ? deriveStatus(event) !== 'past'
+                    ? rangeActive || deriveStatus(event) !== 'past'
                     : deriveStatus(event) === statusFilter;
             const matchesType = typeFilter === 'all' || event.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
@@ -279,6 +303,13 @@ export default function EventsPage() {
                         </div>
                     </InfoModal>
                 </div>
+
+                {/* Datum-reeks-kieser: leeg = die verstek-venster */}
+                <DateRangePicker
+                    from={dateFrom}
+                    to={dateTo}
+                    onChange={(nextFrom, nextTo) => { setDateFrom(nextFrom); setDateTo(nextTo); }}
+                />
             </div>
 
             {/* ── Body ── */}
@@ -297,7 +328,9 @@ export default function EventsPage() {
             ) : filtered.length === 0 ? (
                 <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-12 text-center">
                     <p className="text-[var(--color-text-subtle)] text-sm">
-                        Geen geleenthede gevind nie.
+                        {rangeActive
+                            ? 'Geen geleenthede in die gekose datumreeks nie.'
+                            : 'Geen geleenthede gevind nie.'}
                     </p>
                 </div>
             ) : (
