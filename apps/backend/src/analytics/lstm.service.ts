@@ -4,6 +4,7 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model } from 'mongoose';
 import { spawn } from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
 import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
 import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
@@ -45,11 +46,32 @@ export interface PredictionAccuracyItem {
     eventId:             string;
     title:               string;
     date:                string;
-    maxCapacity:          number;
+    maxCapacity:         number;
     predictedFillRate:   number;
     actualFillRate:      number;
     predictedAttendees:  number;
     actualAttendees:     number;
+}
+
+export type ModelHealth = 'good' | 'fair' | 'poor' | 'unknown';
+
+// Read from apps/ml/model_meta.json, written by train.py after the last training run.
+export interface ModelStatus {
+    available:      boolean;
+    trainedAt:      string | null;
+    eventsUsed:     number | null;
+    fillRateMae:    number | null;
+    noShowMae:      number | null;
+    health:         ModelHealth;
+} 
+
+// Only the fields we actually read out of model_meta.json.
+interface ModelMetaFile {
+    trained_at: string;
+    n_events:   number;
+    fill_mae:   number;
+    noshow_mae: number;
+
 }
 
 // Must match SEQUENCE_LENGTH in apps/ml/train.py and apps/ml/predict.py EXACTLY
@@ -58,6 +80,9 @@ const SEQUENCE_LENGTH = 10;
 
 @Injectable()
 export class LstmService {
+    private readonly MODEL_HEALTH_GOOD_MAE = 0.10;
+    private readonly MODEL_HEALTH_FAIR_MAE = 0.20;
+
     constructor(
         private readonly eventsService: EventsService,
         // Direct injection of the RSVP model so we can run aggregate queries:
@@ -288,18 +313,63 @@ export class LstmService {
         }
     }
 
+    // apps/ml is a sibling of apps/backend; dist/ mirrors src' so this relative septh holds both ts-node dev and the compiled build
+    private mlDir(): string {
+        return path.resolve(__dirname, '../../../ml');
+    }
+
+    // Reads apps/ml/model_meta.json (written by train.py) to report wether a trained model is on disk and how accurate
+    // it was on last held-out validation set
+    async getModelStatus(): Promise <ModelStatus> {
+        const modelPath = path.join(this.mlDir(), 'model.tflite');
+        const metaPath = path.join(this.mlDir(), 'model_meta.json');
+
+        if (!fs.existsSync(modelPath) || !fs.existsSync(metaPath)) {
+            return this.unavailableModelStatus();
+        }
+
+        try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as ModelMetaFile;
+            return {
+                available: true,
+                trainedAt: meta.trained_at,
+                eventsUsed: meta.n_events,
+                fillRateMae: meta.fill_mae,
+                noShowMae: meta.noshow_mae,
+                health: this.computeModelHealth(meta.fill_mae),
+            };
+        } catch {
+            return this.unavailableModelStatus();
+        }
+    }
+
+    private unavailableModelStatus(): ModelStatus {
+        return {
+            available: false,
+            trainedAt: null,
+            eventsUsed: null,
+            fillRateMae: null,
+            noShowMae: null,
+            health: 'unknown',
+        };
+    }
+
+    private computeModelHealth(fillRateMae: number): ModelHealth {
+        if (fillRateMae <= this.MODEL_HEALTH_GOOD_MAE) return 'good';
+        if (fillRateMae <= this.MODEL_HEALTH_FAIR_MAE) return 'fair';
+        return 'poor';
+    }
+
     private runPredictScript(
         sequence: EventFeatures[],
     ): Promise<PredictionResult> {
-        // apps/ml is a sibling of apps/backend; dist/ mirrors src/ (see tsconfig rootDir/outDir),
-        // so this relative depth holds for both ts-node dev and the compiled build.
-        const mlDir = path.resolve(__dirname, '../../../ml');
-        const scriptPath = path.join(mlDir, 'predict.py');
-        // Always use the ml venv's own interpreter - the system 'python' on PATH
-        // may point at an unrelated install with no TensorFlow/numpy installed.
+        const scriptPath = path.join(this.mlDir(), 'predict.py');
+        // Always use the venv's own interpreter - the system 'python' on PATH
+        // may point to an invalid Python install
         const pythonPath = process.platform === 'win32'
-            ? path.join(mlDir, 'venv', 'Scripts', 'python.exe')
-            : path.join(mlDir, 'venv', 'bin', 'python');
+            ? path.join(this.mlDir(), 'venv', 'Scripts', 'python.exe')
+            : path.join(this.mlDir(), 'venv', 'bin', 'python');
+
         // spawn() (no shell: true) passes argv entries directly to the OS - no shell
         // parsing occurs, so JSON containing spaces/brackets/quotes needs no escaping.
         const args = [scriptPath, JSON.stringify(sequence)];
