@@ -42,7 +42,7 @@
       "enforceContrast": false
     },
     "extra": {
-      "apiUrl": "http://192.168.3.67:3000/api/v1",
+      "apiUrl": "http://10.0.2.2:3000/api/v1",
       "eas": {
         "projectId": "3bb685b0-d97f-4fd4-b968-af704e8499be"
       }

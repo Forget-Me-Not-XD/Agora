@@ -156,6 +156,21 @@ export async function getRevenueTrend(): Promise<Trend> {
     return apiFetch<Trend>('/api/v1/analytics/revenue-trend');
 }
 
+export type ModelHealth = 'good' | 'fair' | 'poor' | 'unknown';
+
+export interface ModelStatus {
+    available:      boolean;
+    trainedAt:      string | null;
+    eventsUsed:     number | null;
+    fillRateMae:    number | null;
+    noShowMae:      number | null;
+    health:         ModelHealth;
+}
+
+export async function getModelStatus(): Promise<ModelStatus> {
+    return apiFetch<ModelStatus>('/api/v1/analytics/model-status');
+}
+
 export interface PredictionResult {
     predictedFillRate:   number;
     estimatedRsvps:      number;

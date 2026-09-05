@@ -1,6 +1,13 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
+import { useAuthStore } from '../stores/auth.store';
+
+// 'n 401 met een van hierdie boodskappe beteken die gebruiker het net 'n verkeerde
+// wagwoord ingetik -- dis geen aanduiding dat hul huidige sessie ongeldig is nie,
+// so dit moet NIE die globale afmeld-aksie afvuur nie (anders sou 'n tik-fout op
+// die wagwoord-verander-skerm die hele gebruiker onverwags uitskop).
+const CREDENTIAL_CHECK_MESSAGES = ['Invalid credentials', 'Current password is incorrect'];
 
 /**
  * Centralised HTTP client.
@@ -39,11 +46,25 @@ class ApiClient {
         });
 
         // ========== Response Interceptor: handle 401 ==========
+        // A 401 from a real protected endpoint means the session itself is dead
+        // (expired/invalid token) -- previously this only cleared the stored
+        // token, leaving the Zustand `user` state (and therefore the whole app)
+        // untouched, so the UI stayed stuck on whatever screen it was on with
+        // every subsequent request silently failing. Calling logout() here
+        // instead makes AppNavigator fall back to the Login screen immediately.
         this.axios.interceptors.response.use(
             (response) => response,
             async (error: AxiosError) => {
                 if (error.response?.status === 401) {
-                    await this.clearTokens();
+                    const data = error.response.data as { message?: string } | undefined;
+                    const isCredentialCheck = data?.message !== undefined
+                        && CREDENTIAL_CHECK_MESSAGES.includes(data.message);
+
+                    if (isCredentialCheck) {
+                        await this.clearTokens();
+                    } else {
+                        await useAuthStore.getState().logout();
+                    }
                 }
                 return Promise.reject(error);
             },
