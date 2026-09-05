@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import ResponseProvider from './src/providers/ResponseProvider';
+import InactivityProvider from './src/providers/InactivityProvider';
 import { useAuthStore } from './src/stores/auth.store';
 import { useThemeStore } from './src/stores/theme.store';
 import { useNavTheme, useStatusBarStyle, useThemeColors, useIsDark } from './src/theme/theme';
@@ -67,12 +68,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ResponseProvider>
-        <NavigationContainer theme={navTheme}>
-          <AppNavigator />
-          <StatusBar style={statusBarStyle} />
-        </NavigationContainer>
-      </ResponseProvider>
+      <InactivityProvider>
+        <ResponseProvider>
+          <NavigationContainer theme={navTheme}>
+            <AppNavigator />
+            <StatusBar style={statusBarStyle} />
+          </NavigationContainer>
+        </ResponseProvider>
+      </InactivityProvider>
     </SafeAreaProvider>
   );
 }

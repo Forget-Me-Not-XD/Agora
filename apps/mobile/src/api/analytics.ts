@@ -45,3 +45,36 @@ export async function getDraftPrediction(payload: PredictDraftPayload): Promise<
 export async function getPrediction(eventId: string): Promise<PredictionResult> {
     return apiClient.get<PredictionResult>(`/analytics/prediction?eventId=${eventId}`);
 }
+
+export type ModelHealth = 'good' | 'fair' | 'poor' | 'unknown';
+
+export interface ModelStatus {
+    available: boolean;
+    trainedAt: string | null;
+    eventsUsed: number | null;
+    fillRateMae: number | null;
+    noShowMae: number | null;
+    health: ModelHealth;
+}
+
+// GET /analytics/model-status -- ADMIN/DOSENT, wys of daar 'n opgeleide model bestaan
+export async function getModelStatus(): Promise<ModelStatus> {
+    return apiClient.get<ModelStatus>('/analytics/model-status');
+}
+
+export interface PredictionAccuracyItem {
+    eventId: string;
+    title: string;
+    date: string;
+    maxCapacity: number;
+    predictedFillRate: number;
+    actualFillRate: number;
+    predictedAttendees: number;
+    actualAttendees: number;
+}
+
+// GET /analytics/prediction-accuracy?eventIds=a,b,c -- ADMIN/DOSENT
+export async function getPredictionAccuracy(eventIds: string[]): Promise<PredictionAccuracyItem[]> {
+    if (eventIds.length === 0) return [];
+    return apiClient.get<PredictionAccuracyItem[]>(`/analytics/prediction-accuracy?eventIds=${eventIds.map(encodeURIComponent).join(',')}`);
+}

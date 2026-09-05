@@ -50,12 +50,23 @@ export function AiScreen() {
             ? allUpcoming.filter((e) => e.createdBy === user?.id)
             : allUpcoming;
           const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
-          const results = await Promise.allSettled(upcoming.map((e) => getPrediction(e.id)));
+          // Sequential, not Promise.all -- each prediction spawns a fresh Python
+          // process on the backend that loads TensorFlow from scratch (predict.py
+          // has no model caching), so firing up to MAX_FORECASTS of these at once
+          // can overload the machine and make otherwise-healthy predictions fail.
+          const results: Array<PredictionResult | null> = [];
+          for (const event of upcoming) {
+            try {
+              results.push(await getPrediction(event.id));
+            } catch {
+              results.push(null);
+            }
+          }
           if (!active) return;
           setForecasts(
             upcoming.map((event, i) => ({
               event,
-              prediction: results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<PredictionResult>).value : null,
+              prediction: results[i],
             })),
           );
         } finally {
@@ -82,8 +93,11 @@ export function AiScreen() {
     );
   }
 
-  // Geen enkele "model-status" eindpunt bestaan nie -- ons lei dit eerlik af uit
-  // hoeveel van die regte per-funksie voorspellings hieronder werklik geslaag het.
+  // Hierdie is 'n LEWENDE lees van vandag se opkomende-funksie voorspellings, nie
+  // dieselfde as GET /analytics/model-status nie (wat net bevestig of 'n opgeleide
+  // model-lêer op skyf bestaan) -- die model kan dus "beskikbaar" wees volgens
+  // model-status, en tog hier "Onbeskikbaar" wys as vandag se lewendige oproepe
+  // vir opkomende geleenthede om enige rede misluk het.
   const modelAvailable = forecasts.length === 0 || forecasts.some((f) => f.prediction !== null);
   const availableCount = forecasts.filter((f) => f.prediction !== null).length;
 
@@ -108,7 +122,7 @@ export function AiScreen() {
         {/* ── Model status card ── */}
         <View style={styles.modelCard}>
           <View style={styles.modelCardTop}>
-            <View>
+            <View style={styles.modelCardTextCol}>
               <Text style={styles.modelCardTitle}>KI / LSTM Model</Text>
               <Text style={styles.modelCardSub}>
                 {loading
@@ -309,14 +323,17 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
+      gap: 10,
       marginBottom: 14,
     },
+    modelCardTextCol: { flex: 1 },
     modelCardTitle: { ...typography.subtitle, color: colors.text },
     modelCardSub: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
     modelActivePill: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 5,
+      flexShrink: 0,
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
