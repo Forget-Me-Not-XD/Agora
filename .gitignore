@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# --- Python ---
+.venv/
+
 # --- Node / JS ---
 node_modules/
 npm-debug.log*

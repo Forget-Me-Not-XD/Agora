@@ -5,7 +5,7 @@ import RsvpQrButton from '@/components/RsvpQrButton';
 import { Pill } from '@/components/ui/Pill';
 import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
 
-export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
+export default function MyBookingsTable({ data, attendeeName }: { data: MyRsvp[]; attendeeName: string }) {
     if (data.length === 0) {
         return (
             <p className="text-xs text-[var(--color-text-subtle)] text-center py-8">
@@ -59,6 +59,9 @@ export default function MyBookingsTable({ data }: { data: MyRsvp[] }) {
                                 <RsvpQrButton
                                     rsvpId={r._id}
                                     eventTitle={r.event?.title ?? 'Geleentheid'}
+                                    eventDate={r.event ? formatDateShort(r.event.date) : ''}
+                                    eventLocation={r.event?.location ?? ''}
+                                    attendeeName={attendeeName}
                                     disabled={r.status === 'GEKANSELLEER'}
                                 />
                             </td>
