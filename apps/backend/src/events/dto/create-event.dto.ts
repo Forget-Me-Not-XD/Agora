@@ -42,6 +42,10 @@ export class CreateEventDto {
     @MaxLength(200)
     location!: string;
 
+    @IsString()
+    @IsNotEmpty()
+    placeId!: string;
+
     @IsInt()
     @Min(1)
     maxCapacity!: number;

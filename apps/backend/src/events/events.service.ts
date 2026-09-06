@@ -12,6 +12,7 @@ import { visibleAttendanceRoles } from '../common/rbac/event-visibility';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging/events.constants';
 import { UsersService } from '../users/users.service';
+import { PlacesService } from '../places/places.service';
 
 @Injectable()
 export class EventsService {
@@ -19,6 +20,7 @@ export class EventsService {
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         private readonly rabbitMQService: RabbitMQService,
         private readonly usersService: UsersService,
+        private readonly placesService: PlacesService,
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
@@ -31,10 +33,16 @@ export class EventsService {
             await this.assertValidAssignee(dto.assignedTo);
         }
 
+        const place = await this.placesService.getDetails(dto.placeId);
+
         const created = new this.eventModel({
             ...dto,
             date:       start,
             endDate:    end,
+            address:    place.address,
+            placeId:    place.placeId,
+            lat:        place.lat,
+            lon:        place.lon,
             createdBy:  creatorId,
             assignedTo: dto.assignedTo ? new Types.ObjectId(dto.assignedTo) : null,
         });
@@ -237,11 +245,18 @@ export class EventsService {
             await this.assertValidAssignee(dto.assignedTo);
         }
 
-        const { date, endDate, ...rest } = dto;
+        const { date, endDate, placeId, ...rest } = dto;
         Object.assign(event, rest);
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
+        if (placeId) {
+            const place = await this.placesService.getDetails(placeId);
+            event.address = place.address;
+            event.placeId = place.placeId;
+            event.lat     = place.lat;
+            event.lon     = place.lon;
+        }
 
         this.assertEndAfterStart(event.date, event.endDate);
         this.assertTicketsWithinCapacity(event.sellsTickets, event.ticketsAvailable, event.maxCapacity);
