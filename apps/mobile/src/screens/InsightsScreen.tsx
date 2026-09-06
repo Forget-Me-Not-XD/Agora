@@ -1,16 +1,25 @@
 // ========== Imports: ==========
 import { useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { safeGoBack } from '../lib/navigation';
 import { listEvents, type EventResponse, type EventType } from '../api/events';
+import { getModelStatus, getPredictionAccuracy, type ModelStatus, type PredictionAccuracyItem } from '../api/analytics';
 import { TYPE_LABELS, formatFullDate } from '../lib/event-status';
 import { canViewInsights } from '../lib/rbac';
+import { ModelStatusCard } from '../components/ModelStatusCard';
+import { EventPickerModal } from '../components/EventPickerModal';
+import { PredictionAccuracyBarChart } from '../components/charts/PredictionAccuracyBarChart';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
 
 function isEventPast(event: EventResponse): boolean {
   const now = Date.now();
@@ -32,13 +41,19 @@ function attendanceTone(rate: number, colors: ReturnType<typeof useThemeColors>)
   return { fg: colors.red, bg: colors.redBg };
 }
 
-export function InsightsScreen() {
+export function InsightsScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [events, setEvents] = useState<EventResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [accuracyResults, setAccuracyResults] = useState<PredictionAccuracyItem[] | null>(null);
+  const [accuracyLoading, setAccuracyLoading] = useState(false);
+  const [accuracyError, setAccuracyError] = useState<string | null>(null);
 
   const role = user?.role ?? 'STUDENT';
   const allowed = canViewInsights(role);
@@ -49,8 +64,14 @@ export function InsightsScreen() {
     (async () => {
       setLoading(true);
       try {
-        const all = await listEvents();
-        if (active) setEvents(all);
+        const [all, status] = await Promise.all([
+          listEvents(),
+          getModelStatus().catch(() => null),
+        ]);
+        if (active) {
+          setEvents(all);
+          setModelStatus(status);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -58,10 +79,32 @@ export function InsightsScreen() {
     return () => { active = false; };
   }, [allowed]);
 
+  async function analyze() {
+    setAccuracyLoading(true);
+    setAccuracyError(null);
+    setAccuracyResults(null);
+    try {
+      const items = await getPredictionAccuracy([...selectedIds]);
+      setAccuracyResults(items);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
+      const raw = axiosErr?.response?.data?.message;
+      setAccuracyError(typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie akkuraatheid laai nie.');
+    } finally {
+      setAccuracyLoading(false);
+    }
+  }
+
+  const avgAccuracy = useMemo(() => {
+    if (!accuracyResults || accuracyResults.length === 0) return null;
+    const total = accuracyResults.reduce((sum, r) => sum + Math.max(0, 100 - Math.abs(r.predictedFillRate - r.actualFillRate) * 100), 0);
+    return Math.round(total / accuracyResults.length);
+  }, [accuracyResults]);
+
   if (!allowed) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="KI Insigte" />
+        <ScreenHeader title="KI Insigte" onBack={() => safeGoBack(navigation)} />
         <View style={styles.centerFill}>
           <Feather name="lock" size={28} color={colors.textSubtle} />
           <Text style={styles.emptyText}>
@@ -106,7 +149,12 @@ export function InsightsScreen() {
       <ScreenHeader
         title="KI Insigte"
         subtitle={role === 'ADMIN' ? 'Prestasie oorsig vir alle voltooide geleenthede' : 'Prestasie oorsig vir jou voltooide geleenthede'}
+        onBack={() => safeGoBack(navigation)}
       />
+
+      <View style={styles.pinned}>
+        <ModelStatusCard status={modelStatus} />
+      </View>
 
       {loading ? (
         <View style={styles.centerFill}>
@@ -147,6 +195,59 @@ export function InsightsScreen() {
               styles={styles}
               colors={colors}
             />
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeadRow}>
+              <View style={[styles.iconChip, { backgroundColor: colors.infoBg }]}>
+                <Feather name="cpu" size={14} color={colors.info} />
+              </View>
+              <Text style={styles.cardTitle}>Modelakkuraatheid</Text>
+            </View>
+            <Text style={styles.accuracyIntro}>
+              Kies voltooide geleenthede om te sien hoe naby die KI-model se voorspelling aan die werklike bywoning was.
+            </Text>
+
+            <EventPickerModal
+              events={completed.map((e) => ({ id: e.id, title: e.title, date: e.date }))}
+              selected={selectedIds}
+              onChange={setSelectedIds}
+            />
+
+            <TouchableOpacity
+              style={[styles.analyzeBtn, (selectedIds.size === 0 || accuracyLoading) && styles.analyzeBtnDisabled]}
+              onPress={analyze}
+              disabled={selectedIds.size === 0 || accuracyLoading}
+            >
+              {accuracyLoading && <ActivityIndicator color={colors.primaryText} size="small" />}
+              <Text style={styles.analyzeBtnText}>
+                {accuracyLoading ? 'Analiseer…' : `Analiseer geselekteerde (${selectedIds.size})`}
+              </Text>
+            </TouchableOpacity>
+
+            {accuracyError && <Text style={styles.errorText}>{accuracyError}</Text>}
+
+            {accuracyResults && accuracyResults.length === 0 && !accuracyError && (
+              <Text style={styles.emptyInlineText}>Geen voorspellings beskikbaar vir die gekose geleenthede nie.</Text>
+            )}
+
+            {accuracyResults && accuracyResults.length > 0 && (
+              <>
+                {avgAccuracy !== null && (
+                  <View style={styles.avgAccuracyRow}>
+                    <Text style={styles.avgAccuracyLabel}>
+                      Gem. akkuraatheid oor {accuracyResults.length} geleentheid{accuracyResults.length !== 1 ? 'e' : ''}
+                    </Text>
+                    <View style={[styles.ratePill, { backgroundColor: attendanceTone(avgAccuracy, colors).bg }]}>
+                      <Text style={[styles.rateText, { color: attendanceTone(avgAccuracy, colors).fg }]}>{avgAccuracy}%</Text>
+                    </View>
+                  </View>
+                )}
+                <View style={styles.chartWrap}>
+                  <PredictionAccuracyBarChart items={accuracyResults} />
+                </View>
+              </>
+            )}
           </View>
 
           {topPerformers.length > 0 && (
@@ -282,6 +383,8 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
     centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 32 },
     emptyText: { ...typography.bodyRegular, color: colors.textSubtle, textAlign: 'center' },
 
+    pinned: { paddingHorizontal: 16, paddingBottom: 8 },
+
     scroll: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -322,6 +425,35 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       justifyContent: 'center',
     },
     cardTitle: { ...typography.subtitle, color: colors.text },
+
+    accuracyIntro: { ...typography.caption, color: colors.textSubtle, fontWeight: '500', marginBottom: 10 },
+    analyzeBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      marginTop: 10,
+    },
+    analyzeBtnDisabled: { opacity: 0.5 },
+    analyzeBtnText: { ...typography.body, color: colors.primaryText, fontWeight: '800' },
+    errorText: { ...typography.caption, color: colors.red, fontWeight: '600', marginTop: 8 },
+    emptyInlineText: { ...typography.bodyRegular, color: colors.textSubtle, textAlign: 'center', paddingVertical: 12 },
+    avgAccuracyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginTop: 12,
+      gap: 10,
+    },
+    avgAccuracyLabel: { ...typography.bodyRegular, color: colors.text, flex: 1, flexShrink: 1 },
+    chartWrap: { marginTop: 12 },
 
     performerRow: {
       flexDirection: 'row',

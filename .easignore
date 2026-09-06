@@ -1,0 +1,27 @@
+# Scopes what EAS Build uploads for the mobile app.
+# Without this, `eas build` archives the entire monorepo (git root), not just
+# apps/mobile/ -- including apps/ml's untracked model/dataset files and the
+# root .venv, neither of which is covered by .gitignore. That bloated a build
+# to 670MB and is the likely cause of an unexplained cloud Gradle failure.
+# apps/mobile is fully self-contained (own package.json/lockfile), so none of
+# this is needed to build it.
+
+apps/backend
+apps/web
+apps/ml
+deploy
+Docs
+graphify-out
+.venv
+.next
+*.docx
+*.pptx
+
+# Local Android build/tooling caches -- Android Studio keeps live file locks
+# on these while it's open, which crashes the "Compressing project files"
+# step with EBUSY on Windows. They're gitignored already and fully disposable.
+apps/mobile/android/.gradle
+apps/mobile/android/.cxx
+apps/mobile/android/build
+apps/mobile/android/app/.cxx
+apps/mobile/android/app/build

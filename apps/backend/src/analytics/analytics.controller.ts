@@ -7,7 +7,7 @@ import { Role } from '../common/enums/role.enums';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem } from './lstm.service';
+import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem, ModelStatus } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth, TicketRevenueSummary, EventRevenue, RevenuePerMonth } from './analytics.service';
 import { Trend } from './dto/trend.dto';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
@@ -73,7 +73,7 @@ export class AnalyticsController {
     }
 
     @Get('rsvps-per-month')
-      @UseGuards(RolesGuard, ThrottlerGuard)
+    @UseGuards(RolesGuard, ThrottlerGuard)
     @Throttle({polling: { limit: 60, ttl: 60000}})
     @Roles(Role.ADMIN)
     async getRsvpsPerMonth(): Promise <EventsPerMonth[]> {
@@ -172,6 +172,16 @@ export class AnalyticsController {
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="uitvoer-${type}-${date}.csv"`);
         res.send(csv);
+    }
+
+    // Wether a trained KI-model exists on disk right now, and how accurate it was during training - 
+    // lets the 'Insigte' page show a status indicator without needing to run the real prediction first
+    @Get('model-status')
+    @UseGuards(RolesGuard, ThrottlerGuard)
+    @Throttle({ polling: {limit: 60, ttl: 60000}})
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async getModelStatus(): Promise<ModelStatus> {
+        return this.lstmService.getModelStatus();
     }
 
     @Get('predict/:eventId')

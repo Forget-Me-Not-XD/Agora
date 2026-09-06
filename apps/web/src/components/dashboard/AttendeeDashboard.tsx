@@ -8,11 +8,14 @@ import MyBookingsTable from './MyBookingsTable';
 import { getMyRsvps } from '@/lib/api/rsvp';
 import type { RsvpStatus } from '@/lib/api/rsvp';
 import type { RsvpStatusCount } from '@/lib/api/analytics';
+import { getSession } from '@/lib/session';
 
 const STATUS_ORDER: RsvpStatus[] = ['BEVESTIG', 'HANGENDE', 'GEKANSELLEER'];
 
 export default async function AttendeeDashboard() {
     const rsvps = await getMyRsvps().catch(() => []);
+    const session = getSession();
+    const attendeeName = session ? `${session.name} ${session.surname}` : '';
 
     const confirmed = rsvps.filter((r) => r.status === 'BEVESTIG');
     const pending = rsvps.filter((r) => r.status === 'HANGENDE');
@@ -48,7 +51,7 @@ export default async function AttendeeDashboard() {
                 <h2 className="text-sm font-semibold text-[var(--color-text)] mb-3">
                     Jou Besprekings <span className="text-[var(--color-text-subtle)] font-normal">({rsvps.length})</span>
                 </h2>
-                <MyBookingsTable data={rsvps} />
+                <MyBookingsTable data={rsvps} attendeeName={attendeeName} />
             </div>
         </div>
     );

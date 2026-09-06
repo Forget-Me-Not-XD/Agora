@@ -2,12 +2,14 @@ import { AlertCircle, Users, TrendingUp, TrendingDown, CheckCircle, Trophy } fro
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents, type Event, type EventType } from '@/lib/api/events';
+import { getModelStatus } from '@/lib/api/analytics';
 import { formatDateShort } from '@/lib/format-date';
 import { TYPE_LABELS, TYPE_TONE } from '@/lib/event-view';
 import { Pill, type Tone } from '@/components/ui/Pill';
 import { IconChip } from '@/components/ui/IconChip';
 import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
+import ModelStatusBanner from '@/components/ModelStatusBanner';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 import PredictionAccuracyPanel from '@/components/PredictionAccuracyPanel';
 import AutoRefresh from '@/components/AutoRefresh';
@@ -45,7 +47,10 @@ export default async function InsightsPage() {
         );
     }
 
-    const allEvents = await getEvents().catch(() => [] as Event[]);
+    const [allEvents, modelStatus] = await Promise.all([
+        getEvents().catch(() => [] as Event[]),
+        getModelStatus().catch(() => null),
+    ]);
     const relevantEvents = (user.role === 'ADMIN' ? allEvents : allEvents.filter((e) => e.createdBy === user.id))
         .slice()
         .sort((a, b) => b.date.localeCompare(a.date));
@@ -129,6 +134,10 @@ export default async function InsightsPage() {
                     </div>
                 </InfoModal>
             </div>
+
+            {/* ── Model-status — moet sonder scroll sigbaar wees ── */}
+            <ModelStatusBanner status={modelStatus} />
+
             {/* ── Predicted Attendance Card ── */}
             <PredictedAttendanceCard />
             {/* ── Summary KPI cards ── */}

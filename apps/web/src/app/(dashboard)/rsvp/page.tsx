@@ -1,5 +1,6 @@
 import { AlertCircle } from 'lucide-react';
 import { getMyRsvps } from '@/lib/api/rsvp';
+import { getSession } from '@/lib/session';
 import MyRsvpList from '@/components/MyRsvpList';
 import AutoRefresh from '@/components/AutoRefresh';
 import RsvpDateFilter from '@/components/RsvpDateFilter';
@@ -13,6 +14,8 @@ export default async function MyRsvpsPage({
 }) {
     try {
         const rsvps = await getMyRsvps(searchParams.dateFrom, searchParams.dateTo);
+        const session = getSession();
+        const attendeeName = session ? `${session.name} ${session.surname}` : '';
 
         return (
             <>
@@ -26,7 +29,8 @@ export default async function MyRsvpsPage({
                     </p>
                 </div>
 
-                <MyRsvpList initialRsvps={rsvps} dateFilter={<RsvpDateFilter />} />
+                <MyRsvpList initialRsvps={rsvps} dateFilter={<RsvpDateFilter />} attendeeName={attendeeName} />
+                
             </div>
 
             </>

@@ -29,7 +29,10 @@ export function ScreenHeader({ title, subtitle, onBack, backDisabled, right }: S
                 >
                     <Feather name="arrow-left" size={20} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.topBarTitle} numberOfLines={1}>{title}</Text>
+                <View style={styles.topBarTextCol}>
+                    <Text style={styles.topBarTitle} numberOfLines={1}>{title}</Text>
+                    {subtitle ? <Text style={styles.topBarSubtitle} numberOfLines={1}>{subtitle}</Text> : null}
+                </View>
                 { right ?? <View style={styles.backSpacer} />}
             </View>
         );
@@ -66,7 +69,9 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
             justifyContent: 'center',
         },
         backSpacer: { width: 36 },
-        topBarTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: colors.text},
+        topBarTextCol: { flex: 1 },
+        topBarTitle: { fontSize: 16, fontWeight: '900', color: colors.text},
+        topBarSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 2 },
 
         pageHeader: {
             flexDirection: 'row',
