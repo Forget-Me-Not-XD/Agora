@@ -12,6 +12,7 @@ import {
   COOKIE_NAME,
   COOKIE_USER_NAME,
   COOKIE_REMEMBER_NAME,
+  DEFAULT_ACCESS_EXPIRY,
 } from '@/lib/auth-cookies';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
@@ -134,14 +135,16 @@ export async function completeSsoLoginAction(
 
   const user: UserResponse = await res.json();
 
+  // SSO stuur nie die leeftye saam nie, so gebruik die defaults
   const tokenPair: TokenPair = {
     accessToken,
     refreshToken,
-    expiresIn: 60 * 15,
+    expiresIn: DEFAULT_ACCESS_EXPIRY,
     tokenType: 'Bearer',
     user,
   };
 
+  // SSO het nie 'n onthou-my opsie nie, so ons onthou hulle altyd
   setAuthCookies(cookies(), tokenPair, true);
   redirect('/dashboard');
 }
@@ -171,8 +174,7 @@ export async function changePasswordAction(
   if (userCookie) {
     try {
       const user = JSON.parse(userCookie) as UserResponse;
-      // Behou die onthou-my lewensduur — anders val 'n onthoude sessie hier terug
-      // na 'n korter cookie as die refresh token wat dit veronderstel is te pas.
+      // Hou dieselfde leeftyd as met aanmelding (onthou my of nie)
       const rememberMe = cookieStore.get(COOKIE_REMEMBER_NAME)?.value === '1';
       setUserCookie(cookieStore, { ...user, mustChangePassword: false }, rememberMe);
     } catch {

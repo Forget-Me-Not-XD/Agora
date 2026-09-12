@@ -4,10 +4,9 @@ import type { TokenPair } from '@/lib/types';
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 
 /**
- * Ruil 'n refresh token vir 'n vars token-paar by die backend in.
- *
- * Returns null as die token verwerp word (verval, geroteer, rekening gedeaktiveer) —
- * die oproeper moet dan die cookies verwyder en die gebruiker na /login stuur.
+ * Vra die backend vir nuwe tokens met die refresh token.
+ * Returns null as dit nie werk nie (token verval, rekening gedeaktiveer, ens.),
+ * dan moet die cookies verwyder word en die gebruiker na /login toe.
  */
 export async function refreshTokenPair(refreshToken: string): Promise<TokenPair | null> {
   try {
@@ -22,8 +21,7 @@ export async function refreshTokenPair(refreshToken: string): Promise<TokenPair 
 
     return (await res.json()) as TokenPair;
   } catch {
-    // Backend onbereikbaar — behandel soos 'n mislukte refresh eerder as om die
-    // gebruiker op 'n stukkende bladsy te los.
+    // Backend is af, hanteer dit maar soos 'n mislukte refresh
     return null;
   }
 }

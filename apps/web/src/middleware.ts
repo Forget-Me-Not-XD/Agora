@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+    clearAuthCookies,
     COOKIE_NAME,
     COOKIE_USER_NAME,
     COOKIE_REFRESH_NAME,
@@ -27,31 +28,39 @@ export function middleware(request: NextRequest) {
 
     const isAuthOnly = matchesPath(pathname, AUTH_ONLY_PATHS);
 
-    // Die access token leef net 15 minute. Solank 'n refresh token bestaan, ruil
-    // ons dit stilweg vir 'n nuwe paar in plaas daarvan om die gebruiker uit te
-    // log — dis wat "onthou my" oor blaaier-sessies heen laat werk.
-    //
-    // Die guard cookie verhoed 'n herlei-lus as die nuwe access cookie nie land nie
-    // (bv. secure cookies oor 'n gewone HTTP-verbinding): dan val ons deur na /login.
+    // Access token is weg maar daar is 'n refresh token (onthou my), so gaan refresh eers.
+    // Die guard keer 'n redirect-lus as die nuwe cookie nie gestel kon word nie.
     if (!token && refreshToken && !request.cookies.get(COOKIE_REFRESH_GUARD)) {
         const url    = request.nextUrl.clone();
         url.pathname = REFRESH_PATH;
         url.search   = '';
-        // Na 'n suksesvolle hernuwing gaan die gebruiker terug na waar hulle was.
-        // Vanaf /login of /register is dit die dashboard, nie die aanmeldskerm nie.
+        // Stuur terug na die bladsy waar hulle was, of dashboard as hulle op /login was
         url.searchParams.set(
             'from',
             isAuthOnly ? '/dashboard' : pathname + request.nextUrl.search,
         );
-        // 303 vir 'n POST (server action / vorm), sodat die blaaier die hernu-roete
-        // met GET volg in plaas van om die POST-liggaam daarheen te herhaal.
+        // 303 vir POST sodat die browser met GET volg en nie die POST herhaal nie
         return NextResponse.redirect(url, request.method === 'GET' ? 307 : 303);
     }
 
     if (!token && !isAuthOnly) {
         const url    = request.nextUrl.clone();
         url.pathname = '/login';
-        return NextResponse.redirect(url);
+        url.search   = '';
+
+        // As daar nog 'n user of refresh cookie is, was hulle ingeteken en het die sessie verval
+        const hadSession = Boolean(userCookie || refreshToken);
+
+        if (!hadSession) {
+            return NextResponse.redirect(url);
+        }
+
+        url.searchParams.set('error', 'session_expired');
+
+        // Maak die ou cookies skoon sodat die boodskap net een keer wys
+        const response = NextResponse.redirect(url);
+        clearAuthCookies(response.cookies);
+        return response;
     }
 
     if (token && isAuthOnly) {

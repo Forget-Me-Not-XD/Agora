@@ -14,9 +14,19 @@ export interface JwtPayload {
   role: Role;
   type?: TokenType;  // 'access' = API calls, 'refresh' = only redeemable at /auth/refresh
   jti?: string;      // Unique id, refresh tokens only
+  authAt?: number;   // When the user logged in (epoch seconds), refresh tokens only
   iat?: number;
   exp?: number;
   mustChangePassword?: boolean;
+}
+
+/**
+ * Kyk of die payload 'n refresh token is.
+ * Ou tokens het nog nie 'type' nie, maar net refresh tokens het 'n jti. Die jti-check
+ * kan weg sodra die ou tokens verval het (7 dae na deploy).
+ */
+export function isRefreshToken(payload: JwtPayload): boolean {
+  return payload.type === 'refresh' || (payload.type === undefined && Boolean(payload.jti));
 }
 
 @Injectable()
@@ -37,9 +47,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    // A refresh token is signed with the same secret, so it would otherwise
-    // pass as a bearer token for its full lifetime. Only /auth/refresh may take it.
-    if (payload.type === 'refresh') {
+    // Refresh tokens use the same secret, so block them here. Only /auth/refresh may use them.
+    if (isRefreshToken(payload)) {
       throw new UnauthorizedException('Refresh token cannot be used as an access token');
     }
 

@@ -18,7 +18,7 @@ import {
   import { CreateUserDto } from './dto/create-user.dto';
   import { LoginDto } from './dto/login.dto';
   import { TokenPairDto } from './dto/token-pair.dto';
-  import { JwtPayload } from './strategies/jwt.strategy';
+  import { JwtPayload, isRefreshToken } from './strategies/jwt.strategy';
   import { SsoProfile } from './interfaces/sso-profile.interface';
   import { SsoProvider } from '../common/enums/sso-provider.enum';
   import { SsoAccountNotFoundException } from './exceptions/sso-account-not-found.exception';
@@ -237,9 +237,9 @@ import {
     /**
      * Exchange a valid refresh token for a fresh token pair.
      *
-     * The refresh token is rotated on every call (new jti), so the caller must
-     * replace both tokens. Re-checks the account state, since a user may have
-     * been deactivated or locked out since the refresh token was issued.
+     * The refresh token is rotated on every call, so the caller must replace both
+     * tokens. We check the account again in case it was deactivated or locked.
+     * Rotating doesn't extend the session, see issueTokenPair.
      */
     async refresh(refreshToken: string): Promise<TokenPairDto> {
       let payload: JwtPayload;
@@ -250,7 +250,9 @@ import {
         throw new UnauthorizedException('Invalid or expired refresh token');
       }
 
-      if (payload.type !== 'refresh' || !payload.sub) {
+      // isRefreshToken laat ook ou tokens sonder 'type' deur, anders word almal
+      // wat reeds ingeteken is na die deploy uitgeskop.
+      if (!isRefreshToken(payload) || !payload.sub) {
         throw new UnauthorizedException('Invalid or expired refresh token');
       }
 
@@ -264,20 +266,34 @@ import {
         throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
       }
 
-      // A password can expire mid-session; flag it here so the new token pair
-      // carries mustChangePassword and the client routes to /change-password.
+      // Password can expire mid-session, so flag it here and the client goes to /change-password.
       if (this.isPasswordExpired(user.passwordChangedAt) && !user.mustChangePassword) {
         await this.usersService.markPasswordExpired(user._id.toString());
         user.mustChangePassword = true;
       }
 
+      // Keep the original login time. Older tokens don't have authAt yet, but for
+      // them iat is still the login time.
+      const sessionStart = payload.authAt ?? payload.iat;
+
+      if (sessionStart === undefined) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
       this.logger.log(`-- Token refreshed: ${user.email}`);
-      return this.issueTokenPair(user);
+      return this.issueTokenPair(user, sessionStart);
     }
 
     // ── Helpers ──────────────────────────────────────
   
-    private async issueTokenPair(user: UserDocument): Promise<TokenPairDto> {
+    /**
+     * Issue an access + refresh token pair.
+     *
+     * authAt is when the user originally logged in (leave it out on a normal login).
+     * We use it so a remember-me session ends 7 days after login, even if the tokens
+     * get refreshed in between. The access token also can't outlive that.
+     */
+    private async issueTokenPair(user: UserDocument, authAt?: number): Promise<TokenPairDto> {
       const payload: JwtPayload = {
         sub: user._id.toString(),
         email: user.email,
@@ -287,20 +303,31 @@ import {
       const accessExpiry = this.config.get<StringValue>('jwt.accessExpiry')!;
       const refreshExpiry = this.config.get<StringValue>('jwt.refreshExpiry')!;
   
+      const nowSeconds   = Math.floor(Date.now() / 1000);
+      const sessionStart = authAt ?? nowSeconds;
+      const refreshLeft  = sessionStart + this.parseExpiryToSeconds(refreshExpiry) - nowSeconds;
+  
+      // Session is over, user has to log in again
+      if (refreshLeft <= 0) {
+        throw new UnauthorizedException('Session expired. Please sign in again.');
+      }
+  
+      const accessSeconds = Math.min(this.parseExpiryToSeconds(accessExpiry), refreshLeft);
+  
       const accessToken = await this.jwtService.signAsync(
         { ...payload, type: 'access' },
-        { expiresIn: accessExpiry as StringValue },
+        { expiresIn: accessSeconds },
       );
       const refreshToken = await this.jwtService.signAsync(
-        { ...payload, type: 'refresh', jti: uuidv4() },
-        { expiresIn: refreshExpiry as StringValue},
+        { ...payload, type: 'refresh', jti: uuidv4(), authAt: sessionStart },
+        { expiresIn: refreshLeft },
       );
   
       return {
         accessToken,
         refreshToken,
-        expiresIn: this.parseExpiryToSeconds(accessExpiry),
-        refreshExpiresIn: this.parseExpiryToSeconds(refreshExpiry),
+        expiresIn: accessSeconds,
+        refreshExpiresIn: refreshLeft,
         tokenType: 'Bearer',
         user: UserResponseDto.fromDocument(user),
       };

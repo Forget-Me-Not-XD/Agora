@@ -7,21 +7,18 @@ export const COOKIE_USER_NAME    = 'akademia_user';
 export const COOKIE_REMEMBER_NAME = 'akademia_remember';
 export const COOKIE_REFRESH_GUARD = 'akademia_refresh_guard';
 
-/**
- * Hoe lank die guard cookie na 'n hernu-poging bly staan. Verhoed 'n herlei-lus
- * as die nuwe access cookie om een of ander rede nie by die blaaier land nie.
- */
+/** Hoe lank die guard cookie bly na 'n refresh, keer 'n redirect-lus as die nuwe cookie nie gestel word nie. */
 export const REFRESH_GUARD_SECONDS = 10;
 
-/**
- * Refresh a few seconds before the access token actually expires, so a request
- * that slips through the middleware never reaches the backend with a dead JWT.
- */
+/** Refresh bietjie voor die access token verval sodat die backend nie 'n dooie token kry nie. */
 const ACCESS_COOKIE_SKEW_SECONDS = 30;
 
-/** Fallback lifetime as die backend nie 'n expiresIn teruggee nie (15 min / 7 dae). */
-const DEFAULT_ACCESS_EXPIRY  = 60 * 15;
-const DEFAULT_REFRESH_EXPIRY = 60 * 60 * 24 * 7;
+/**
+ * Default leeftye as die backend nie expiresIn / refreshExpiresIn stuur nie.
+ * Moet dieselfde wees as JWT_ACCESS_EXPIRY en JWT_REFRESH_EXPIRY in die backend.
+ */
+export const DEFAULT_ACCESS_EXPIRY  = 60 * 15;          // JWT_ACCESS_EXPIRY=15m
+export const DEFAULT_REFRESH_EXPIRY = 60 * 60 * 24 * 7; // JWT_REFRESH_EXPIRY=7d
 
 interface CookieOptions {
   httpOnly: boolean;
@@ -50,14 +47,10 @@ function baseOptions(): CookieOptions {
 }
 
 /**
- * Stel access-, refresh-, user- en remember-cookies uit 'n token-paar.
+ * Stel die auth cookies uit 'n token-paar.
  *
- * Die access cookie hou net so lank as die JWT self (min 'n paar sekondes speling).
- * Sodra dit verval, sien die middleware geen token nie en ruil die refresh token
- * vir 'n nuwe paar in — dis wat die sessie aan die lewe hou, nie die access cookie nie.
- *
- * rememberMe = false → refresh/user cookies verval saam met die blaaier-sessie.
- * rememberMe = true  → refresh/user cookies hou so lank as wat die refresh JWT geldig is.
+ * rememberMe = false → geen refresh cookie nie, so die gebruiker word na 15 min uitgelog.
+ * rememberMe = true  → refresh cookie wat hou tot 7 dae na aanmelding.
  */
 export function setAuthCookies(
   cookieStore: CookieWriter,
@@ -66,14 +59,13 @@ export function setAuthCookies(
 ): void {
   const opts = baseOptions();
 
-  const accessMaxAge = Math.max(
-    (data.expiresIn ?? DEFAULT_ACCESS_EXPIRY) - ACCESS_COOKIE_SKEW_SECONDS,
-    30,
-  );
+  const accessSeconds = data.expiresIn ?? DEFAULT_ACCESS_EXPIRY;
   const refreshMaxAge = data.refreshExpiresIn ?? DEFAULT_REFRESH_EXPIRY;
 
-  // Persistent as "onthou my" gekies is, andersins 'n session cookie (geen maxAge).
-  const persist = rememberMe ? { maxAge: refreshMaxAge } : {};
+  // Speling maak net sin as ons kan refresh, anders verloor die gebruiker net 30 sekondes
+  const accessMaxAge = rememberMe
+    ? Math.max(accessSeconds - ACCESS_COOKIE_SKEW_SECONDS, 30)
+    : accessSeconds;
 
   cookieStore.set(COOKIE_NAME, data.accessToken, { ...opts, maxAge: accessMaxAge });
 
@@ -81,25 +73,24 @@ export function setAuthCookies(
     setUserCookie(cookieStore, data.user, rememberMe, refreshMaxAge);
   }
 
-  if (data.refreshToken) {
-    cookieStore.set(COOKIE_REFRESH_NAME, data.refreshToken, { ...opts, ...persist });
-  }
-
-  // Onthou die keuse self, anders weet die refresh-roete nie of die nuwe cookies
-  // persistent of session cookies moet wees nie.
-  if (rememberMe) {
+  if (rememberMe && data.refreshToken) {
+    cookieStore.set(COOKIE_REFRESH_NAME, data.refreshToken, { ...opts, maxAge: refreshMaxAge });
+    // Die refresh roete moet weet of die gebruiker onthou-my gekies het
     cookieStore.set(COOKIE_REMEMBER_NAME, '1', { ...opts, maxAge: refreshMaxAge });
   } else {
+    // Verwyder ou cookies van 'n vorige onthou-my aanmelding, anders bly hulle steeds ingelog
+    cookieStore.delete(COOKIE_REFRESH_NAME);
     cookieStore.delete(COOKIE_REMEMBER_NAME);
+    cookieStore.delete(COOKIE_REFRESH_GUARD);
   }
 }
 
 /**
- * Stoor die gebruikersprofiel wat die backend teruggee, sodat server components
- * naam/van/rol kan lees sonder om op die JWT payload staat te maak.
+ * Stoor die gebruiker se profiel sodat server components naam/van/rol kan lees.
  *
- * Behou dieselfde lewensduur as die refresh cookie: 'n onthoude sessie kry 'n
- * persistente cookie, 'n gewone aanmelding 'n session cookie.
+ * Met onthou-my hou dit so lank soos die refresh cookie, anders is dit 'n session cookie.
+ * Die session cookie bly langer as die access cookie, so die middleware kan sien die
+ * sessie het verval en 'n boodskap op /login wys.
  */
 export function setUserCookie(
   cookieStore: CookieWriter,
@@ -113,7 +104,7 @@ export function setUserCookie(
   });
 }
 
-/** Verwyder elke auth cookie — afmelding, verwyderde rekening, of 'n dooie refresh token. */
+/** Verwyder al die auth cookies (uitlog, rekening verwyder of refresh het misluk). */
 export function clearAuthCookies(cookieStore: CookieWriter): void {
   cookieStore.delete(COOKIE_NAME);
   cookieStore.delete(COOKIE_REFRESH_NAME);
@@ -122,7 +113,7 @@ export function clearAuthCookies(cookieStore: CookieWriter): void {
   cookieStore.delete(COOKIE_REFRESH_GUARD);
 }
 
-/** Merk dat 'n hernu-poging pas gebeur het — sien COOKIE_REFRESH_GUARD. */
+/** Stel die guard cookie na 'n refresh poging. */
 export function setRefreshGuard(cookieStore: CookieWriter): void {
   cookieStore.set(COOKIE_REFRESH_GUARD, '1', {
     ...baseOptions(),

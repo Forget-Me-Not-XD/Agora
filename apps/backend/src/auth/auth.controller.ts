@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Headers, Res, UseFilters, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -16,7 +17,7 @@ import { JwtPayload } from './strategies/jwt.strategy';
 import { SsoProfile } from './interfaces/sso-profile.interface';
 import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -59,9 +60,27 @@ export class AuthController {
   }
 
   /**
-   * Exchange a refresh token for a fresh token pair.
-   * Throttled like login — this endpoint takes an unauthenticated credential.
+   * Ruil 'n refresh token vir 'n nuwe token-paar.
+   *
+   * Ons throttle per token en nie net per IP nie. Al die web se hernuwings kom van
+   * die Next-bediener se IP af, so met die gewone limiet het almal dieselfde 10/min
+   * gedeel en is gebruikers uitgeskop sodra dit vol was.
    */
+  @Throttle({
+    // Per sessie. Token word gehash sodat die rou token nie in die throttler gestoor word nie.
+    default: {
+      limit: 30,
+      ttl:   60_000,
+      getTracker: (req: { body?: { refreshToken?: string }; ip?: string }) => {
+        const token = req.body?.refreshToken;
+        return token
+          ? `rt:${createHash('sha256').update(token).digest('base64url')}`
+          : `ip:${req.ip ?? 'unknown'}`;
+      },
+    },
+    // Ruim limiet per IP, anders kry iemand wat vals tokens stuur elke keer 'n nuwe emmer.
+    polling: { limit: 300, ttl: 60_000 },
+  })
   @UseGuards(ThrottlerGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)

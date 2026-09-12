@@ -15,8 +15,7 @@ const CREDENTIAL_CHECK_MESSAGES = ['Invalid credentials', 'Current password is i
  *
  * - Reads API URL from app.json or EXPO_PUBLIC_API_URL
  * - Attaches JWT to every request via interceptor
- * - Handles 401 by silently refreshing the session once, and only logs the user
- *   out if that refresh fails
+ * - On a 401 it tries to refresh the session once, and only logs out if that fails
  */
 
 const API_URL =
@@ -32,9 +31,7 @@ type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 class ApiClient {
     private readonly axios: AxiosInstance;
 
-    // Een enkele hernu-oproep op 'n slag: as vyf versoeke gelyktydig 'n 401 kry,
-    // deel hulle almal dieselfde belofte in plaas van om die refresh token vyf
-    // keer te roteer (waarvan vier dan verwerp sou word).
+    // Net een refresh op 'n slag. As 'n paar versoeke gelyk 'n 401 kry, wag hulle almal vir dieselfde een.
     private refreshPromise: Promise<boolean> | null = null;
 
     constructor() {
@@ -73,9 +70,7 @@ class ApiClient {
                         return Promise.reject(error);
                     }
 
-                    // Die access token leef net 15 minute. Probeer eers stilweg
-                    // hernu voordat ons die gebruiker uitskop -- _retry verhoed dat
-                    // 'n tweede 401 op dieselfde versoek weer 'n hernuwing afvuur.
+                    // Probeer eers refresh voor ons die gebruiker uitlog. _retry keer dat ons dit twee keer probeer.
                     const config = error.config as RetryableConfig | undefined;
 
                     if (config && !config._retry && await this.refreshSession()) {
@@ -107,12 +102,9 @@ class ApiClient {
     }
 
     /**
-     * Ruil die gestoorde refresh token vir 'n vars token-paar in.
-     *
-     * Gebruik 'n kaal axios-oproep sodat die response interceptor nie homself
-     * weer afvuur as die hernuwing self 'n 401 kry nie.
-     *
-     * Returns true as die sessie hernu is, false as die gebruiker weer moet aanmeld.
+     * Ruil die refresh token vir nuwe tokens.
+     * Gebruik gewone axios en nie this.axios nie, anders loop die interceptor weer as dit 'n 401 kry.
+     * Returns true as dit gewerk het, false as die gebruiker weer moet aanmeld.
      */
     private async refreshSession(): Promise<boolean> {
         if (this.refreshPromise) {

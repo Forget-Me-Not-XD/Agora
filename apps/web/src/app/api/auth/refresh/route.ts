@@ -13,14 +13,13 @@ import {
 export const dynamic = 'force-dynamic';
 
 /**
- * Stilweg-hernu roete.
+ * Refresh roete.
  *
- * Die middleware stuur 'n gebruiker hierheen wanneer die access cookie verval het
- * maar 'n refresh cookie nog bestaan. Ons ruil die refresh token vir 'n nuwe paar,
- * stel die cookies, en stuur die gebruiker terug na waar hulle op pad was.
+ * Die middleware stuur die gebruiker hierheen as die access cookie weg is maar daar nog
+ * 'n refresh cookie is. Ons kry nuwe tokens, stel die cookies en stuur hulle terug na
+ * die bladsy waarheen hulle wou gaan.
  *
- * Loop in die Node runtime (nie edge nie), sodat process.env.API_URL by looptyd
- * gelees word — die waarde word in produksie deur die container ingespuit.
+ * Dit loop in Node (nie edge nie) sodat API_URL in produksie van die container af gelees word.
  */
 export async function GET(request: NextRequest) {
   const target      = safeRedirectPath(request.nextUrl.searchParams.get('from'));
@@ -45,10 +44,15 @@ export async function GET(request: NextRequest) {
   return response;
 }
 
-/** Mislukte hernuwing: gooi die sessie weg en stuur terug na die aanmeldskerm. */
+/**
+ * Refresh het misluk, verwyder die cookies en stuur na /login.
+ * Ons stel die guard hier ook, net ingeval die cookies nie weggaan nie en ons in 'n
+ * redirect-lus tussen /login en hierdie roete beland.
+ */
 function expireSession(loginUrl: URL): NextResponse {
   const response = noStore(NextResponse.redirect(loginUrl));
   clearAuthCookies(response.cookies);
+  setRefreshGuard(response.cookies);
   return response;
 }
 
@@ -58,8 +62,7 @@ function noStore(response: NextResponse): NextResponse {
 }
 
 /**
- * Slegs 'n pad binne hierdie webwerf mag deurgegee word — 'n volle URL of 'n
- * protokol-relatiewe pad ("//boos.example") sou 'n open redirect wees.
+ * Laat net paaie op ons eie site toe. 'n Volle URL of "//iets.com" sou 'n open redirect wees.
  */
 function safeRedirectPath(from: string | null): string {
   if (!from || !from.startsWith('/') || from.startsWith('//')) {
