@@ -19,6 +19,7 @@ import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
 
 @Controller('auth')
@@ -55,6 +56,17 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ): Promise<TokenPairDto> {
     return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
+  }
+
+  /**
+   * Exchange a refresh token for a fresh token pair.
+   * Throttled like login — this endpoint takes an unauthenticated credential.
+   */
+  @UseGuards(ThrottlerGuard)
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() dto: RefreshTokenDto): Promise<TokenPairDto> {
+    return this.authService.refresh(dto.refreshToken);
   }
 
   @Post('change-password')

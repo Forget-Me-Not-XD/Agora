@@ -234,6 +234,47 @@ import {
       this.logger.log(`-- Password changed: ${user.email}`);
     }
   
+    /**
+     * Exchange a valid refresh token for a fresh token pair.
+     *
+     * The refresh token is rotated on every call (new jti), so the caller must
+     * replace both tokens. Re-checks the account state, since a user may have
+     * been deactivated or locked out since the refresh token was issued.
+     */
+    async refresh(refreshToken: string): Promise<TokenPairDto> {
+      let payload: JwtPayload;
+
+      try {
+        payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken);
+      } catch {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      if (payload.type !== 'refresh' || !payload.sub) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      const user = await this.usersService.findById(payload.sub).catch(() => null);
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('Account no longer exists');
+      }
+
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
+      }
+
+      // A password can expire mid-session; flag it here so the new token pair
+      // carries mustChangePassword and the client routes to /change-password.
+      if (this.isPasswordExpired(user.passwordChangedAt) && !user.mustChangePassword) {
+        await this.usersService.markPasswordExpired(user._id.toString());
+        user.mustChangePassword = true;
+      }
+
+      this.logger.log(`-- Token refreshed: ${user.email}`);
+      return this.issueTokenPair(user);
+    }
+
     // ── Helpers ──────────────────────────────────────
   
     private async issueTokenPair(user: UserDocument): Promise<TokenPairDto> {
@@ -246,11 +287,12 @@ import {
       const accessExpiry = this.config.get<StringValue>('jwt.accessExpiry')!;
       const refreshExpiry = this.config.get<StringValue>('jwt.refreshExpiry')!;
   
-      const accessToken = await this.jwtService.signAsync(payload, {
-        expiresIn: accessExpiry as StringValue,
-      });
+      const accessToken = await this.jwtService.signAsync(
+        { ...payload, type: 'access' },
+        { expiresIn: accessExpiry as StringValue },
+      );
       const refreshToken = await this.jwtService.signAsync(
-        { ...payload, jti: uuidv4() },
+        { ...payload, type: 'refresh', jti: uuidv4() },
         { expiresIn: refreshExpiry as StringValue},
       );
   
@@ -258,6 +300,7 @@ import {
         accessToken,
         refreshToken,
         expiresIn: this.parseExpiryToSeconds(accessExpiry),
+        refreshExpiresIn: this.parseExpiryToSeconds(refreshExpiry),
         tokenType: 'Bearer',
         user: UserResponseDto.fromDocument(user),
       };

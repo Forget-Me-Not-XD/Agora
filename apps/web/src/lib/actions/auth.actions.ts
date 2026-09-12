@@ -5,47 +5,16 @@ import { redirect } from 'next/navigation';
 import { createUser, changePassword, type CreateUserPayload, type ChangePasswordPayload } from '@/lib/api/auth';
 import { deleteAccount } from '@/lib/api/users';
 import type { TokenPair, LoginPayload, UserResponse } from '@/lib/types';
-import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME } from '@/lib/auth-cookies';
+import {
+  setAuthCookies,
+  setUserCookie,
+  clearAuthCookies,
+  COOKIE_NAME,
+  COOKIE_USER_NAME,
+  COOKIE_REMEMBER_NAME,
+} from '@/lib/auth-cookies';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
-
-/**
- * Shared helper: stel beide access en refresh tokens as HttpOnly cookies.
- *
- * rememberMe = false → refresh token verval met die browser sessie (geen maxAge).
- * rememberMe = true  → refresh token hou vir 30 dae op die skyf.
- * The access token is altyd 15 min maak nie saak wat nie.
- */
-function setAuthCookies(
-  cookieStore: ReturnType<typeof cookies>,
-  data: TokenPair,
-  rememberMe = false,
-) {
-  const cookieOpts = {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path:     '/',
-  };
-
-  cookieStore.set(COOKIE_NAME, data.accessToken, { ...cookieOpts, maxAge: 60 * 15 });
-
-  // Store the user profile returned by the backend so server components can
-  // read name/surname/role without depending on what the JWT payload contains.
-  if (data.user) {
-    cookieStore.set(COOKIE_USER_NAME, JSON.stringify(data.user), {
-      ...cookieOpts,
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
-    });
-  }
-
-  if (data.refreshToken) {
-    cookieStore.set(COOKIE_REFRESH_NAME, data.refreshToken, {
-      ...cookieOpts,
-      ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
-    });
-  }
-}
 
 /**
  * Login server action.
@@ -202,13 +171,10 @@ export async function changePasswordAction(
   if (userCookie) {
     try {
       const user = JSON.parse(userCookie) as UserResponse;
-      cookieStore.set(COOKIE_USER_NAME, JSON.stringify({ ...user, mustChangePassword: false}), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-      });
+      // Behou die onthou-my lewensduur — anders val 'n onthoude sessie hier terug
+      // na 'n korter cookie as die refresh token wat dit veronderstel is te pas.
+      const rememberMe = cookieStore.get(COOKIE_REMEMBER_NAME)?.value === '1';
+      setUserCookie(cookieStore, { ...user, mustChangePassword: false }, rememberMe);
     } catch {
       // Malformed cookie - nothing to patch, next full login will fix the corrupted cookie
     }
@@ -222,10 +188,7 @@ export async function changePasswordAction(
  * Verwyder die cookies en stuur gebruiker terug na login skerm.
  */
 export async function logoutAction(): Promise<void> {
-  const cookieStore = cookies();
-  cookieStore.delete(COOKIE_NAME);
-  cookieStore.delete(COOKIE_REFRESH_NAME);
-  cookieStore.delete(COOKIE_USER_NAME);
+  clearAuthCookies(cookies());
   redirect('/login');
 }
 
@@ -247,9 +210,6 @@ export async function deleteAccountAction(): Promise<{ error?: string }> {
     return { error: err instanceof Error ? err.message : 'Kon nie rekening verwyder nie.' };
   }
 
-  const cookieStore = cookies();
-  cookieStore.delete(COOKIE_NAME);
-  cookieStore.delete(COOKIE_REFRESH_NAME);
-  cookieStore.delete(COOKIE_USER_NAME);
+  clearAuthCookies(cookies());
   redirect('/login?deleted=true');
 }

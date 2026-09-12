@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosInstance } from 'axios';
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { useAuthStore } from '../stores/auth.store';
@@ -15,7 +15,8 @@ const CREDENTIAL_CHECK_MESSAGES = ['Invalid credentials', 'Current password is i
  *
  * - Reads API URL from app.json or EXPO_PUBLIC_API_URL
  * - Attaches JWT to every request via interceptor
- * - Handles 401 by clearing tokens (refresh logic added in later commits)
+ * - Handles 401 by silently refreshing the session once, and only logs the user
+ *   out if that refresh fails
  */
 
 const API_URL =
@@ -26,8 +27,15 @@ const API_URL =
 const ACCESS_TOKEN_KEY = 'akademia.accessToken';
 const REFRESH_TOKEN_KEY = 'akademia.refreshToken';
 
+type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
 class ApiClient {
     private readonly axios: AxiosInstance;
+
+    // Een enkele hernu-oproep op 'n slag: as vyf versoeke gelyktydig 'n 401 kry,
+    // deel hulle almal dieselfde belofte in plaas van om die refresh token vyf
+    // keer te roteer (waarvan vier dan verwerp sou word).
+    private refreshPromise: Promise<boolean> | null = null;
 
     constructor() {
         this.axios = axios.create({
@@ -62,9 +70,20 @@ class ApiClient {
 
                     if (isCredentialCheck) {
                         await this.clearTokens();
-                    } else {
-                        await useAuthStore.getState().logout();
+                        return Promise.reject(error);
                     }
+
+                    // Die access token leef net 15 minute. Probeer eers stilweg
+                    // hernu voordat ons die gebruiker uitskop -- _retry verhoed dat
+                    // 'n tweede 401 op dieselfde versoek weer 'n hernuwing afvuur.
+                    const config = error.config as RetryableConfig | undefined;
+
+                    if (config && !config._retry && await this.refreshSession()) {
+                        config._retry = true;
+                        return this.axios.request(config);
+                    }
+
+                    await useAuthStore.getState().logout();
                 }
                 return Promise.reject(error);
             },
@@ -85,6 +104,42 @@ class ApiClient {
     async hasToken(): Promise<boolean> {
         const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
         return !!token;
+    }
+
+    /**
+     * Ruil die gestoorde refresh token vir 'n vars token-paar in.
+     *
+     * Gebruik 'n kaal axios-oproep sodat die response interceptor nie homself
+     * weer afvuur as die hernuwing self 'n 401 kry nie.
+     *
+     * Returns true as die sessie hernu is, false as die gebruiker weer moet aanmeld.
+     */
+    private async refreshSession(): Promise<boolean> {
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+
+        this.refreshPromise = (async () => {
+            try {
+                const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+                if (!refreshToken) return false;
+
+                const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(
+                    `${API_URL}/auth/refresh`,
+                    { refreshToken },
+                    { timeout: 30_000, headers: { 'Content-Type': 'application/json' } },
+                );
+
+                await this.setTokens(data.accessToken, data.refreshToken);
+                return true;
+            } catch {
+                return false;
+            } finally {
+                this.refreshPromise = null;
+            }
+        })();
+
+        return this.refreshPromise;
     }
 
     // ========== HTTP verbs ==========

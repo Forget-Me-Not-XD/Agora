@@ -25,7 +25,8 @@ export interface UserResponse {
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
-  expiresIn: number;
+  expiresIn: number;          // access-token lifetime in seconds
+  refreshExpiresIn?: number;  // refresh-token lifetime in seconds
   tokenType: 'Bearer';
   user: UserResponse;
 }
