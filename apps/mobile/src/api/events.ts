@@ -25,6 +25,7 @@ export interface EventResponse {
   sellsTickets: boolean;
   ticketPrice: number | null;
   ticketsAvailable: number | null;
+  allowsPlusOne: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,7 @@ export interface CreateEventPayload {
   sellsTickets?: boolean;
   ticketPrice?: number;
   ticketsAvailable?: number;
+  allowsPlusOne?: boolean;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;

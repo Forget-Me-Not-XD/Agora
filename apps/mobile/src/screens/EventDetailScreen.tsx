@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -28,6 +28,7 @@ import type { PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
 import { typography } from '../theme/typography';
+import { clearMyRsvpsPrefetch } from '../lib/prefetch';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -41,6 +42,10 @@ export function EventDetailScreen() {
   const isDark = useIsDark();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [wantsPlusOne, setWantsPlusOne] = useState(false);
+  const [plusOneName, setPlusOneName] = useState('');
+  const [plusOneSurname, setPlusOneSurname] = useState('');
+  const [plusOneEmail, setPlusOneEmail] = useState('');
 
   const isCreating = route.params.eventId === 'new';
 
@@ -145,12 +150,27 @@ export function EventDetailScreen() {
   }
 
   async function handleRsvp() {
+    if (wantsPlusOne) {
+      if (!plusOneName.trim() || !plusOneSurname.trim() || !plusOneEmail.trim()) {
+        Alert.alert('RSVP', 'Vul asseblief jou +1 se naam, van en e-pos in.', [{ text: 'OK' }]);
+        return;
+      }
+    }
+
     setRsvpSubmitting(true);
     try {
-      await createRsvp(event!.id);
+      await createRsvp(
+        event!.id,
+        wantsPlusOne
+          ? { name: plusOneName.trim(), surname: plusOneSurname.trim(), email: plusOneEmail.trim() }
+          : undefined,
+      );
+      clearMyRsvpsPrefetch();
       Alert.alert(
         'Ingeskryf!',
-        'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
+        wantsPlusOne
+          ? 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode, en jou +1 s\'n, onder die RSVP-oortjie.'
+          : 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
         [{ text: 'OK' }],
       );
     } catch (err: unknown) {
@@ -189,7 +209,15 @@ export function EventDetailScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* ── Title block ── */}
         <View style={styles.titleBlock}>
@@ -321,25 +349,83 @@ export function EventDetailScreen() {
           event.sellsTickets ? (
             <PaymentModal event={event} />
           ) : (
-            <TouchableOpacity
-              style={[styles.primaryBtn, rsvpSubmitting && styles.btnDisabled]}
-              onPress={handleRsvp}
-              disabled={rsvpSubmitting}
-              accessibilityLabel="RSVP vir hierdie funksie"
-            >
-              {rsvpSubmitting ? (
-                <ActivityIndicator color={colors.surface} />
-              ) : (
-                <>
-                  <Feather name="check-circle" size={16} color={colors.surface} />
-                  <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
-                </>
+            <>
+              {event.allowsPlusOne && (
+                <View style={styles.detailsCard}>
+                  <View style={styles.ticketToggleRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fieldLabel}>Bring 'n +1</Text>
+                      <Text style={styles.fieldHint}>Voeg 'n gas by jou RSVP</Text>
+                    </View>
+                    <Switch
+                      value={wantsPlusOne}
+                      onValueChange={setWantsPlusOne}
+                      disabled={rsvpSubmitting}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor={colors.surface}
+                    />
+                  </View>
+
+                  {wantsPlusOne && (
+                    <>
+                      <Text style={styles.fieldLabel}>+1 se naam *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Naam"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneName}
+                        onChangeText={setPlusOneName}
+                        editable={!rsvpSubmitting}
+                        returnKeyType="next"
+                      />
+                      <Text style={styles.fieldLabel}>+1 se van *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Van"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneSurname}
+                        onChangeText={setPlusOneSurname}
+                        editable={!rsvpSubmitting}
+                        returnKeyType="next"
+                      />
+                      <Text style={styles.fieldLabel}>+1 se e-pos *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e-pos@voorbeeld.com"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneEmail}
+                        onChangeText={setPlusOneEmail}
+                        editable={!rsvpSubmitting}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        returnKeyType="done"
+                      />
+                    </>
+                  )}
+                </View>
               )}
-            </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, rsvpSubmitting && styles.btnDisabled]}
+                onPress={handleRsvp}
+                disabled={rsvpSubmitting}
+                accessibilityLabel="RSVP vir hierdie funksie"
+              >
+                {rsvpSubmitting ? (
+                  <ActivityIndicator color={colors.surface} />
+                ) : (
+                  <>
+                    <Feather name="check-circle" size={16} color={colors.surface} />
+                    <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
           )
         )}
 
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -368,6 +454,7 @@ function CreateEventForm({
   const [sellsTickets, setSellsTickets] = useState(false);
   const [ticketPrice, setTicketPrice] = useState('');
   const [ticketsAvailable, setTicketsAvailable] = useState('');
+  const [allowsPlusOne, setAllowsPlusOne] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -517,6 +604,7 @@ function CreateEventForm({
         sellsTickets,
         ticketPrice: sellsTickets ? ticketPriceNum : undefined,
         ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
+        allowsPlusOne,
       });
       safeGoBack(navigation);
     } catch (err: unknown) {
@@ -542,6 +630,10 @@ function CreateEventForm({
         backDisabled={isSubmitting}
       />
 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -737,6 +829,20 @@ function CreateEventForm({
               </View>
             </View>
           )}
+
+          <View style={styles.ticketToggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Laat +1 toe</Text>
+              <Text style={styles.fieldHint}>Gaste kan 'n gas by hul RSVP voeg</Text>
+            </View>
+            <Switch
+              value={allowsPlusOne}
+              onValueChange={setAllowsPlusOne}
+              disabled={isSubmitting}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -828,6 +934,7 @@ function CreateEventForm({
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

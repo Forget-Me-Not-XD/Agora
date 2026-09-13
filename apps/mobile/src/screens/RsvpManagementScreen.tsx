@@ -147,8 +147,17 @@ export function RsvpManagementScreen() {
               return (
                 <View key={rsvp.id} style={styles.row}>
                   <View style={styles.rowInfo}>
-                    <Text style={styles.rowName}>{attendeeName(rsvp)}</Text>
-                    <Text style={styles.rowMeta}>{rsvp.user ? rsvp.user.email : 'Walk-in (geen rekening nie)'}</Text>
+                    <Text style={styles.rowName}>
+                      {attendeeName(rsvp)}{rsvp.primaryRsvpId ? ' (+1-gas)' : ''}
+                    </Text>
+                    <Text style={styles.rowMeta}>
+                      {rsvp.user ? rsvp.user.email : rsvp.guestEmail ?? 'Walk-in (geen rekening nie)'}
+                    </Text>
+                    {rsvp.plusOneName && (
+                      <Text style={styles.rowMeta}>
+                        +1: {rsvp.plusOneName} {rsvp.plusOneSurname} ({rsvp.plusOneEmail})
+                      </Text>
+                    )}
                     <View style={styles.badgeRow}>
                       <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
                         <Text style={[styles.badgeText, { color: statusColors.text }]}>

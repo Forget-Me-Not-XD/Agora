@@ -38,11 +38,16 @@ export class RsvpService {
         private readonly calendarSyncService: CalendarSyncService,
     ) {}
 
-    async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
+        async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
 
         if (event.sellsTickets) {
             throw new ForbiddenException('Hierdie geleentheid vereis \'n kaartjie-aankoop');
+        }
+
+        const hasPlusOne = Boolean(dto.plusOneName && dto.plusOneSurname && dto.plusOneEmail);
+        if (hasPlusOne && !event.allowsPlusOne) {
+            throw new ForbiddenException('Hierdie geleentheid laat nie \'n plus-een toe nie');
         }
 
         const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
@@ -57,7 +62,7 @@ export class RsvpService {
             throw new ConflictException('Jy het alreeds vir hierdie geleentheid ingeskryf');
         }
 
-        await this.eventsService.incrementConfirmedAttendees(dto.eventId);
+        await this.eventsService.incrementConfirmedAttendees(dto.eventId, hasPlusOne ? 2 : 1);
 
         // 'n Vorige gekanselleerde RSVP vir dieselfde (event, user) bestaan reeds as 'n
         // dokument -- die unieke indeks op (event, user) laat nie 'n tweede toe nie, so
@@ -75,7 +80,54 @@ export class RsvpService {
             rsvp.googleCalendarEventId = null;
             rsvp.outlookCalendarEventId = null;
         }
-        await rsvp.save();
+
+        const stalePlusOneId = rsvp.plusOneRsvpId;
+
+        if (hasPlusOne) {
+            rsvp.plusOneName = dto.plusOneName;
+            rsvp.plusOneSurname = dto.plusOneSurname;
+            rsvp.plusOneEmail = dto.plusOneEmail;
+        } else {
+            rsvp.plusOneName = undefined;
+            rsvp.plusOneSurname = undefined;
+            rsvp.plusOneEmail = undefined;
+        }
+
+        let plusOneRsvp: RsvpDocument | null = null;
+        if (hasPlusOne) {
+            // Die +1-gas kry sy eie, volwaardige RSVP-dokument -- eie qrPayload en
+            // checkedIn-status, presies asof hulle self ingeskryf het (soos 'n walk-in,
+            // maar vooraf geskep i.p.v. eers by die deur).
+            plusOneRsvp = new this.rsvpModel({
+                event: dto.eventId,
+                guestName: `${dto.plusOneName} ${dto.plusOneSurname}`,
+                guestEmail: dto.plusOneEmail,
+                qrPayload: uuidv4(),
+                status: RsvpStatus.HANGENDE,
+                primaryRsvpId: rsvp._id,
+            });
+            rsvp.plusOneRsvpId = plusOneRsvp._id;
+        } else {
+            rsvp.plusOneRsvpId = null;
+        }
+
+        try {
+            if (plusOneRsvp) await plusOneRsvp.save();
+            await rsvp.save();
+        } catch (err) {
+            // Niks van hierdie siklus het geldig gestoor nie -- gee die volle
+            // gereserveerde plek terug en verwyder die weeskop +1-dokument (indien enige).
+            await this.eventsService.decrementConfirmedAttendees(dto.eventId, hasPlusOne ? 2 : 1);
+            if (plusOneRsvp) await this.rsvpModel.deleteOne({ _id: plusOneRsvp._id }).exec();
+            throw err;
+        }
+
+        // 'n Vorige siklus se +1-gas-RSVP is nie meer geldig nie -- kanselleer dit eers
+        // NADAT die nuwe toestand veilig gestoor is, sodat 'n mislukking hierbo nooit
+        // die (nog geldige) ou +1 kanselleer sonder om 'n werkende nuwe een te skep nie.
+        if (stalePlusOneId) {
+            await this.cancelLinkedPlusOne(stalePlusOneId.toString());
+        }
 
         const user = await this.usersService.findById(userId);
         const syncResult = await this.calendarSyncService.syncRsvpCreated(user, event);
@@ -88,6 +140,7 @@ export class RsvpService {
 
         return rsvp;
     }
+
 
     async hasTicket(eventId: string, userId: string): Promise<boolean> {
         const existing = await this.rsvpModel
@@ -188,6 +241,12 @@ export class RsvpService {
             await this.eventsService.decrementCheckedInCount(event._id.toString());
         }
 
+        // Die +1-gas se eie RSVP (indien enige) is nie meer geldig sodra die hoof-
+        // registreerder kanselleer nie -- kanselleer dit ook, wat sy eie plek vrystel.
+        if (rsvp.plusOneRsvpId) {
+            await this.cancelLinkedPlusOne(rsvp.plusOneRsvpId.toString());
+        }
+
         if (rsvp.user && (rsvp.googleCalendarEventId || rsvp.outlookCalendarEventId)) {
             const user = await this.usersService.findById(rsvp.user.toString());
             await this.calendarSyncService.syncRsvpCancelled(
@@ -195,6 +254,25 @@ export class RsvpService {
                 rsvp.googleCalendarEventId,
                 rsvp.outlookCalendarEventId,
             );
+        }
+    }
+
+    // Kanselleer 'n +1-gas se gekoppelde RSVP en stel sy plek vry. 'n No-op as dit
+    // reeds gekanselleer is (bv. omdat dit vroeër al deur hierdie funksie hanteer is).
+    private async cancelLinkedPlusOne(plusOneRsvpId: string): Promise<void> {
+        const plusOneRsvp = await this.rsvpModel.findById(plusOneRsvpId).exec();
+        if (!plusOneRsvp || plusOneRsvp.status === RsvpStatus.GEKANSELLEER) return;
+
+        const wasCheckedIn = plusOneRsvp.checkedIn;
+        plusOneRsvp.status = RsvpStatus.GEKANSELLEER;
+        await plusOneRsvp.save();
+
+        const event = await this.eventsService.findById(plusOneRsvp.event.toString());
+        event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
+        await event.save();
+
+        if (wasCheckedIn) {
+            await this.eventsService.decrementCheckedInCount(event._id.toString());
         }
     }
 
@@ -250,9 +328,15 @@ export class RsvpService {
         if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
 
         if (requesterRole !== Role.ADMIN && rsvp.user?.toString() !== requesterId) {
-            throw new ForbiddenException(`Jy mag nie hierdie QR-kode opvra nie`);
+            // Nie die eienaar self nie -- maar as dit 'n +1-gas se RSVP is, mag die
+            // persoon wat hulle uitgenooi het (die hoof-registreerder) dit steeds opvra.
+            const primaryRsvp = rsvp.primaryRsvpId
+                ? await this.rsvpModel.findById(rsvp.primaryRsvpId).exec()
+                : null;
+            if (primaryRsvp?.user?.toString() !== requesterId) {
+                throw new ForbiddenException(`Jy mag nie hierdie QR-kode opvra nie`);
+            }
         }
-        
 
         return toBuffer(rsvp.qrPayload);
     }
@@ -280,8 +364,10 @@ export class RsvpService {
         await rsvp.save();
         await this.eventsService.incrementCheckedInCount(event._id.toString());
 
+        // Walk-ins en +1-gaste het geen gekoppelde `user` nie -- val dan terug op
+        // guestName (die naam wat by registrasie/RSVP-tyd ingesamel is).
         return {
-            guestName: `${rsvp.user.name} ${rsvp.user.surname}`,
+            guestName: rsvp.user ? `${rsvp.user.name} ${rsvp.user.surname}` : rsvp.guestName ?? 'Onbekende gas',
             eventTitle: event.title,
             eventDate: event.date,
         };

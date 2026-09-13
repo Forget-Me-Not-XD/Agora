@@ -260,6 +260,24 @@ export default function MyRsvpList({ initialRsvps, initialDateFrom, initialDateT
                                         disabled={isCancelled}
                                     />
 
+                                    {r.plusOneRsvpId && (
+                                        <RsvpQrButton
+                                            rsvpId={r.plusOneRsvpId}
+                                            eventTitle={r.event?.title ?? 'Geleentheid'}
+                                            eventDate={r.event ? formatDateLong(r.event.date) : ''}
+                                            eventLocation={r.event?.location ?? ''}
+                                            eventAddress={r.event?.address ?? ''}
+                                            mapsUrl={
+                                                r.event?.lat != null && r.event?.lon != null
+                                                    ? `https://www.google.com/maps/search/?api=1&query=${r.event.lat},${r.event.lon}`
+                                                    : null
+                                            }
+                                            attendeeName={[r.plusOneName, r.plusOneSurname].filter(Boolean).join(' ')}
+                                            disabled={isCancelled}
+                                            label="+1 QR-kode"
+                                        />
+                                    )}
+
                                     {!isCancelled && (
                                         <div className="ml-auto flex items-center gap-2">
                                             {confirmId === r._id ? (

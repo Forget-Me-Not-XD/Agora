@@ -26,6 +26,10 @@ export interface RsvpResponse {
     qrPayload: string;
     checkedIn: boolean;
     checkedInAt: string | null;
+    plusOneName?: string;
+    plusOneSurname?: string;
+    plusOneEmail?: string;
+    plusOneRsvpId?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -37,8 +41,23 @@ export interface RsvpWithEvent extends Omit<RsvpResponse, 'event'> {
 
 // Skryf die aangemelde gebruiker in vir 'n geleentheid
 // POST /rsvp -- 409 - alreeds ingeskryf, 409 - vol bespreek
-export async function createRsvp(eventId: string): Promise<RsvpResponse> {
-    return apiClient.post<RsvpResponse, { eventId: string }>('/rsvp', { eventId });
+export interface CreateRsvpPayload {
+    eventId: string;
+    plusOneName?: string;
+    plusOneSurname?: string;
+    plusOneEmail?: string;
+}
+
+export async function createRsvp(
+    eventId: string,
+    plusOne?: { name: string; surname: string; email: string },
+): Promise<RsvpResponse> {
+    return apiClient.post<RsvpResponse, CreateRsvpPayload>('/rsvp', {
+        eventId,
+        plusOneName: plusOne?.name,
+        plusOneSurname: plusOne?.surname,
+        plusOneEmail: plusOne?.email,
+    });
 }
 
 // GET /rsvp/my - al die gebruiker se RSVP's, opsioneel gefiltreer op datumreeks
@@ -94,6 +113,12 @@ export interface RsvpWithUser {
     qrPayload: string;
     checkedIn: boolean;
     checkedInAt: string | null;
+    guestEmail: string | null;
+    plusOneName: string | null;
+    plusOneSurname: string | null;
+    plusOneEmail: string | null;
+    plusOneRsvpId: string | null;
+    primaryRsvpId: string | null;
     createdAt: string;
 }
 

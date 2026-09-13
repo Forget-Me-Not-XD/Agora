@@ -55,7 +55,7 @@ export default function MyBookingsTable({ data, attendeeName }: { data: MyRsvp[]
                                     {RSVP_STATUS_LABEL[r.status]}
                                 </Pill>
                             </td>
-                            <td className="py-2.5 text-right">
+                            <td className="py-2.5 text-right space-x-3 whitespace-nowrap">
                                 <RsvpQrButton
                                     rsvpId={r._id}
                                     eventTitle={r.event?.title ?? 'Geleentheid'}
@@ -70,6 +70,23 @@ export default function MyBookingsTable({ data, attendeeName }: { data: MyRsvp[]
                                     attendeeName={attendeeName}
                                     disabled={r.status === 'GEKANSELLEER'}
                                 />
+                                {r.plusOneRsvpId && (
+                                    <RsvpQrButton
+                                        rsvpId={r.plusOneRsvpId}
+                                        eventTitle={r.event?.title ?? 'Geleentheid'}
+                                        eventDate={r.event ? formatDateShort(r.event.date) : ''}
+                                        eventLocation={r.event?.location ?? ''}
+                                        eventAddress={r.event?.address ?? ''}
+                                        mapsUrl={
+                                            r.event?.lat != null && r.event?.lon != null
+                                                ? `https://www.google.com/maps/search/?api=1&query=${r.event.lat},${r.event.lon}`
+                                                : null
+                                        }
+                                        attendeeName={[r.plusOneName, r.plusOneSurname].filter(Boolean).join(' ')}
+                                        disabled={r.status === 'GEKANSELLEER'}
+                                        label="+1 QR-kode"
+                                    />
+                                )}
                             </td>
                         </tr>
                     ))}

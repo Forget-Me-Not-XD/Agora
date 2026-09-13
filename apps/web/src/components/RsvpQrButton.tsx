@@ -14,9 +14,10 @@ interface RsvpQrButtonProps {
     mapsUrl: string | null;
     attendeeName: string;
     disabled?: boolean;
+    label?: string;
 }
 
-export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled }: RsvpQrButtonProps) {
+export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled, label = 'QR-kode' }: RsvpQrButtonProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [qrDataUri, setQrDataUri] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
                 className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)] hover:underline"
             >
                 <QrCode size={14} />
-                QR-kode
+                {label}
             </button>
 
             {open && (

@@ -293,7 +293,7 @@ export function RsvpScreen() {
             </Text>
           </View>
         ) : (
-          filteredRsvps.map(({ _id, status, event }) => {
+          filteredRsvps.map(({ _id, status, event, plusOneRsvpId, plusOneName, plusOneSurname }) => {
             const cfg = {
               ...getRsvpStatusColors(status, isDark),
               label: RSVP_STATUS_LABELS[status],
@@ -301,6 +301,8 @@ export function RsvpScreen() {
             };
             const { day, month } = formatDate(event.date);
             const showQr = openQrId === _id;
+            const showPlusOneQr = !!plusOneRsvpId && openQrId === plusOneRsvpId;
+            const plusOneFullName = [plusOneName, plusOneSurname].filter(Boolean).join(' ');
             return (
               <View key={_id} style={styles.rsvpCard}>
                 <View style={styles.rsvpCardTop}>
@@ -353,6 +355,32 @@ export function RsvpScreen() {
                   </ViewShot>
                 )}
 
+                {showPlusOneQr && plusOneRsvpId && (
+                  <ViewShot
+                    ref={(r) => { ticketRefs.current[plusOneRsvpId] = r; }}
+                    options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+                  >
+                    <View style={styles.ticketCard}>
+                      <Text style={styles.ticketEventTitle}>{event.title}</Text>
+                      <Text style={styles.ticketMeta}>{day} {month} · {event.location}</Text>
+                      {event.address ? <Text style={styles.ticketMeta}>{event.address}</Text> : null}
+                      <View style={styles.qrBox}>
+                        {qrLoadingId === plusOneRsvpId ? (
+                          <ActivityIndicator color={colors.primary} />
+                        ) : qrUriById[plusOneRsvpId] ? (
+                          <Image
+                            source={{ uri: qrUriById[plusOneRsvpId] }}
+                            style={styles.qrImage}
+                            resizeMode="contain"
+                            accessibilityLabel="+1 se QR-kode"
+                          />
+                        ) : null}
+                      </View>
+                      {plusOneFullName ? <Text style={styles.ticketAttendee}>{plusOneFullName} (+1)</Text> : null}
+                    </View>
+                  </ViewShot>
+                )}
+
                 <View style={styles.rsvpActions}>
                   <TouchableOpacity
                     style={styles.qrBtn}
@@ -363,6 +391,17 @@ export function RsvpScreen() {
                     <Text style={styles.qrBtnText}>{showQr ? 'Versteek QR' : 'Wys QR'}</Text>
                   </TouchableOpacity>
 
+                  {plusOneRsvpId && (
+                    <TouchableOpacity
+                      style={styles.qrBtn}
+                      onPress={() => toggleQr(plusOneRsvpId)}
+                      accessibilityLabel={showPlusOneQr ? 'Versteek +1 se QR-kode' : 'Wys +1 se QR-kode'}
+                    >
+                      <Feather name="user-plus" size={13} color={colors.primary} />
+                      <Text style={styles.qrBtnText}>{showPlusOneQr ? 'Versteek +1 QR' : 'Wys +1 QR'}</Text>
+                    </TouchableOpacity>
+                  )}
+
                   {showQr && qrUriById[_id] && (
                     <TouchableOpacity
                       style={styles.qrBtn}
@@ -371,6 +410,17 @@ export function RsvpScreen() {
                     >
                       <Feather name="download" size={13} color={colors.primary} />
                       <Text style={styles.qrBtnText}>Stoor Kaartjie</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {showPlusOneQr && plusOneRsvpId && qrUriById[plusOneRsvpId] && (
+                    <TouchableOpacity
+                      style={styles.qrBtn}
+                      onPress={() => handleShareTicket(plusOneRsvpId)}
+                      accessibilityLabel="Stoor +1 se kaartjie"
+                    >
+                      <Feather name="download" size={13} color={colors.primary} />
+                      <Text style={styles.qrBtnText}>Stoor +1 Kaartjie</Text>
                     </TouchableOpacity>
                   )}
 
