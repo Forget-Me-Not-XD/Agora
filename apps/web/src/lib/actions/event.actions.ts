@@ -1,7 +1,7 @@
 'use server';
 
 // ========== Imports: ==========
-import { createEvent, getEvents, updateEvent } from '@/lib/api/events';
+import { createEvent, getEvents, getVenues, updateEvent } from '@/lib/api/events';
 import type { CreateEventPayload, Event, EventFilters, UpdateEventPayload } from '@/lib/api/events';
 
 export interface CreateEventResult {
@@ -43,5 +43,13 @@ export async function listEventsAction(filters?: EventFilters): Promise<ListEven
         return { events };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Kon nie geleenthede laai nie.' };
+    }
+}
+
+export async function getVenuesAction() {
+    try {
+        return await getVenues();
+    } catch {
+        return [];
     }
 }

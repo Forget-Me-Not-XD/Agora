@@ -55,6 +55,17 @@ export interface CreateEventPayload {
     ticketsAvailable?:         number;
 }
 
+export interface Venue {
+    id:          string;
+    label:       string;
+    campus:      string;
+    maxCapacity: number;
+}
+
+export async function getVenues(): Promise<Venue[]> {
+    return apiFetch<Venue[]>('/api/v1/events/venues');
+}
+
 export type UpdateEventPayload = Partial<CreateEventPayload>;
 
 export interface EventFilters {
