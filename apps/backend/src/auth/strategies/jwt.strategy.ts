@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -15,18 +15,10 @@ export interface JwtPayload {
   type?: TokenType;  // 'access' = API calls, 'refresh' = only redeemable at /auth/refresh
   jti?: string;      // Unique id, refresh tokens only
   authAt?: number;   // When the user logged in (epoch seconds), refresh tokens only
+  remember?: boolean; // Remember-me session, refresh tokens only
   iat?: number;
   exp?: number;
   mustChangePassword?: boolean;
-}
-
-/**
- * Kyk of die payload 'n refresh token is.
- * Ou tokens het nog nie 'type' nie, maar net refresh tokens het 'n jti. Die jti-check
- * kan weg sodra die ou tokens verval het (7 dae na deploy).
- */
-export function isRefreshToken(payload: JwtPayload): boolean {
-  return payload.type === 'refresh' || (payload.type === undefined && Boolean(payload.jti));
 }
 
 @Injectable()
@@ -47,12 +39,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    // Refresh tokens use the same secret, so block them here. Only /auth/refresh may use them.
-    if (isRefreshToken(payload)) {
-      throw new UnauthorizedException('Refresh token cannot be used as an access token');
+    // Refresh tokens use the same secret, so only let access tokens through here.
+    // Refresh tokens can only be redeemed at /auth/refresh.
+    if (payload.type !== 'access') {
+      throw new UnauthorizedException('Only an access token can be used here');
     }
 
-    const user = await this.usersService.findById(payload.sub).catch(() => null);
+    // Same as AuthService.refresh: only "user not found" is a 401. If Mongo is down we return
+    // 503, otherwise the clients would think the session is dead and log the user out.
+    const user = await this.usersService.findById(payload.sub).catch((err) => {
+      if (err instanceof NotFoundException) return null;
+      throw new ServiceUnavailableException('Could not verify session, try again shortly');
+    });
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Account no longer exists');
     }

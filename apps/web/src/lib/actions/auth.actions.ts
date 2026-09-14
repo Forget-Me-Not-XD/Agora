@@ -11,8 +11,9 @@ import {
   clearAuthCookies,
   COOKIE_NAME,
   COOKIE_USER_NAME,
-  COOKIE_REMEMBER_NAME,
+  COOKIE_REFRESH_NAME,
   DEFAULT_ACCESS_EXPIRY,
+  remainingSessionSeconds,
 } from '@/lib/auth-cookies';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
@@ -29,13 +30,14 @@ const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 export async function loginAction(
   payload: LoginPayload & { rememberMe?: boolean },
 ): Promise<string | null> {
-  const { rememberMe, ...rest } = payload;
+  const { rememberMe = false, ...rest } = payload;
 
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(rest),
+      // Stuur altyd rememberMe, anders gee die backend 'n lang sessie (dis vir mobiel)
+      body:    JSON.stringify({ ...rest, rememberMe }),
       cache:   'no-store',
     });
 
@@ -46,7 +48,7 @@ export async function loginAction(
     }
 
     const data: TokenPair = await res.json();
-    setAuthCookies(cookies(), data, rememberMe ?? false);
+    setAuthCookies(cookies(), data, rememberMe);
   } catch {
     return 'Kan nie aan die bediener koppel nie. Probeer later.';
   }
@@ -76,7 +78,8 @@ export async function registerAction(payload: {
     const res = await fetch(`${API_URL}/api/v1/auth/register`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
+      // Registrasie het nie 'n onthou-my keuse nie, so dit is 'n gewone sessie
+      body:    JSON.stringify({ ...payload, rememberMe: false }),
       cache:   'no-store',
     });
 
@@ -174,9 +177,9 @@ export async function changePasswordAction(
   if (userCookie) {
     try {
       const user = JSON.parse(userCookie) as UserResponse;
-      // Hou dieselfde leeftyd as met aanmelding (onthou my of nie)
-      const rememberMe = cookieStore.get(COOKIE_REMEMBER_NAME)?.value === '1';
-      setUserCookie(cookieStore, { ...user, mustChangePassword: false }, rememberMe);
+      // Hou so lank as wat die sessie nog oor het, soos met aanmelding
+      const maxAge = remainingSessionSeconds(cookieStore.get(COOKIE_REFRESH_NAME)?.value, token);
+      setUserCookie(cookieStore, { ...user, mustChangePassword: false }, maxAge);
     } catch {
       // Malformed cookie - nothing to patch, next full login will fix the corrupted cookie
     }

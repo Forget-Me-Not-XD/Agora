@@ -5,7 +5,7 @@ import { cookies }                from 'next/headers';
 import { revalidatePath }         from 'next/cache';
 import { updateUser, UserTitle, searchUsersByTag, type UserTag, type UserResponseDto } from '@/lib/api/users';
 import { getSession, getToken }    from '@/lib/session';
-import { COOKIE_USER_NAME, COOKIE_REMEMBER_NAME, setUserCookie } from '@/lib/auth-cookies';
+import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME, remainingSessionSeconds, setUserCookie } from '@/lib/auth-cookies';
 import type { UserResponse }      from '@/lib/types';
 
 /**
@@ -15,7 +15,7 @@ import type { UserResponse }      from '@/lib/types';
  * hierdie cookie, nie uit die JWT nie. Sonder hierdie sinchronisasie sou 'n
  * naamverandering eers na 'n nuwe aanmelding sigbaar wees.
  *
- * Gebruik setUserCookie sodat die leeftyd dieselfde bly as met aanmelding (onthou my of nie).
+ * Die cookie hou so lank as wat die sessie nog oor het, soos met aanmelding.
  */
 function syncUserCookie(patch: Partial<UserResponse>) {
     const cookieStore = cookies();
@@ -23,9 +23,12 @@ function syncUserCookie(patch: Partial<UserResponse>) {
     if (!raw) return;
 
     try {
-        const user       = JSON.parse(raw) as UserResponse;
-        const rememberMe = cookieStore.get(COOKIE_REMEMBER_NAME)?.value === '1';
-        setUserCookie(cookieStore, { ...user, ...patch }, rememberMe);
+        const user   = JSON.parse(raw) as UserResponse;
+        const maxAge = remainingSessionSeconds(
+            cookieStore.get(COOKIE_REFRESH_NAME)?.value,
+            cookieStore.get(COOKIE_NAME)?.value,
+        );
+        setUserCookie(cookieStore, { ...user, ...patch }, maxAge);
     } catch {
         // Korrupte cookie -- die volgende aanmelding skryf dit oor.
     }

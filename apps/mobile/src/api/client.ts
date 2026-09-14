@@ -15,7 +15,7 @@ const CREDENTIAL_CHECK_MESSAGES = ['Invalid credentials', 'Current password is i
  *
  * - Reads API URL from app.json or EXPO_PUBLIC_API_URL
  * - Attaches JWT to every request via interceptor
- * - On a 401 it tries to refresh the session once, and only logs out if that fails
+ * - On a 401 it refreshes the session once and retries, and only logs out if the session is really dead
  */
 
 const API_URL =
@@ -28,11 +28,14 @@ const REFRESH_TOKEN_KEY = 'akademia.refreshToken';
 
 type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+// ok = nuwe tokens, invalid = sessie is dood, unavailable = backend besig of geen netwerk nie
+type RefreshOutcome = 'ok' | 'invalid' | 'unavailable';
+
 class ApiClient {
     private readonly axios: AxiosInstance;
 
-    // Net een refresh op 'n slag. As 'n paar versoeke gelyk 'n 401 kry, wag hulle almal vir dieselfde een.
-    private refreshPromise: Promise<boolean> | null = null;
+    // Net een refresh op 'n slag. Kry 'n paar versoeke gelyk 'n 401, wag hulle almal vir dieselfde refresh.
+    private refreshPromise: Promise<RefreshOutcome> | null = null;
 
     constructor() {
         this.axios = axios.create({
@@ -51,12 +54,13 @@ class ApiClient {
         });
 
         // ========== Response Interceptor: handle 401 ==========
-        // A 401 from a real protected endpoint means the session itself is dead
-        // (expired/invalid token) -- previously this only cleared the stored
-        // token, leaving the Zustand `user` state (and therefore the whole app)
-        // untouched, so the UI stayed stuck on whatever screen it was on with
-        // every subsequent request silently failing. Calling logout() here
-        // instead makes AppNavigator fall back to the Login screen immediately.
+        // A 401 from a protected endpoint usually just means the access token has
+        // expired, so we first try to refresh the session and retry the request.
+        // Only when the refresh token is rejected too is the session really dead.
+        // We then call logout() rather than only clearing the stored tokens: that
+        // resets the Zustand `user` state, so AppNavigator falls back to the Login
+        // screen immediately instead of leaving the UI stuck on the current screen
+        // with every later request failing.
         this.axios.interceptors.response.use(
             (response) => response,
             async (error: AxiosError) => {
@@ -70,12 +74,23 @@ class ApiClient {
                         return Promise.reject(error);
                     }
 
-                    // Probeer eers refresh voor ons die gebruiker uitlog. _retry keer dat ons dit twee keer probeer.
+                    // Probeer eers refresh voordat ons die gebruiker uitlog. _retry merk die herhaalde
+                    // versoek: kry dit weer 'n 401, log ons uit in plaas van weer te refresh.
                     const config = error.config as RetryableConfig | undefined;
 
-                    if (config && !config._retry && await this.refreshSession()) {
-                        config._retry = true;
-                        return this.axios.request(config);
+                    if (config && !config._retry) {
+                        const outcome = await this.refreshSession();
+
+                        if (outcome === 'ok') {
+                            config._retry = true;
+                            return this.axios.request(config);
+                        }
+
+                        // Die backend is besig of die foon het nie netwerk nie. Moenie uitlog nie:
+                        // hierdie versoek misluk net, en die volgende een probeer weer refresh.
+                        if (outcome === 'unavailable') {
+                            return Promise.reject(error);
+                        }
                     }
 
                     await useAuthStore.getState().logout();
@@ -104,17 +119,18 @@ class ApiClient {
     /**
      * Ruil die refresh token vir nuwe tokens.
      * Gebruik gewone axios en nie this.axios nie, anders loop die interceptor weer as dit 'n 401 kry.
-     * Returns true as dit gewerk het, false as die gebruiker weer moet aanmeld.
+     * 'ok' as ons nuwe tokens het, 'invalid' as die gebruiker weer moet aanmeld, en
+     * 'unavailable' as die backend besig is of die foon nie netwerk het nie.
      */
-    private async refreshSession(): Promise<boolean> {
+    private async refreshSession(): Promise<RefreshOutcome> {
         if (this.refreshPromise) {
             return this.refreshPromise;
         }
 
-        this.refreshPromise = (async () => {
+        this.refreshPromise = (async (): Promise<RefreshOutcome> => {
             try {
                 const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
-                if (!refreshToken) return false;
+                if (!refreshToken) return 'invalid';
 
                 const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(
                     `${API_URL}/auth/refresh`,
@@ -123,9 +139,15 @@ class ApiClient {
                 );
 
                 await this.setTokens(data.accessToken, data.refreshToken);
-                return true;
-            } catch {
-                return false;
+                return 'ok';
+            } catch (err) {
+                const status = (err as AxiosError).response?.status;
+
+                // 429 is net die throttler. Ander 4xx beteken die token sal nooit werk nie.
+                if (status !== undefined && status >= 400 && status < 500 && status !== 429) {
+                    return 'invalid';
+                }
+                return 'unavailable';
             } finally {
                 this.refreshPromise = null;
             }
