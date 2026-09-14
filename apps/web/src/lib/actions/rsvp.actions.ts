@@ -1,21 +1,29 @@
 'use server';
 
 import { cancelRsvp, createRsvp, getMyRsvps, getRsvpQrDataUri } from '@/lib/api/rsvp';
-import type { MyRsvp } from '@/lib/api/rsvp';
+import type { MyRsvp, CreateRsvpPlusOne } from '@/lib/api/rsvp';
 
 export interface RsvpActionResult {
-    qrDataUri?:        string;
-    syncedToGoogle?:   boolean;
-    syncedToOutlook?:  boolean;
-    error?:            string;
+    qrDataUri?:         string;
+    plusOneQrDataUri?:  string;
+    syncedToGoogle?:    boolean;
+    syncedToOutlook?:   boolean;
+    error?:             string;
 }
 
-export async function rsvpToEventAction(eventId: string): Promise<RsvpActionResult> {
+export async function rsvpToEventAction(
+    eventId: string,
+    plusOne?: CreateRsvpPlusOne,
+): Promise<RsvpActionResult> {
     try {
-        const rsvp      = await createRsvp(eventId);
-        const qrDataUri = await getRsvpQrDataUri(rsvp._id);
+        const rsvp = await createRsvp(eventId, plusOne);
+        const [qrDataUri, plusOneQrDataUri] = await Promise.all([
+            getRsvpQrDataUri(rsvp._id),
+            rsvp.plusOneRsvpId ? getRsvpQrDataUri(rsvp.plusOneRsvpId) : Promise.resolve(undefined),
+        ]);
         return {
             qrDataUri,
+            plusOneQrDataUri,
             syncedToGoogle:  rsvp.googleCalendarEventId  !== null,
             syncedToOutlook: rsvp.outlookCalendarEventId !== null,
         };

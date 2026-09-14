@@ -81,6 +81,9 @@ export class Event {
     @Prop ({ type: Number, default: null })
     ticketsAvailable!: number | null;
 
+    @Prop ({ default: false })
+    allowsPlusOne!: boolean;
+
     createdAt?: Date;
     updatedAt?: Date;
 }

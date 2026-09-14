@@ -19,9 +19,13 @@ export class Rsvp {
     @Prop ({ type: SchemaTypes.ObjectId, ref: 'User', index: true })
     user?: Types.ObjectId;
 
-    // Net gestel vir 'n walk-in; onnodig wanneer 'n `user` gekoppel is.
+    // Net gestel vir 'n walk-in of 'n +1-gas; onnodig wanneer 'n `user` gekoppel is.
     @Prop ({ trim: true })
     guestName?: string;
+
+    // Net gestel op 'n +1-gas se eie RSVP-dokument (sien primaryRsvpId hieronder).
+    @Prop ({ trim: true })
+    guestEmail?: string;
 
     @Prop ({ required: true, enum: RsvpStatus, default: RsvpStatus.HANGENDE })
     status!: RsvpStatus;
@@ -46,6 +50,25 @@ export class Rsvp {
 
     @Prop ({ type: SchemaTypes.ObjectId, ref: 'Payment', default: null })
     payment!: Types.ObjectId | null;
+
+    @Prop ({ trim: true })
+    plusOneName?: string;
+
+    @Prop ({ trim: true })
+    plusOneSurname?: string;
+
+    @Prop ({ trim: true })
+    plusOneEmail?: string;
+
+    // Gestel op die hoof-registreerder se RSVP: wys na die +1-gas se eie,
+    // onafhanklike RSVP-dokument (met sy eie qrPayload/checkedIn).
+    @Prop ({ type: SchemaTypes.ObjectId, ref: 'Rsvp', default: null })
+    plusOneRsvpId!: Types.ObjectId | null;
+
+    // Gestel op die +1-gas se eie RSVP-dokument: wys terug na die hoof-
+    // registreerder se RSVP wat hulle uitgenooi het.
+    @Prop ({ type: SchemaTypes.ObjectId, ref: 'Rsvp', default: null })
+    primaryRsvpId!: Types.ObjectId | null;
 
     createdAt?: Date;
     updatedAt?: Date;

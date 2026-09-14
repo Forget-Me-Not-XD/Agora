@@ -156,16 +156,14 @@ export class EventsService {
         return visibleAttendanceRoles(viewerRole).includes(event.intendedAttendance);
     }
 
-    async incrementConfirmedAttendees(id: string): Promise<EventDocument> {
+    async incrementConfirmedAttendees(id: string, amount: number = 1): Promise<EventDocument> {
         if (!isValidObjectId(id)) {
             throw new NotFoundException(`Event ${id} not found`);
         }
 
-        // Atomiese voorwaardelike inkrement voorkom die TOCTOU-wedloop tussen die
-        // kapasiteitstoets en die skrywe wanneer verskeie RSVP's gelyktydig inkom.
         const updated = await this.eventModel.findOneAndUpdate(
-            { _id: id, $expr: { $lt: ['$confirmedAttendees', '$maxCapacity'] } },
-            { $inc: { confirmedAttendees: 1 } },
+            { _id: id, $expr: { $lte: [{ $add: ['$confirmedAttendees', amount] }, '$maxCapacity'] } },
+            { $inc: { confirmedAttendees: amount } },
             { new: true },
         ).exec();
 
@@ -174,6 +172,32 @@ export class EventsService {
         const event = await this.eventModel.findById(id).exec();
         if (!event) throw new NotFoundException(`Event ${id} not found`);
         throw new ConflictException('Hierdie geleentheid is vol bespreek');
+    }
+
+    async decrementConfirmedAttendees(id: string, amount: number = 1): Promise<EventDocument> {
+        if (!isValidObjectId(id)) {
+            throw new NotFoundException(`Event ${id} not found`);
+        }
+
+        const updated = await this.eventModel.findOneAndUpdate(
+            { _id: id, confirmedAttendees: { $gte: amount } },
+            { $inc: { confirmedAttendees: -amount } },
+            { new: true },
+        ).exec();
+
+        if (updated) return updated;
+
+        // Kan nie die volle `amount` aftrek sonder om onder 0 te gaan nie --
+        // stel dit eerder direk op 0 (dieselfde "clamp by zero" gedrag as
+        // die ou nie-atomiese kode wat dit vervang).
+        const clamped = await this.eventModel.findOneAndUpdate(
+            { _id: id },
+            { $set: { confirmedAttendees: 0 } },
+            { new: true },
+        ).exec();
+
+        if (!clamped) throw new NotFoundException(`Event ${id} not found`);
+        return clamped;
     }
 
     async decrementTicketsAvailable(id: string): Promise<EventDocument> {

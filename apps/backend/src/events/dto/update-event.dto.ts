@@ -109,4 +109,8 @@ export class UpdateEventDto {
     @IsInt()
     @Min(1)
     ticketsAvailable?: number;
+
+    @IsOptional()
+    @IsBoolean()
+    allowsPlusOne?: boolean;
 }

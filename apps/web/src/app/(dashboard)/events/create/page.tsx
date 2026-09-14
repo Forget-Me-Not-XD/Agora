@@ -39,6 +39,7 @@ export default function CreateEventPage() {
                     sellsTickets: false,
                     ticketPrice: '',
                     ticketsAvailable: '',
+                    allowsPlusOne: false,
                 }}
             />
         </div>

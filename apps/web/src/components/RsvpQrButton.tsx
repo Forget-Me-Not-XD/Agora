@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QrCode, X, Loader2, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { getRsvpQrAction } from '@/lib/actions/rsvp.actions';
@@ -14,9 +14,10 @@ interface RsvpQrButtonProps {
     mapsUrl: string | null;
     attendeeName: string;
     disabled?: boolean;
+    label?: string;
 }
 
-export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled }: RsvpQrButtonProps) {
+export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled, label = 'QR-kode' }: RsvpQrButtonProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [qrDataUri, setQrDataUri] = useState<string | null>(null);
@@ -24,6 +25,14 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
     const [downloading, setDownloading] = useState(false);
 
     const ticketRef = useRef<HTMLDivElement>(null);
+
+    // Dieselfde komponent-instansie kan hergebruik word met 'n ANDER rsvpId (bv. 'n
+    // gekanselleerde +1 vervang deur 'n nuwe een) -- maak seker die gekasde QR van
+    // die vorige id nie steeds gewys word nie sodra die prop verander.
+    useEffect(() => {
+        setQrDataUri(null);
+        setError(null);
+    }, [rsvpId]);
 
     async function handleOpen() {
         setOpen(true);
@@ -47,7 +56,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
             const dataUrl = await toPng(ticketRef.current, { pixelRatio: 2, backgroundColor: '#ffffff' });
             const link = document.createElement('a');
             link.href = dataUrl;
-            link.download = `kaartjie-${eventTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
+            link.download = `kaartjie-${eventTitle.replace(/\s+/g, '-').toLowerCase()}-${rsvpId.slice(-6)}.png`;
             link.click();
         } finally {
             setDownloading(false);
@@ -65,7 +74,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
                 className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)] hover:underline"
             >
                 <QrCode size={14} />
-                QR-kode
+                {label}
             </button>
 
             {open && (

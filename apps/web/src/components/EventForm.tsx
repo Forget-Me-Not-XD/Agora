@@ -39,6 +39,7 @@ export interface EventFormValues {
     sellsTickets:       boolean;
     ticketPrice:        string;
     ticketsAvailable:   string;
+    allowsPlusOne:      boolean;
 }
 
 interface EventFormProps {
@@ -160,6 +161,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 sellsTickets:       formData.sellsTickets,
                 ticketPrice:        formData.sellsTickets ? Number(formData.ticketPrice) : undefined,
                 ticketsAvailable:   formData.sellsTickets ? Number(formData.ticketsAvailable) : undefined,
+                allowsPlusOne:      formData.allowsPlusOne,
             };
 
             if (mode === 'create') {
@@ -482,6 +484,16 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                         </div>
                     )}
                 </div>
+
+                <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
+                    <input
+                        type="checkbox"
+                        checked={formData.allowsPlusOne}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, allowsPlusOne: e.target.checked }))}
+                        className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                    />
+                    Gaste kan 'n gas by hul RSVP voeg
+                </label>
 
                 {apiError && (
                     <div
