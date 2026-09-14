@@ -482,30 +482,15 @@ useEffect(() => {
     }
 
     if (useVenue) {
-      if(!selectedVenue)
-        setError('Kies asseblief \'n lokaal');
-        return;
-    }
-
-    if (useVenue) {
-
-    const venue = selectedVenue;
-
-      if (!venue) {
+      if (!selectedVenue) {
         setError('Kies asseblief \'n lokaal.');
         return;
       }
 
-      if (cap > venue.maxCapacity) {
-        setError(`${venue.label} (${venue.campus}) se kapasiteit is ${venue.maxCapacity} -- kies 'n groter lokaal of verlaag die kapasiteit.`);
+      if (cap > selectedVenue.maxCapacity) {
+        setError(`${selectedVenue.label} (${selectedVenue.campus}) se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit.`);
         return;
       }
-      
-    }
-
-    if (useVenue && selectedVenue && cap > selectedVenue.maxCapacity) {
-      setError(`${selectedVenue.label} (${selectedVenue.campus}) se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit.`);
-      return;
     }
 
     let budgetNum: number | undefined;

@@ -1,7 +1,7 @@
 export interface Venue {
     id: string;
     label: string;       // "L1" ... "L10"
-    campus: string;       // EventForm.tsx se STUDY_CENTER moet ooreenstem
+    campus: string;
     maxCapacity: number;
 }
 
@@ -56,8 +56,4 @@ export function formatVenueLabel(venue: Venue): string {
 
 export function findVenueByLocation(location: string): Venue | undefined {
     return VENUES.find((v) => formatVenueLabel(v) === location);
-}
-
-export function getVenuesByCampus(campus: string): Venue[] {
-    return VENUES.filter((v) => v.campus === campus);
 }

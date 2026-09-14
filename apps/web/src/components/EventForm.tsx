@@ -18,15 +18,6 @@ import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
 import type { PlaceDetails } from '@/lib/api/places';
 import type { Venue } from '@/lib/api/events';
 
-
-const STUDY_CENTERS = [
-    'Centurion - Leriba',
-    'Centurion - Gerhard straat',
-    'Paarl',
-    'George',
-    'Somerset Wes',
-];
-
 export interface EventFormValues {
     title:              string;
     description:        string;
@@ -67,17 +58,28 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     const [errors, setErrors]           = useState<Record<string, string>>({});
 
     const [venues, setVenues] = useState<Venue[]>([]);
+    const [venuesError, setVenuesError] = useState<string | null>(null);
     const [useVenue, setUseVenue] = useState(false);
     const [venueId, setVenueId] = useState('');
 
     useEffect(() => {
-        getVenuesAction().then(setVenues);
+        getVenuesAction().then((result) => {
+            if (result.error) {
+                setVenuesError(result.error);
+            } else {
+                setVenues(result.venues ?? []);
+            }
+        });
     }, []);
 
     useEffect(() => {
         setVenueId('');
     }, [formData.studyCenter]);
 
+    const campuses = Array.from(new Set(venues.map((v) => v.campus)));
+    const studyCenters = campuses.includes(formData.studyCenter) || !formData.studyCenter
+        ? campuses
+        : [formData.studyCenter, ...campuses];
     const campusVenues = venues.filter((v) => v.campus === formData.studyCenter);
     const selectedVenue = campusVenues.find((v) => v.id === venueId);
 
@@ -296,6 +298,11 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                     Maksimum kapasiteit vir {selectedVenue.label}: {selectedVenue.maxCapacity}
                 </p>
             )}
+            {venuesError && (
+                <p className="text-xs text-[var(--color-red)] mt-1">
+                    Kon nie lokale laai nie: {venuesError}
+                </p>
+            )}
         </>
     ):(
         <input
@@ -356,7 +363,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                             onChange={(e) => handleChange('studyCenter', e.target.value)}
                             className={inputClass('studyCenter')}
                         >
-                            {STUDY_CENTERS.map((c) => (
+                            {studyCenters.map((c) => (
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </select>
