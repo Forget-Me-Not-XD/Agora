@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QrCode, X, Loader2, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { getRsvpQrAction } from '@/lib/actions/rsvp.actions';
@@ -26,6 +26,14 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
 
     const ticketRef = useRef<HTMLDivElement>(null);
 
+    // Dieselfde komponent-instansie kan hergebruik word met 'n ANDER rsvpId (bv. 'n
+    // gekanselleerde +1 vervang deur 'n nuwe een) -- maak seker die gekasde QR van
+    // die vorige id nie steeds gewys word nie sodra die prop verander.
+    useEffect(() => {
+        setQrDataUri(null);
+        setError(null);
+    }, [rsvpId]);
+
     async function handleOpen() {
         setOpen(true);
         if (qrDataUri) return;
@@ -48,7 +56,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
             const dataUrl = await toPng(ticketRef.current, { pixelRatio: 2, backgroundColor: '#ffffff' });
             const link = document.createElement('a');
             link.href = dataUrl;
-            link.download = `kaartjie-${eventTitle.replace(/\s+/g, '-').toLowerCase()}.png`;
+            link.download = `kaartjie-${eventTitle.replace(/\s+/g, '-').toLowerCase()}-${rsvpId.slice(-6)}.png`;
             link.click();
         } finally {
             setDownloading(false);

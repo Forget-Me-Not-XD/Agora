@@ -12,3 +12,12 @@ export const RSVP_STATUS_TONE: Record<RsvpStatus, Tone> = {
     HANGENDE:     'yellow',
     GEKANSELLEER: 'red',
 };
+
+export function buildMapsUrl(lat: number | null | undefined, lon: number | null | undefined): string | null {
+    if (lat == null || lon == null) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+}
+
+export function fullName(name?: string | null, surname?: string | null): string {
+    return [name, surname].filter(Boolean).join(' ');
+}

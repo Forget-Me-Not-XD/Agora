@@ -16,11 +16,11 @@ export async function rsvpToEventAction(
     plusOne?: CreateRsvpPlusOne,
 ): Promise<RsvpActionResult> {
     try {
-        const rsvp      = await createRsvp(eventId, plusOne);
-        const qrDataUri = await getRsvpQrDataUri(rsvp._id);
-        const plusOneQrDataUri = rsvp.plusOneRsvpId
-            ? await getRsvpQrDataUri(rsvp.plusOneRsvpId)
-            : undefined;
+        const rsvp = await createRsvp(eventId, plusOne);
+        const [qrDataUri, plusOneQrDataUri] = await Promise.all([
+            getRsvpQrDataUri(rsvp._id),
+            rsvp.plusOneRsvpId ? getRsvpQrDataUri(rsvp.plusOneRsvpId) : Promise.resolve(undefined),
+        ]);
         return {
             qrDataUri,
             plusOneQrDataUri,

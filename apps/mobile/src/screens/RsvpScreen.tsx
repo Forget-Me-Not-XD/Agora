@@ -29,7 +29,7 @@ import {
 } from '../api/rsvp';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
-import { takeMyRsvpsPrefetch } from '../lib/prefetch';
+import { takeMyRsvpsPrefetch, clearMyRsvpsPrefetch } from '../lib/prefetch';
 import { useAuthStore } from '../stores/auth.store';
 
 
@@ -44,10 +44,11 @@ export function RsvpScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // QR per inskrywing
-  const [openQrId, setOpenQrId] = useState<string | null>(null);
+  // QR per inskrywing -- 'n Set (nie 'n enkele id nie) sodat 'n primêre en 'n
+  // +1 se QR onafhanklik van mekaar oop/besig-om-te-laai kan wees.
+  const [openQrIds, setOpenQrIds] = useState<Set<string>>(new Set());
   const [qrUriById, setQrUriById] = useState<Record<string, string>>({});
-  const [qrLoadingId, setQrLoadingId] = useState<string | null>(null);
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
 
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
@@ -107,21 +108,33 @@ export function RsvpScreen() {
   );
 
   async function toggleQr(rsvpId: string) {
-    if (openQrId === rsvpId) {
-      setOpenQrId(null);
+    if (openQrIds.has(rsvpId)) {
+      setOpenQrIds((prev) => {
+        const next = new Set(prev);
+        next.delete(rsvpId);
+        return next;
+      });
       return;
     }
-    setOpenQrId(rsvpId);
+    setOpenQrIds((prev) => new Set(prev).add(rsvpId));
     if (qrUriById[rsvpId]) return; // klaar gelaai;
-    setQrLoadingId(rsvpId);
+    setLoadingIds((prev) => new Set(prev).add(rsvpId));
     try {
       const uri = await getRsvpQrDataUri(rsvpId);
       setQrUriById((prev) => ({ ...prev, [rsvpId]: uri }));
     } catch {
       Alert.alert('QR-kode', 'Kon nie die QR-kode laai nie. Probeer asseblief weer.');
-      setOpenQrId(null);
+      setOpenQrIds((prev) => {
+        const next = new Set(prev);
+        next.delete(rsvpId);
+        return next;
+      });
     } finally {
-      setQrLoadingId(null);
+      setLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(rsvpId);
+        return next;
+      });
     }
   }
 
@@ -151,6 +164,7 @@ export function RsvpScreen() {
             setCancelingId(rsvpId);
             try {
               await cancelRsvp(rsvpId);
+              clearMyRsvpsPrefetch();
               setRsvps((prev) => prev.filter((r) => r._id !== rsvpId));
             } catch {
               Alert.alert('Kanselleer', 'Kon nie die RSVP kanselleer nie. Probeer asseblief weer.');
@@ -300,8 +314,8 @@ export function RsvpScreen() {
               icon: RSVP_STATUS_ICONS[status],
             };
             const { day, month } = formatDate(event.date);
-            const showQr = openQrId === _id;
-            const showPlusOneQr = !!plusOneRsvpId && openQrId === plusOneRsvpId;
+            const showQr = openQrIds.has(_id);
+            const showPlusOneQr = !!plusOneRsvpId && openQrIds.has(plusOneRsvpId);
             const plusOneFullName = [plusOneName, plusOneSurname].filter(Boolean).join(' ');
             return (
               <View key={_id} style={styles.rsvpCard}>
@@ -339,7 +353,7 @@ export function RsvpScreen() {
                       <Text style={styles.ticketMeta}>{day} {month} · {event.location}</Text>
                       {event.address ? <Text style={styles.ticketMeta}>{event.address}</Text> : null}
                       <View style={styles.qrBox}>
-                        {qrLoadingId === _id ? (
+                        {loadingIds.has(_id) ? (
                           <ActivityIndicator color={colors.primary} />
                         ) : qrUriById[_id] ? (
                           <Image
@@ -365,7 +379,7 @@ export function RsvpScreen() {
                       <Text style={styles.ticketMeta}>{day} {month} · {event.location}</Text>
                       {event.address ? <Text style={styles.ticketMeta}>{event.address}</Text> : null}
                       <View style={styles.qrBox}>
-                        {qrLoadingId === plusOneRsvpId ? (
+                        {loadingIds.has(plusOneRsvpId) ? (
                           <ActivityIndicator color={colors.primary} />
                         ) : qrUriById[plusOneRsvpId] ? (
                           <Image

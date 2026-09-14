@@ -38,7 +38,7 @@ export class RsvpService {
         private readonly calendarSyncService: CalendarSyncService,
     ) {}
 
-        async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
+    async createRsvp(dto: CreateRsvpDto, userId: string): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
 
         if (event.sellsTickets) {
@@ -141,7 +141,6 @@ export class RsvpService {
         return rsvp;
     }
 
-
     async hasTicket(eventId: string, userId: string): Promise<boolean> {
         const existing = await this.rsvpModel
         .findOne({ event: eventId, user: userId, status: { $ne: RsvpStatus.GEKANSELLEER } })
@@ -217,6 +216,12 @@ export class RsvpService {
         const rsvp = await this.rsvpModel.findById(rsvpId).exec();
         if (!rsvp) throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);
 
+        // Idempotent: 'n dubbele-tik of herhaalde versoek op 'n reeds-gekanselleerde
+        // RSVP moet nie kapasiteit 'n tweede keer aftrek nie.
+        if (rsvp.status === RsvpStatus.GEKANSELLEER) {
+            return;
+        }
+
         const event = await this.eventsService.findById(rsvp.event.toString());
 
         // 'n Gebruiker mag altyd sy eie RSVP kanselleer; om iemand anders s'n te
@@ -232,8 +237,7 @@ export class RsvpService {
         rsvp.status = RsvpStatus.GEKANSELLEER;
         await rsvp.save();
 
-        event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
-        await event.save();
+        await this.eventsService.decrementConfirmedAttendees(event._id.toString());
 
         // Ongewone geval: iemand wat reeds ingeteken is se RSVP word daarna
         // gekanselleer -- moenie hulle steeds as "bygewoon" tel nie.
@@ -245,6 +249,16 @@ export class RsvpService {
         // registreerder kanselleer nie -- kanselleer dit ook, wat sy eie plek vrystel.
         if (rsvp.plusOneRsvpId) {
             await this.cancelLinkedPlusOne(rsvp.plusOneRsvpId.toString());
+        }
+
+        // Omgekeerde geval: as DIT die +1-gas se eie RSVP is wat hier gekanselleer
+        // word (bv. 'n admin kanselleer net die gas se ry), moet die hoof-
+        // registreerder se plusOneRsvpId nie na 'n dooie dokument bly wys nie.
+        if (rsvp.primaryRsvpId) {
+            await this.rsvpModel.updateOne(
+                { _id: rsvp.primaryRsvpId },
+                { $set: { plusOneRsvpId: null } },
+            ).exec();
         }
 
         if (rsvp.user && (rsvp.googleCalendarEventId || rsvp.outlookCalendarEventId)) {
@@ -267,12 +281,10 @@ export class RsvpService {
         plusOneRsvp.status = RsvpStatus.GEKANSELLEER;
         await plusOneRsvp.save();
 
-        const event = await this.eventsService.findById(plusOneRsvp.event.toString());
-        event.confirmedAttendees = Math.max(0, event.confirmedAttendees - 1);
-        await event.save();
+        await this.eventsService.decrementConfirmedAttendees(plusOneRsvp.event.toString());
 
         if (wasCheckedIn) {
-            await this.eventsService.decrementCheckedInCount(event._id.toString());
+            await this.eventsService.decrementCheckedInCount(plusOneRsvp.event.toString());
         }
     }
 
@@ -338,6 +350,10 @@ export class RsvpService {
             }
         }
 
+        if (rsvp.status === RsvpStatus.GEKANSELLEER) {
+            throw new ConflictException('Hierdie RSVP is gekanselleer');
+        }
+
         return toBuffer(rsvp.qrPayload);
     }
 
@@ -354,6 +370,9 @@ export class RsvpService {
         const event = await this.eventsService.findById(rsvp.event.toString());
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
 
+        if (rsvp.status === RsvpStatus.GEKANSELLEER) {
+            throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
+        }
         if (rsvp.checkedIn) {
             throw new ConflictException('Gas het reeds ingecheck');
         }

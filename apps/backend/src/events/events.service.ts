@@ -164,25 +164,25 @@ export class EventsService {
         throw new ConflictException('Hierdie geleentheid is vol bespreek');
     }
 
-    async decrementConfirmedAttendees(id: string, amount: number= 1): Promise<EventDocument> {
+    async decrementConfirmedAttendees(id: string, amount: number = 1): Promise<EventDocument> {
         if (!isValidObjectId(id)) {
             throw new NotFoundException(`Event ${id} not found`);
         }
 
         const updated = await this.eventModel.findOneAndUpdate(
             { _id: id, confirmedAttendees: { $gte: amount } },
-            { $inc: { confirmedAttendees: -amount} },
+            { $inc: { confirmedAttendees: -amount } },
             { new: true },
         ).exec();
 
         if (updated) return updated;
 
-        // Kon nie volle 'amount' aftrek sonder om onder 0 te gaan nie
-        // Stel dit eerder na 0 sodat die 'clamp by zero' gedrag as die ou
-        // nie-atomiese kode fit verwag
-        const clamped = await this.eventModel.findOneAndUpdate (
+        // Kan nie die volle `amount` aftrek sonder om onder 0 te gaan nie --
+        // stel dit eerder direk op 0 (dieselfde "clamp by zero" gedrag as
+        // die ou nie-atomiese kode wat dit vervang).
+        const clamped = await this.eventModel.findOneAndUpdate(
             { _id: id },
-            { $set: { confirmedAttendees: 0} },
+            { $set: { confirmedAttendees: 0 } },
             { new: true },
         ).exec();
 
