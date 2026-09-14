@@ -88,6 +88,7 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     sellsTickets: event.sellsTickets,
                     ticketPrice: event.ticketPrice !== null ? String(event.ticketPrice) : '',
                     ticketsAvailable: event.ticketsAvailable !== null ? String(event.ticketsAvailable) : '',
+                    allowsPlusOne: event.allowsPlusOne,
                 }}
             />
         </div>

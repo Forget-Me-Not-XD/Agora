@@ -33,6 +33,7 @@ export class EventResponseDto {
     sellsTickets!: boolean;
     ticketPrice!: number | null;
     ticketsAvailable!: number | null;
+    allowsPlusOne!: boolean;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -61,6 +62,7 @@ export class EventResponseDto {
             sellsTickets:               event.sellsTickets,
             ticketPrice:                event.ticketPrice,
             ticketsAvailable:           event.ticketsAvailable,
+            allowsPlusOne:              event.allowsPlusOne,
             createdAt:                  event.createdAt!,
             updatedAt:                  event.updatedAt!,
         };

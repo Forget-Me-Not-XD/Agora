@@ -23,9 +23,15 @@ export default function RsvpModal({ event }: RsvpModalProps) {
     const [open, setOpen]                   = useState(false);
     const [loading, setLoading]             = useState(false);
     const [qrDataUri, setQrDataUri]         = useState<string | null>(null);
+    const [plusOneQrDataUri, setPlusOneQrDataUri] = useState<string | null>(null);
     const [error, setError]                 = useState<string | null>(null);
     const [syncedToGoogle, setSyncedGoogle]   = useState(false);
     const [syncedToOutlook, setSyncedOutlook] = useState(false);
+    const [wantsPlusOne, setWantsPlusOne]     = useState(false);
+    const [plusOneName, setPlusOneName]       = useState('');
+    const [plusOneSurname, setPlusOneSurname] = useState('');
+    const [plusOneEmail, setPlusOneEmail]     = useState('');
+    const [plusOneError, setPlusOneError]     = useState<string | null>(null);
 
     const isFull = event.confirmedAttendees >= event.maxCapacity;
     const isPast = deriveStatus(event) === 'past';
@@ -36,19 +42,37 @@ export default function RsvpModal({ event }: RsvpModalProps) {
         setOpen(false);
         setLoading(false);
         setQrDataUri(null);
+        setPlusOneQrDataUri(null);
         setError(null);
         setSyncedGoogle(false);
         setSyncedOutlook(false);
+        setWantsPlusOne(false);
+        setPlusOneName('');
+        setPlusOneSurname('');
+        setPlusOneEmail('');
+        setPlusOneError(null);
     }
 
     async function handleConfirm() {
+        if (wantsPlusOne && (!plusOneName.trim() || !plusOneSurname.trim() || !plusOneEmail.trim())) {
+            setPlusOneError('Vul asseblief jou +1 se naam, van en e-pos in.');
+            return;
+        }
+        setPlusOneError(null);
+
         setLoading(true);
         setError(null);
-        const results = await rsvpToEventAction(event.id);
+        const results = await rsvpToEventAction(
+            event.id,
+            wantsPlusOne
+                ? { name: plusOneName.trim(), surname: plusOneSurname.trim(), email: plusOneEmail.trim() }
+                : undefined,
+        );
         if (results.error) {
             setError(results.error);
         } else {
             setQrDataUri(results.qrDataUri ?? null);
+            setPlusOneQrDataUri(results.plusOneQrDataUri ?? null);
             setSyncedGoogle(results.syncedToGoogle ?? false);
             setSyncedOutlook(results.syncedToOutlook ?? false);
         }
@@ -104,6 +128,14 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={qrDataUri} alt="RSVP QR-kode" className="w-44 h-44 rounded-lg border border-[var(--color-border)]" />
                                     <p className="text-sm font-medium text-[var(--color-text)]">Wys hierdie QR-kode by die deur</p>
+
+                                    {plusOneQrDataUri && (
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={plusOneQrDataUri} alt="+1 se QR-kode" className="w-44 h-44 rounded-lg border border-[var(--color-border)]" />
+                                            <p className="text-sm font-medium text-[var(--color-text)]">Jou +1 se QR-kode &mdash; wys dit ook by die deur</p>
+                                        </>
+                                    )}
 
                                     {(syncedToGoogle || syncedToOutlook) && (
                                         <div className="w-full space-y-1.5">
@@ -162,6 +194,50 @@ export default function RsvpModal({ event }: RsvpModalProps) {
                                             <span>{availableSpots} plekke beskikbaar</span>
                                         </div>
                                     </div>
+
+                                    {event.allowsPlusOne && (
+                                        <div className="space-y-2 pt-1">
+                                            <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={wantsPlusOne}
+                                                    onChange={(e) => setWantsPlusOne(e.target.checked)}
+                                                    className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                                                />
+                                                Bring 'n +1
+                                            </label>
+
+                                            {wantsPlusOne && (
+                                                <div className="space-y-2">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+1 se naam"
+                                                        value={plusOneName}
+                                                        onChange={(e) => setPlusOneName(e.target.value)}
+                                                        className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none focus:border-[var(--color-primary)] transition-colors"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="+1 se van"
+                                                        value={plusOneSurname}
+                                                        onChange={(e) => setPlusOneSurname(e.target.value)}
+                                                        className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none focus:border-[var(--color-primary)] transition-colors"
+                                                    />
+                                                    <input
+                                                        type="email"
+                                                        placeholder="+1 se e-pos"
+                                                        value={plusOneEmail}
+                                                        onChange={(e) => setPlusOneEmail(e.target.value)}
+                                                        className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none focus:border-[var(--color-primary)] transition-colors"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {plusOneError && (
+                                                <p className="text-xs text-[var(--color-red)]">{plusOneError}</p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className="flex gap-2 pt-2">
                                         <button

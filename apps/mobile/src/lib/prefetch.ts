@@ -67,6 +67,13 @@ export function takeMyRsvpsPrefetch(): Promise<RsvpWithEvent[]> | null {
   return promise;
 }
 
+// Geroep ná enige mutasie wat die gebruiker se RSVP-lys verander (RSVP, kansellasie,
+// kaartjie-aankoop) -- sonder hierdie sou 'n nog-ongebruikte, vooraf-gelaaide
+// momentopname van vóór die mutasie steeds aan die RSVP-oortjie gegee word.
+export function clearMyRsvpsPrefetch(): void {
+  myRsvpsPromise = null;
+}
+
 export function takePredictionPrefetch(): Promise<PredictionResult | null> | null {
   const promise = ifFresh(predictionPromise);
   predictionPromise = null;

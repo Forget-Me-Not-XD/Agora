@@ -29,6 +29,7 @@ export interface Event {
     sellsTickets:             boolean;
     ticketPrice:              number | null;
     ticketsAvailable:         number | null;
+    allowsPlusOne:            boolean;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -53,6 +54,18 @@ export interface CreateEventPayload {
     sellsTickets?:             boolean;
     ticketPrice?:              number;
     ticketsAvailable?:         number;
+    allowsPlusOne?:            boolean;
+}
+
+export interface Venue {
+    id:          string;
+    label:       string;
+    campus:      string;
+    maxCapacity: number;
+}
+
+export async function getVenues(): Promise<Venue[]> {
+    return apiFetch<Venue[]>('/api/v1/events/venues');
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;

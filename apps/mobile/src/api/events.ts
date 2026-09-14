@@ -25,6 +25,7 @@ export interface EventResponse {
   sellsTickets: boolean;
   ticketPrice: number | null;
   ticketsAvailable: number | null;
+  allowsPlusOne: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,7 @@ export interface CreateEventPayload {
   sellsTickets?: boolean;
   ticketPrice?: number;
   ticketsAvailable?: number;
+  allowsPlusOne?: boolean;
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;
@@ -56,6 +58,17 @@ export interface AssignPhotographerPayload {
   photographerId: string;
   brief: string;
 } 
+
+export interface Venue {
+  id: string;
+  label: string;
+  campus: string;
+  maxCapacity: number;
+}
+
+export async function getVenues(): Promise<Venue[]> {
+  return apiClient.get<Venue[]>('/events/venues');
+}
 
 export async function listEvents(from?: string, to?: string): Promise <EventResponse[]> {
   const params = new URLSearchParams();

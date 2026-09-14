@@ -1,12 +1,12 @@
 'use client';
 
 // ========== Imports: ==========
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useCurrentUser } from '@/components/UserContext';
 import { canCreateEvents } from '@/lib/rbac';
-import { createEventAction, updateEventAction } from '@/lib/actions/event.actions';
+import { createEventAction, updateEventAction, getVenuesAction } from '@/lib/actions/event.actions';
 import { ATTENDANCE_OPTIONS, type AttendanceRole } from '@/lib/attendance';
 import type { EventType } from '@/lib/api/events';
 import DatePicker from '@/components/DatePicker';
@@ -16,14 +16,7 @@ import FinanceAssigneeSelect from '@/components/FinanceAssigneeSelect';
 import TimeRangeInput from '@/components/TimeRangeInput';
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
 import type { PlaceDetails } from '@/lib/api/places';
-
-const STUDY_CENTERS = [
-    'Centurion - Leriba',
-    'Centurion - Gerhard straat',
-    'Paarl',
-    'George',
-    'Somerset Wes',
-];
+import type { Venue } from '@/lib/api/events';
 
 export interface EventFormValues {
     title:              string;
@@ -46,6 +39,7 @@ export interface EventFormValues {
     sellsTickets:       boolean;
     ticketPrice:        string;
     ticketsAvailable:   string;
+    allowsPlusOne:      boolean;
 }
 
 interface EventFormProps {
@@ -63,6 +57,40 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     const [apiError, setApiError]       = useState<string | null>(null);
     const [isPending, startTransition]  = useTransition();
     const [errors, setErrors]           = useState<Record<string, string>>({});
+
+    const [venues, setVenues] = useState<Venue[]>([]);
+    const [venuesError, setVenuesError] = useState<string | null>(null);
+    const [useVenue, setUseVenue] = useState(false);
+    const [venueId, setVenueId] = useState('');
+
+    useEffect(() => {
+        getVenuesAction().then((result) => {
+            if (result.error) {
+                setVenuesError(result.error);
+            } else {
+                setVenues(result.venues ?? []);
+            }
+        });
+    }, []);
+
+    useEffect(() => {
+        setVenueId('');
+    }, [formData.studyCenter]);
+
+    const campuses = Array.from(new Set(venues.map((v) => v.campus)));
+    const studyCenters = campuses.includes(formData.studyCenter) || !formData.studyCenter
+        ? campuses
+        : [formData.studyCenter, ...campuses];
+    const campusVenues = venues.filter((v) => v.campus === formData.studyCenter);
+    const selectedVenue = campusVenues.find((v) => v.id === venueId);
+
+    useEffect(() => {
+        if (useVenue && selectedVenue) {
+          setFormData((prev) => ({ ...prev, location: `${selectedVenue.campus} - ${selectedVenue.label}` }));
+        }
+    }, [useVenue, selectedVenue]);
+
+    
 
     if (mode === 'create' && !canCreateEvents(user.role)) {
         return (
@@ -88,9 +116,13 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
             e.endTime = 'Eindtyd moet na begintyd wees';
         }
         if (!formData.location.trim()) e.location = 'Ligging is verpligtend';
+        if (useVenue && !venueId) e.location = "Kies asseblief 'n lokaal";
         if (mode === 'create' && !formData.placeId) e.address = 'Kies \'n geldige adres uit die soeklys';
         if (!formData.capacity || Number(formData.capacity) <= 0)
-            e.capacity = 'Geldige kapasiteit is verpligtend';
+             e.capacity = 'Geldige kapasiteit is verpligtend';
+        if (useVenue && selectedVenue && Number(formData.capacity) > selectedVenue.maxCapacity) {
+             e.capacity = `${selectedVenue.label} se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit`;
+}
         if (formData.budget === '' || Number(formData.budget) < 0)
             e.budget = 'Geldige begroting is verpligtend';
         if (formData.sellsTickets) {
@@ -129,6 +161,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 sellsTickets:       formData.sellsTickets,
                 ticketPrice:        formData.sellsTickets ? Number(formData.ticketPrice) : undefined,
                 ticketsAvailable:   formData.sellsTickets ? Number(formData.ticketsAvailable) : undefined,
+                allowsPlusOne:      formData.allowsPlusOne,
             };
 
             if (mode === 'create') {
@@ -233,20 +266,58 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                     endError={errors.endTime}
                 />
 
-                <div>
-                    <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">
-                        Ligging
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Saal, gebou, ens..."
-                        value={formData.location}
-                        onChange={(e) => handleChange('location', e.target.value)}
-                        className={inputClass('location')}
-                    />
-                    {errors.location && (
-                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.location}</p>
-                    )}
+            <div>
+                <div className="flex items-center justify-between mb-1.5">
+                 <label className="text-xs font-medium text-[var(--color-text-subtle)]">Ligging</label>
+                <button
+                 type="button"
+                 onClick={() => { setUseVenue((v) => !v); setVenueId(''); }}
+                 className="text-xs text-[var(--color-primary)] hover:underline"
+                >
+                    {useVenue ? 'Gebruik vrye adres' : 'Kies Akademia-lokaal'}
+                </button>
+            </div>
+
+        {useVenue ? (
+            <>
+                <select
+                    value={venueId}
+                    onChange={(e) => setVenueId(e.target.value)}
+                    className={inputClass('location')}
+                >
+                    <option value="">Kies 'n lokaal...</option>
+                    {campusVenues.map((v) => (
+                    <option key={v.id} value={v.id}>
+
+                        {v.label} (maks. {v.maxCapacity})
+
+                    </option>
+                ))}
+            </select>
+
+            {selectedVenue && (
+                <p className="text-xs text-[var(--color-text-subtle)] mt-1">
+                    Maksimum kapasiteit vir {selectedVenue.label}: {selectedVenue.maxCapacity}
+                </p>
+            )}
+            {venuesError && (
+                <p className="text-xs text-[var(--color-red)] mt-1">
+                    Kon nie lokale laai nie: {venuesError}
+                </p>
+            )}
+        </>
+    ):(
+        <input
+            type="text"
+            placeholder="Saal, gebou, ens..."
+            value={formData.location}
+            onChange={(e) => handleChange('location', e.target.value)}
+            className={inputClass('location')}
+        />
+    )}
+            {errors.location && (
+                  <p className="text-xs text-[var(--color-red)] mt-1">{errors.location}</p>
+              )}
                 </div>
 
                 <div>
@@ -294,7 +365,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                             onChange={(e) => handleChange('studyCenter', e.target.value)}
                             className={inputClass('studyCenter')}
                         >
-                            {STUDY_CENTERS.map((c) => (
+                            {studyCenters.map((c) => (
                                 <option key={c} value={c}>{c}</option>
                             ))}
                         </select>
@@ -413,6 +484,16 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                         </div>
                     )}
                 </div>
+
+                <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
+                    <input
+                        type="checkbox"
+                        checked={formData.allowsPlusOne}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, allowsPlusOne: e.target.checked }))}
+                        className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                    />
+                    Gaste kan 'n gas by hul RSVP voeg
+                </label>
 
                 {apiError && (
                     <div

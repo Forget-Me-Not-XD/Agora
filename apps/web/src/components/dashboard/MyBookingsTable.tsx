@@ -3,7 +3,7 @@ import type { MyRsvp } from '@/lib/api/rsvp';
 import { formatDateShort } from '@/lib/format-date';
 import RsvpQrButton from '@/components/RsvpQrButton';
 import { Pill } from '@/components/ui/Pill';
-import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
+import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE, buildMapsUrl, fullName } from '@/lib/rsvp-view';
 
 export default function MyBookingsTable({ data, attendeeName }: { data: MyRsvp[]; attendeeName: string }) {
     if (data.length === 0) {
@@ -55,21 +55,29 @@ export default function MyBookingsTable({ data, attendeeName }: { data: MyRsvp[]
                                     {RSVP_STATUS_LABEL[r.status]}
                                 </Pill>
                             </td>
-                            <td className="py-2.5 text-right">
+                            <td className="py-2.5 text-right space-x-3 whitespace-nowrap">
                                 <RsvpQrButton
                                     rsvpId={r._id}
                                     eventTitle={r.event?.title ?? 'Geleentheid'}
                                     eventDate={r.event ? formatDateShort(r.event.date) : ''}
                                     eventLocation={r.event?.location ?? ''}
                                     eventAddress={r.event?.address ?? ''}
-                                    mapsUrl={
-                                        r.event?.lat != null && r.event?.lon != null
-                                            ? `https://www.google.com/maps/search/?api=1&query=${r.event.lat},${r.event.lon}`
-                                            : null
-                                    }
+                                    mapsUrl={buildMapsUrl(r.event?.lat, r.event?.lon)}
                                     attendeeName={attendeeName}
                                     disabled={r.status === 'GEKANSELLEER'}
                                 />
+                                {r.plusOneRsvpId && (
+                                    <RsvpQrButton
+                                        rsvpId={r.plusOneRsvpId}
+                                        eventTitle={r.event?.title ?? 'Geleentheid'}
+                                        eventDate={r.event ? formatDateShort(r.event.date) : ''}
+                                        eventLocation={r.event?.location ?? ''}
+                                        eventAddress={r.event?.address ?? ''}
+                                        mapsUrl={buildMapsUrl(r.event?.lat, r.event?.lon)}
+                                        attendeeName={fullName(r.plusOneName, r.plusOneSurname)}
+                                        label="+1 QR-kode"
+                                    />
+                                )}
                             </td>
                         </tr>
                     ))}

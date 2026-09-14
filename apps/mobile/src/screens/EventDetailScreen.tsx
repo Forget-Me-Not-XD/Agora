@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -19,7 +19,7 @@ import {
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getEvent, createEvent, type EventResponse } from '../api/events';
+import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
 import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput';
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
@@ -28,6 +28,7 @@ import type { PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
 import { typography } from '../theme/typography';
+import { clearMyRsvpsPrefetch } from '../lib/prefetch';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -41,6 +42,10 @@ export function EventDetailScreen() {
   const isDark = useIsDark();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [wantsPlusOne, setWantsPlusOne] = useState(false);
+  const [plusOneName, setPlusOneName] = useState('');
+  const [plusOneSurname, setPlusOneSurname] = useState('');
+  const [plusOneEmail, setPlusOneEmail] = useState('');
 
   const isCreating = route.params.eventId === 'new';
 
@@ -145,12 +150,27 @@ export function EventDetailScreen() {
   }
 
   async function handleRsvp() {
+    if (wantsPlusOne) {
+      if (!plusOneName.trim() || !plusOneSurname.trim() || !plusOneEmail.trim()) {
+        Alert.alert('RSVP', 'Vul asseblief jou +1 se naam, van en e-pos in.', [{ text: 'OK' }]);
+        return;
+      }
+    }
+
     setRsvpSubmitting(true);
     try {
-      await createRsvp(event!.id);
+      await createRsvp(
+        event!.id,
+        wantsPlusOne
+          ? { name: plusOneName.trim(), surname: plusOneSurname.trim(), email: plusOneEmail.trim() }
+          : undefined,
+      );
+      clearMyRsvpsPrefetch();
       Alert.alert(
         'Ingeskryf!',
-        'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
+        wantsPlusOne
+          ? 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode, en jou +1 s\'n, onder die RSVP-oortjie.'
+          : 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
         [{ text: 'OK' }],
       );
     } catch (err: unknown) {
@@ -189,7 +209,15 @@ export function EventDetailScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* ── Title block ── */}
         <View style={styles.titleBlock}>
@@ -321,25 +349,83 @@ export function EventDetailScreen() {
           event.sellsTickets ? (
             <PaymentModal event={event} />
           ) : (
-            <TouchableOpacity
-              style={[styles.primaryBtn, rsvpSubmitting && styles.btnDisabled]}
-              onPress={handleRsvp}
-              disabled={rsvpSubmitting}
-              accessibilityLabel="RSVP vir hierdie funksie"
-            >
-              {rsvpSubmitting ? (
-                <ActivityIndicator color={colors.surface} />
-              ) : (
-                <>
-                  <Feather name="check-circle" size={16} color={colors.surface} />
-                  <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
-                </>
+            <>
+              {event.allowsPlusOne && (
+                <View style={styles.detailsCard}>
+                  <View style={styles.ticketToggleRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.fieldLabel}>Bring 'n +1</Text>
+                      <Text style={styles.fieldHint}>Voeg 'n gas by jou RSVP</Text>
+                    </View>
+                    <Switch
+                      value={wantsPlusOne}
+                      onValueChange={setWantsPlusOne}
+                      disabled={rsvpSubmitting}
+                      trackColor={{ false: colors.border, true: colors.primary }}
+                      thumbColor={colors.surface}
+                    />
+                  </View>
+
+                  {wantsPlusOne && (
+                    <>
+                      <Text style={styles.fieldLabel}>+1 se naam *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Naam"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneName}
+                        onChangeText={setPlusOneName}
+                        editable={!rsvpSubmitting}
+                        returnKeyType="next"
+                      />
+                      <Text style={styles.fieldLabel}>+1 se van *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Van"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneSurname}
+                        onChangeText={setPlusOneSurname}
+                        editable={!rsvpSubmitting}
+                        returnKeyType="next"
+                      />
+                      <Text style={styles.fieldLabel}>+1 se e-pos *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e-pos@voorbeeld.com"
+                        placeholderTextColor={colors.textSubtle}
+                        value={plusOneEmail}
+                        onChangeText={setPlusOneEmail}
+                        editable={!rsvpSubmitting}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        returnKeyType="done"
+                      />
+                    </>
+                  )}
+                </View>
               )}
-            </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, rsvpSubmitting && styles.btnDisabled]}
+                onPress={handleRsvp}
+                disabled={rsvpSubmitting}
+                accessibilityLabel="RSVP vir hierdie funksie"
+              >
+                {rsvpSubmitting ? (
+                  <ActivityIndicator color={colors.surface} />
+                ) : (
+                  <>
+                    <Feather name="check-circle" size={16} color={colors.surface} />
+                    <Text style={styles.primaryBtnText}>RSVP vir hierdie funksie</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
           )
         )}
 
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -368,6 +454,7 @@ function CreateEventForm({
   const [sellsTickets, setSellsTickets] = useState(false);
   const [ticketPrice, setTicketPrice] = useState('');
   const [ticketsAvailable, setTicketsAvailable] = useState('');
+  const [allowsPlusOne, setAllowsPlusOne] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -375,6 +462,27 @@ function CreateEventForm({
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [predictionUnavailable, setPredictionUnavailable] = useState(false);
   const [predictionErrorDetail, setPredictionErrorDetail] = useState<string | null>(null);
+
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [useVenue, setUseVenue] = useState(false);
+  const [selectedCampus, setSelectedCampus] = useState('');
+  const [venueId, setVenueId] = useState('');
+
+  useEffect(() => {
+
+  getVenues().then(setVenues).catch(() => setVenues([]));
+
+  }, []);
+
+  const campuses = Array.from(new Set(venues.map((v) => v.campus)));
+  const campusVenues = venues.filter((v) => v.campus === selectedCampus);
+  const selectedVenue = campusVenues.find((v) => v.id === venueId);
+
+useEffect(() => {
+  if (useVenue && selectedVenue) {
+    setLocation(`${selectedVenue.campus} - ${selectedVenue.label}`);
+  }
+}, [useVenue, selectedVenue]);
 
   useEffect(() => {
     const cap = parseInt(maxCapacity, 10);
@@ -460,6 +568,18 @@ function CreateEventForm({
       return;
     }
 
+    if (useVenue) {
+      if (!selectedVenue) {
+        setError('Kies asseblief \'n lokaal.');
+        return;
+      }
+
+      if (cap > selectedVenue.maxCapacity) {
+        setError(`${selectedVenue.label} (${selectedVenue.campus}) se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit.`);
+        return;
+      }
+    }
+
     let budgetNum: number | undefined;
     if (budget.trim()) {
       budgetNum = Number(budget);
@@ -517,6 +637,7 @@ function CreateEventForm({
         sellsTickets,
         ticketPrice: sellsTickets ? ticketPriceNum : undefined,
         ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
+        allowsPlusOne,
       });
       safeGoBack(navigation);
     } catch (err: unknown) {
@@ -542,6 +663,10 @@ function CreateEventForm({
         backDisabled={isSubmitting}
       />
 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -654,16 +779,74 @@ function CreateEventForm({
             />
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Ligging *</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="bv. Hoofsaal, Kampus A"
-            placeholderTextColor={colors.textSubtle}
-            value={location}
-            onChangeText={setLocation}
-            editable={!isSubmitting}
-            returnKeyType="next"
-          />
+          <View style={styles.venueToggleRow}>
+              <Text style={styles.fieldLabel}>Ligging *</Text>
+                  <TouchableOpacity
+                       onPress={() => {
+                          setUseVenue((v) => !v);
+                          setVenueId('');
+                          setSelectedCampus('');
+                        }}
+                    disabled={isSubmitting}
+          >
+
+          <Text style={styles.venueToggleText}>
+            {useVenue ? 'Gebruik vrye teks' : 'Kies Akademia-lokaal'}
+          </Text>
+                </TouchableOpacity>
+          </View>
+
+      {useVenue ? (
+      <>
+        <View style={styles.chipRow}>
+           {campuses.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.chip, selectedCampus === c && styles.chipActive]}
+                onPress={() => { setSelectedCampus(c); setVenueId(''); }}
+                disabled={isSubmitting}
+        >
+          <Text style={[styles.chipText, selectedCampus === c && styles.chipTextActive]}>{c}</Text>
+
+              </TouchableOpacity>
+      ))}
+
+        </View>
+
+    {selectedCampus !== '' && (
+      <View style={styles.chipRow}>
+        {campusVenues.map((v) => (
+          <TouchableOpacity
+            key={v.id}
+            style={[styles.chip, venueId === v.id && styles.chipActive]}
+            onPress={() => setVenueId(v.id)}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.chipText, venueId === v.id && styles.chipTextActive]}>
+              {v.label} (maks. {v.maxCapacity})
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )}
+
+    {selectedVenue && (
+      <Text style={styles.fieldHint}>
+        Maksimum kapasiteit vir {selectedVenue.label}: {selectedVenue.maxCapacity}
+      </Text>
+    )}
+   </>
+            ):(
+              <TextInput
+                style={styles.textInput}
+                placeholder="bv. Hoofsaal, Kampus A"
+                placeholderTextColor={colors.textSubtle}
+                value={location}
+                onChangeText={setLocation}
+                editable={!isSubmitting}
+                returnKeyType="next"
+              />
+          )}
 
           <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Adres *</Text>
           <AddressAutocompleteInput
@@ -737,6 +920,20 @@ function CreateEventForm({
               </View>
             </View>
           )}
+
+          <View style={styles.ticketToggleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fieldLabel}>Laat +1 toe</Text>
+              <Text style={styles.fieldHint}>Gaste kan 'n gas by hul RSVP voeg</Text>
+            </View>
+            <Switch
+              value={allowsPlusOne}
+              onValueChange={setAllowsPlusOne}
+              disabled={isSubmitting}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -828,6 +1025,7 @@ function CreateEventForm({
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -1087,6 +1285,45 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontWeight: '900',
       color: colors.text,
     },
+
+    venueToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  venueToggleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.background,
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textSubtle,
+  },
+  chipTextActive: {
+    color: colors.surface,
+  },
 
     predictionCard: {
       backgroundColor: colors.surface,

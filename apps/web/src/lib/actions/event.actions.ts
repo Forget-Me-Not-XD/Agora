@@ -1,8 +1,8 @@
 'use server';
 
 // ========== Imports: ==========
-import { createEvent, getEvents, updateEvent } from '@/lib/api/events';
-import type { CreateEventPayload, Event, EventFilters, UpdateEventPayload } from '@/lib/api/events';
+import { createEvent, getEvents, getVenues, updateEvent } from '@/lib/api/events';
+import type { CreateEventPayload, Event, EventFilters, UpdateEventPayload, Venue } from '@/lib/api/events';
 
 export interface CreateEventResult {
     id?:    string;
@@ -43,5 +43,19 @@ export async function listEventsAction(filters?: EventFilters): Promise<ListEven
         return { events };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Kon nie geleenthede laai nie.' };
+    }
+}
+
+export interface ListVenuesResult {
+    venues?: Venue[];
+    error?:  string;
+}
+
+export async function getVenuesAction(): Promise<ListVenuesResult> {
+    try {
+        const venues = await getVenues();
+        return { venues };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie lokale laai nie.' };
     }
 }

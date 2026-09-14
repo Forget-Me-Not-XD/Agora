@@ -15,6 +15,10 @@ export interface RsvpResponse {
     checkedInAt:             string | null;
     googleCalendarEventId:   string | null;
     outlookCalendarEventId:  string | null;
+    plusOneName?:            string;
+    plusOneSurname?:         string;
+    plusOneEmail?:           string;
+    plusOneRsvpId?:          string;
     createdAt:               string;
     updatedAt:               string;
 }
@@ -46,6 +50,10 @@ export interface MyRsvp {
     checkedInAt: string | null;
     paid:        boolean;
     payment:     string | null;
+    plusOneName?:    string;
+    plusOneSurname?: string;
+    plusOneEmail?:   string;
+    plusOneRsvpId?:  string;
     createdAt:   string;
     updatedAt:   string;
 }
@@ -57,7 +65,13 @@ async function throwHttpError(res: Response): Promise<never> {
 }
 
 // POST /api/v1/rsvp — 409 reeds ingeskryf, 409 vol bespreek, 400 ongeldige eventId
-export async function createRsvp(eventId: string): Promise<RsvpResponse> {
+export interface CreateRsvpPlusOne {
+    name:    string;
+    surname: string;
+    email:   string;
+}
+
+export async function createRsvp(eventId: string, plusOne?: CreateRsvpPlusOne): Promise<RsvpResponse> {
     const token = getToken();
 
     const res = await fetch(`${BASE_URL}/api/v1/rsvp`, {
@@ -66,7 +80,12 @@ export async function createRsvp(eventId: string): Promise<RsvpResponse> {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body:  JSON.stringify({ eventId }),
+        body: JSON.stringify({
+            eventId,
+            plusOneName:    plusOne?.name,
+            plusOneSurname: plusOne?.surname,
+            plusOneEmail:   plusOne?.email,
+        }),
         cache: 'no-store',
     });
 

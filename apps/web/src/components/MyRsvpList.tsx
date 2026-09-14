@@ -9,7 +9,7 @@ import { usePollWhileActive } from '@/lib/user-activity';
 import { cancelRsvpAction, getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
 import RsvpQrButton from '@/components/RsvpQrButton';
 import { Pill } from '@/components/ui/Pill';
-import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE } from '@/lib/rsvp-view';
+import { RSVP_STATUS_LABEL, RSVP_STATUS_TONE, buildMapsUrl, fullName } from '@/lib/rsvp-view';
 import DateRangePicker from '@/components/DateRangePicker';
 
 const FILTERS: { value: RsvpStatus | 'alles'; label: string }[] = [
@@ -242,14 +242,23 @@ export default function MyRsvpList({ initialRsvps, initialDateFrom, initialDateT
                                         eventDate={r.event ? formatDateLong(r.event.date) : ''}
                                         eventLocation={r.event?.location ?? ''}
                                         eventAddress={r.event?.address ?? ''}
-                                        mapsUrl={
-                                            r.event?.lat != null && r.event?.lon != null
-                                                ? `https://www.google.com/maps/search/?api=1&query=${r.event.lat},${r.event.lon}`
-                                                : null
-                                        }
+                                        mapsUrl={buildMapsUrl(r.event?.lat, r.event?.lon)}
                                         attendeeName={attendeeName}
                                         disabled={isCancelled}
                                     />
+
+                                    {r.plusOneRsvpId && (
+                                        <RsvpQrButton
+                                            rsvpId={r.plusOneRsvpId}
+                                            eventTitle={r.event?.title ?? 'Geleentheid'}
+                                            eventDate={r.event ? formatDateLong(r.event.date) : ''}
+                                            eventLocation={r.event?.location ?? ''}
+                                            eventAddress={r.event?.address ?? ''}
+                                            mapsUrl={buildMapsUrl(r.event?.lat, r.event?.lon)}
+                                            attendeeName={fullName(r.plusOneName, r.plusOneSurname)}
+                                            label="+1 QR-kode"
+                                        />
+                                    )}
 
                                     {!isCancelled && (
                                         <div className="ml-auto flex items-center gap-2">
