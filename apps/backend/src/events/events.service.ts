@@ -14,6 +14,7 @@ import { EXCHANGES, ROUTING_KEYS, PhotographerAssignedEvent } from '../messaging
 import { UsersService } from '../users/users.service';
 import { PlacesService } from '../places/places.service';
 import { PlaceDetailsDto } from '../places/dto/place-details.dto';
+import { findVenueByLocation, VENUES } from './data/venues';
 
 @Injectable()
 export class EventsService {
@@ -29,7 +30,8 @@ export class EventsService {
         const end   = dto.endDate ? new Date(dto.endDate) : undefined;
         this.assertEndAfterStart(start, end);
         this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
-
+        this.assertVenueCapacity(dto.location, dto.maxCapacity);
+        
         if (dto.assignedTo) {
             await this.assertValidAssignee(dto.assignedTo);
         }
@@ -48,6 +50,14 @@ export class EventsService {
             assignedTo: dto.assignedTo ? new Types.ObjectId(dto.assignedTo) : null,
         });
         return created.save();
+    }
+
+    // Kry die vooraf-bepaalde lokaale vir die assert metodes
+
+    getVenues() {
+
+    return VENUES;
+    
     }
 
     // Herverifieer die adres bediener-kant teen Geoapify -- 'n kliënt se placeId/lat/lon
@@ -278,6 +288,7 @@ export class EventsService {
 
         this.assertEndAfterStart(event.date, event.endDate);
         this.assertTicketsWithinCapacity(event.sellsTickets, event.ticketsAvailable, event.maxCapacity);
+        this.assertVenueCapacity(event.location, event.maxCapacity);
 
         return event.save();
     }
@@ -368,6 +379,15 @@ export class EventsService {
         }
     }
 
+    private assertVenueCapacity(location: string, maxCapacity: number): void {
+    const venue = findVenueByLocation(location);
+    if (venue && maxCapacity > venue.maxCapacity) {
+        throw new BadRequestException(
+            `${venue.label} (${venue.campus}) se kapasiteit is ${venue.maxCapacity} - kies 'n groter lokaal of verlaag die verwagte bywoning`,
+        );
+    }
+}
+
     private assertTicketsWithinCapacity(
         sellsTickets: boolean | undefined,
         ticketsAvailable: number | null | undefined,
@@ -378,3 +398,5 @@ export class EventsService {
         }
     }
 }
+
+

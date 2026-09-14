@@ -19,7 +19,7 @@ import {
 import { canViewBudget, canManageCheckIns } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getEvent, createEvent, type EventResponse } from '../api/events';
+import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
 import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput';
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
@@ -376,6 +376,27 @@ function CreateEventForm({
   const [predictionUnavailable, setPredictionUnavailable] = useState(false);
   const [predictionErrorDetail, setPredictionErrorDetail] = useState<string | null>(null);
 
+  const [venues, setVenues] = useState<Venue[]>([]);
+  const [useVenue, setUseVenue] = useState(false);
+  const [selectedCampus, setSelectedCampus] = useState('');
+  const [venueId, setVenueId] = useState('');
+
+  useEffect(() => {
+
+  getVenues().then(setVenues).catch(() => setVenues([]));
+
+  }, []);
+
+  const campuses = Array.from(new Set(venues.map((v) => v.campus)));
+  const campusVenues = venues.filter((v) => v.campus === selectedCampus);
+  const selectedVenue = campusVenues.find((v) => v.id === venueId);
+
+useEffect(() => {
+  if (useVenue && selectedVenue) {
+    setLocation(`${selectedVenue.campus} - ${selectedVenue.label}`);
+  }
+}, [useVenue, selectedVenue]);
+
   useEffect(() => {
     const cap = parseInt(maxCapacity, 10);
     if (isNaN(cap) || cap <= 0) {
@@ -458,6 +479,18 @@ function CreateEventForm({
     if (isNaN(cap) || cap <= 0) {
       setError('Kapasiteit moet \'n positiewe getal wees.');
       return;
+    }
+
+    if (useVenue) {
+      if (!selectedVenue) {
+        setError('Kies asseblief \'n lokaal.');
+        return;
+      }
+
+      if (cap > selectedVenue.maxCapacity) {
+        setError(`${selectedVenue.label} (${selectedVenue.campus}) se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit.`);
+        return;
+      }
     }
 
     let budgetNum: number | undefined;
@@ -654,16 +687,74 @@ function CreateEventForm({
             />
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Ligging *</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="bv. Hoofsaal, Kampus A"
-            placeholderTextColor={colors.textSubtle}
-            value={location}
-            onChangeText={setLocation}
-            editable={!isSubmitting}
-            returnKeyType="next"
-          />
+          <View style={styles.venueToggleRow}>
+              <Text style={styles.fieldLabel}>Ligging *</Text>
+                  <TouchableOpacity
+                       onPress={() => {
+                          setUseVenue((v) => !v);
+                          setVenueId('');
+                          setSelectedCampus('');
+                        }}
+                    disabled={isSubmitting}
+          >
+
+          <Text style={styles.venueToggleText}>
+            {useVenue ? 'Gebruik vrye teks' : 'Kies Akademia-lokaal'}
+          </Text>
+                </TouchableOpacity>
+          </View>
+
+      {useVenue ? (
+      <>
+        <View style={styles.chipRow}>
+           {campuses.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={[styles.chip, selectedCampus === c && styles.chipActive]}
+                onPress={() => { setSelectedCampus(c); setVenueId(''); }}
+                disabled={isSubmitting}
+        >
+          <Text style={[styles.chipText, selectedCampus === c && styles.chipTextActive]}>{c}</Text>
+
+              </TouchableOpacity>
+      ))}
+
+        </View>
+
+    {selectedCampus !== '' && (
+      <View style={styles.chipRow}>
+        {campusVenues.map((v) => (
+          <TouchableOpacity
+            key={v.id}
+            style={[styles.chip, venueId === v.id && styles.chipActive]}
+            onPress={() => setVenueId(v.id)}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.chipText, venueId === v.id && styles.chipTextActive]}>
+              {v.label} (maks. {v.maxCapacity})
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )}
+
+    {selectedVenue && (
+      <Text style={styles.fieldHint}>
+        Maksimum kapasiteit vir {selectedVenue.label}: {selectedVenue.maxCapacity}
+      </Text>
+    )}
+   </>
+            ):(
+              <TextInput
+                style={styles.textInput}
+                placeholder="bv. Hoofsaal, Kampus A"
+                placeholderTextColor={colors.textSubtle}
+                value={location}
+                onChangeText={setLocation}
+                editable={!isSubmitting}
+                returnKeyType="next"
+              />
+          )}
 
           <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Adres *</Text>
           <AddressAutocompleteInput
@@ -1087,6 +1178,45 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontWeight: '900',
       color: colors.text,
     },
+
+    venueToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  venueToggleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.background,
+  },
+  chipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textSubtle,
+  },
+  chipTextActive: {
+    color: colors.surface,
+  },
 
     predictionCard: {
       backgroundColor: colors.surface,

@@ -57,6 +57,17 @@ export interface AssignPhotographerPayload {
   brief: string;
 } 
 
+export interface Venue {
+  id: string;
+  label: string;
+  campus: string;
+  maxCapacity: number;
+}
+
+export async function getVenues(): Promise<Venue[]> {
+  return apiClient.get<Venue[]>('/events/venues');
+}
+
 export async function listEvents(from?: string, to?: string): Promise <EventResponse[]> {
   const params = new URLSearchParams();
   if (from) params.set('from', from);

@@ -47,6 +47,11 @@ export class EventsController {
         );
         return events.map(EventResponseDto.fromDocument);
     }
+    
+    @Get('venues')
+    getVenues(): {id: string; label: string; campus: string; maxCapacity: number}[] {
+        return this.eventsService.getVenues();
+    }
 
     @Get(':id')
     async findOne(
