@@ -3,10 +3,12 @@ import {
     Injectable,
     UnauthorizedException,
     ForbiddenException,
+    NotFoundException,
+    ServiceUnavailableException,
     Logger,
   } from '@nestjs/common';
   import { ConfigService } from '@nestjs/config';
-  import type { StringValue } from 'ms';
+  import ms, { type StringValue } from 'ms';
   import { JwtService } from '@nestjs/jwt';
   import * as bcrypt from 'bcrypt';
   import { v4 as uuidv4 } from 'uuid';
@@ -46,7 +48,13 @@ import {
       private readonly jwtService: JwtService,
       private readonly config: ConfigService,
       private readonly rabbitmq: RabbitMQService,
-    ) {}
+    ) {
+      // Check the expiry settings once at startup. A typo in .env then stops the app with a
+      // clear error instead of quietly giving every session the wrong lifetime.
+      for (const key of ['jwt.accessExpiry', 'jwt.refreshExpiry', 'jwt.idleExpiry']) {
+        this.parseExpiryToSeconds(this.config.get<string>(key) ?? '');
+      }
+    }
   
     /**
      * Register a new user.
@@ -80,7 +88,7 @@ import {
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_REGISTERED, event);
   
       this.logger.log(`-- User registered: ${user.email}`);
-      return this.issueTokenPair(user);
+      return this.issueTokenPair(user, { remember: dto.rememberMe ?? true });
     }
   
     /**
@@ -167,7 +175,7 @@ import {
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_LOGIN, event);
   
       this.logger.log(`-- User logged in: ${user.email}`);
-      return this.issueTokenPair(user);
+      return this.issueTokenPair(user, { remember: dto.rememberMe ?? true });
     }
 
     /**
@@ -234,9 +242,85 @@ import {
       this.logger.log(`-- Password changed: ${user.email}`);
     }
   
+    /**
+     * Exchange a valid refresh token for a fresh token pair.
+     *
+     * Every call also hands out a new refresh token, so callers should store both new tokens.
+     * The old refresh token isn't revoked (there is no token store); it keeps working until
+     * it expires.
+     *
+     * The account is checked again in case it has been deactivated or locked, or the password
+     * has expired. A refresh can move the idle window of a session without remember-me
+     * forward, but never past the limit counted from the original login (see issueTokenPair).
+     */
+    async refresh(refreshToken: string): Promise<TokenPairDto> {
+      let payload: JwtPayload;
+
+      try {
+        payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken);
+      } catch {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      // Only refresh tokens can be redeemed here, and every refresh token carries the original
+      // login time and the remember-me choice. Check this before touching the database.
+      if (
+        payload.type !== 'refresh' ||
+        !payload.sub ||
+        typeof payload.authAt !== 'number' ||
+        typeof payload.remember !== 'boolean'
+      ) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+
+      // Only "user not found" means the session is dead. Anything else (e.g. Mongo is down)
+      // becomes a 503, so the clients keep the session and try again later.
+      const user = await this.usersService.findById(payload.sub).catch((err) => {
+        if (err instanceof NotFoundException) return null;
+        this.logger.error(`-- Refresh failed, could not load user: ${err}`);
+        throw new ServiceUnavailableException('Could not refresh session, try again shortly');
+      });
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('Account no longer exists');
+      }
+
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
+      }
+
+      // The password can expire mid-session, so check it here as well, the same way login does.
+      // The web picks the flag up from the returned user and sends them to /change-password.
+      if (this.isPasswordExpired(user.passwordChangedAt) && !user.mustChangePassword) {
+        await this.usersService.markPasswordExpired(user._id.toString());
+        user.mustChangePassword = true;
+      }
+
+      this.logger.log(`-- Token refreshed: ${user.email}`);
+      // Keep the original login time, so refreshing never extends the session past its limit
+      return this.issueTokenPair(user, { authAt: payload.authAt, remember: payload.remember });
+    }
+
     // ── Helpers ──────────────────────────────────────
   
-    private async issueTokenPair(user: UserDocument): Promise<TokenPairDto> {
+    /**
+     * Issue an access + refresh token pair.
+     *
+     * authAt is when the user originally logged in. Leave it out for a new login, registration
+     * or SSO login, and pass it on a refresh. No session lasts longer than refreshExpiry
+     * (7 days by default) after that moment, however often the tokens are refreshed in between.
+     * The access token never outlives the refresh token.
+     *
+     * remember = true  → the refresh token lasts until the end of the session.
+     * remember = false → the refresh token only lasts idleExpiry (15 min by default). The web's
+     *                    heartbeat refreshes it while the user is active, so it keeps moving
+     *                    forward. Once they stop, nothing refreshes it and it expires. The token's
+     *                    own expiry enforces this, so it doesn't depend on the browser cookie.
+     */
+    private async issueTokenPair(
+      user: UserDocument,
+      { authAt, remember = true }: { authAt?: number; remember?: boolean } = {},
+    ): Promise<TokenPairDto> {
       const payload: JwtPayload = {
         sub: user._id.toString(),
         email: user.email,
@@ -245,31 +329,55 @@ import {
   
       const accessExpiry = this.config.get<StringValue>('jwt.accessExpiry')!;
       const refreshExpiry = this.config.get<StringValue>('jwt.refreshExpiry')!;
+      const idleExpiry = this.config.get<StringValue>('jwt.idleExpiry')!;
   
-      const accessToken = await this.jwtService.signAsync(payload, {
-        expiresIn: accessExpiry as StringValue,
-      });
+      const nowSeconds   = Math.floor(Date.now() / 1000);
+      const sessionStart = authAt ?? nowSeconds;
+      const sessionLeft  = sessionStart + this.parseExpiryToSeconds(refreshExpiry) - nowSeconds;
+  
+      // The session has reached its limit, so the user has to log in again
+      if (sessionLeft <= 0) {
+        throw new UnauthorizedException('Session expired. Please sign in again.');
+      }
+  
+      const refreshLeft = remember
+        ? sessionLeft
+        : Math.min(this.parseExpiryToSeconds(idleExpiry), sessionLeft);
+  
+      const accessSeconds = Math.min(this.parseExpiryToSeconds(accessExpiry), refreshLeft);
+  
+      const accessToken = await this.jwtService.signAsync(
+        { ...payload, type: 'access' },
+        { expiresIn: accessSeconds },
+      );
       const refreshToken = await this.jwtService.signAsync(
-        { ...payload, jti: uuidv4() },
-        { expiresIn: refreshExpiry as StringValue},
+        { ...payload, type: 'refresh', jti: uuidv4(), authAt: sessionStart, remember },
+        { expiresIn: refreshLeft },
       );
   
       return {
         accessToken,
         refreshToken,
-        expiresIn: this.parseExpiryToSeconds(accessExpiry),
+        expiresIn: accessSeconds,
+        refreshExpiresIn: refreshLeft,
         tokenType: 'Bearer',
         user: UserResponseDto.fromDocument(user),
       };
     }
   
+    /**
+     * Turn an expiry like "15m" or "7d" into seconds. This uses ms, the same parser jsonwebtoken
+     * uses, so values like "1w" or "30 days" mean what they say. Anything invalid throws.
+     */
     private parseExpiryToSeconds(expiry: string): number {
-      const match = expiry.match(/^(\d+)([smhd])$/);
-      if (!match) return 900;   // 15 min default
-      const value = parseInt(match[1], 10);
-      const unit = match[2];
-      const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
-      return value * (multipliers[unit] ?? 60);
+      const millis = expiry ? ms(expiry as StringValue) : undefined;
+
+      // ms returns undefined for anything it can't read. It also reads a bare number such as
+      // "900" as milliseconds, which is why anything under a second is rejected too.
+      if (typeof millis !== 'number' || !(millis >= 1000)) {
+        throw new Error(`Invalid JWT expiry "${expiry}", use a value like "15m" or "7d"`);
+      }
+      return Math.floor(millis / 1000);
     }
   
     private async publishFailedLogin(email: string, ip: string, reason: string): Promise<void> {

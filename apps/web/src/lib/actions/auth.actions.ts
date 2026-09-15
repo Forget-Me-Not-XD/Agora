@@ -5,47 +5,18 @@ import { redirect } from 'next/navigation';
 import { createUser, changePassword, type CreateUserPayload, type ChangePasswordPayload } from '@/lib/api/auth';
 import { deleteAccount } from '@/lib/api/users';
 import type { TokenPair, LoginPayload, UserResponse } from '@/lib/types';
-import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME } from '@/lib/auth-cookies';
+import {
+  setAuthCookies,
+  setUserCookie,
+  clearAuthCookies,
+  COOKIE_NAME,
+  COOKIE_USER_NAME,
+  COOKIE_REFRESH_NAME,
+  DEFAULT_ACCESS_EXPIRY,
+  remainingSessionSeconds,
+} from '@/lib/auth-cookies';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
-
-/**
- * Shared helper: stel beide access en refresh tokens as HttpOnly cookies.
- *
- * rememberMe = false → refresh token verval met die browser sessie (geen maxAge).
- * rememberMe = true  → refresh token hou vir 30 dae op die skyf.
- * The access token is altyd 15 min maak nie saak wat nie.
- */
-function setAuthCookies(
-  cookieStore: ReturnType<typeof cookies>,
-  data: TokenPair,
-  rememberMe = false,
-) {
-  const cookieOpts = {
-    httpOnly: true,
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path:     '/',
-  };
-
-  cookieStore.set(COOKIE_NAME, data.accessToken, { ...cookieOpts, maxAge: 60 * 15 });
-
-  // Store the user profile returned by the backend so server components can
-  // read name/surname/role without depending on what the JWT payload contains.
-  if (data.user) {
-    cookieStore.set(COOKIE_USER_NAME, JSON.stringify(data.user), {
-      ...cookieOpts,
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
-    });
-  }
-
-  if (data.refreshToken) {
-    cookieStore.set(COOKIE_REFRESH_NAME, data.refreshToken, {
-      ...cookieOpts,
-      ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
-    });
-  }
-}
 
 /**
  * Login server action.
@@ -59,13 +30,14 @@ function setAuthCookies(
 export async function loginAction(
   payload: LoginPayload & { rememberMe?: boolean },
 ): Promise<string | null> {
-  const { rememberMe, ...rest } = payload;
+  const { rememberMe = false, ...rest } = payload;
 
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(rest),
+      // Stuur altyd rememberMe, anders gee die backend 'n lang sessie (dis vir mobiel)
+      body:    JSON.stringify({ ...rest, rememberMe }),
       cache:   'no-store',
     });
 
@@ -76,7 +48,7 @@ export async function loginAction(
     }
 
     const data: TokenPair = await res.json();
-    setAuthCookies(cookies(), data, rememberMe ?? false);
+    setAuthCookies(cookies(), data, rememberMe);
   } catch {
     return 'Kan nie aan die bediener koppel nie. Probeer later.';
   }
@@ -106,7 +78,8 @@ export async function registerAction(payload: {
     const res = await fetch(`${API_URL}/api/v1/auth/register`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
+      // Registrasie het nie 'n onthou-my keuse nie, so dit is 'n gewone sessie
+      body:    JSON.stringify({ ...payload, rememberMe: false }),
       cache:   'no-store',
     });
 
@@ -165,14 +138,16 @@ export async function completeSsoLoginAction(
 
   const user: UserResponse = await res.json();
 
+  // SSO stuur nie die leeftye saam nie, so gebruik die defaults
   const tokenPair: TokenPair = {
     accessToken,
     refreshToken,
-    expiresIn: 60 * 15,
+    expiresIn: DEFAULT_ACCESS_EXPIRY,
     tokenType: 'Bearer',
     user,
   };
 
+  // SSO het nie 'n onthou-my opsie nie, so ons onthou hulle altyd
   setAuthCookies(cookies(), tokenPair, true);
   redirect('/dashboard');
 }
@@ -202,13 +177,9 @@ export async function changePasswordAction(
   if (userCookie) {
     try {
       const user = JSON.parse(userCookie) as UserResponse;
-      cookieStore.set(COOKIE_USER_NAME, JSON.stringify({ ...user, mustChangePassword: false}), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 24,
-      });
+      // Hou so lank as wat die sessie nog oor het, soos met aanmelding
+      const maxAge = remainingSessionSeconds(cookieStore.get(COOKIE_REFRESH_NAME)?.value, token);
+      setUserCookie(cookieStore, { ...user, mustChangePassword: false }, maxAge);
     } catch {
       // Malformed cookie - nothing to patch, next full login will fix the corrupted cookie
     }
@@ -222,10 +193,7 @@ export async function changePasswordAction(
  * Verwyder die cookies en stuur gebruiker terug na login skerm.
  */
 export async function logoutAction(): Promise<void> {
-  const cookieStore = cookies();
-  cookieStore.delete(COOKIE_NAME);
-  cookieStore.delete(COOKIE_REFRESH_NAME);
-  cookieStore.delete(COOKIE_USER_NAME);
+  clearAuthCookies(cookies());
   redirect('/login');
 }
 
@@ -247,9 +215,6 @@ export async function deleteAccountAction(): Promise<{ error?: string }> {
     return { error: err instanceof Error ? err.message : 'Kon nie rekening verwyder nie.' };
   }
 
-  const cookieStore = cookies();
-  cookieStore.delete(COOKIE_NAME);
-  cookieStore.delete(COOKIE_REFRESH_NAME);
-  cookieStore.delete(COOKIE_USER_NAME);
+  clearAuthCookies(cookies());
   redirect('/login?deleted=true');
 }

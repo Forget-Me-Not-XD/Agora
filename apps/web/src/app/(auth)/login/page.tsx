@@ -41,6 +41,12 @@ export default function LoginPage() {
       return;
     }
 
+    if (params.get('error') === 'session_expired') {
+      setError('Jou sessie het verstryk. Meld asseblief weer aan.');
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
     if (params.get('deleted') === 'true') {
       setDeletedNotice(true);
       window.history.replaceState(null, '', window.location.pathname);

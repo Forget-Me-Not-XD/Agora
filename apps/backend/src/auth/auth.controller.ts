@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Headers, Res, UseFilters, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -16,9 +17,10 @@ import { JwtPayload } from './strategies/jwt.strategy';
 import { SsoProfile } from './interfaces/sso-profile.interface';
 import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
 
 @Controller('auth')
@@ -55,6 +57,39 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ): Promise<TokenPairDto> {
     return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
+  }
+
+  /**
+   * Exchange a refresh token for a new token pair.
+   *
+   * Every refresh from the web app arrives from the Next server's IP, so a plain per-IP
+   * limit would put all web users in one bucket. We limit per refresh token instead, with a
+   * looser per-IP limit on top.
+   */
+  @Throttle({
+    // Per refresh token. Each successful refresh hands out a new token, which gets its own bucket.
+    // The token is hashed so the raw value never ends up in the throttler's storage.
+    default: {
+      limit: 30,
+      ttl:   60_000,
+      getTracker: (req: { body?: { refreshToken?: unknown }; ip?: string }) => {
+        // Guards run before validation, so the body can contain anything here. createHash throws
+        // on a non-string, which would turn a bad request into a 500, so fall back to the IP.
+        const token = req.body?.refreshToken;
+        return typeof token === 'string' && token
+          ? `rt:${createHash('sha256').update(token).digest('base64url')}`
+          : `ip:${req.ip ?? 'unknown'}`;
+      },
+    },
+    // Per IP. Someone sending made-up tokens gets a fresh per-token bucket every time, and this
+    // still catches them. Keep in mind that all web users share the Next server's IP here.
+    polling: { limit: 300, ttl: 60_000 },
+  })
+  @UseGuards(ThrottlerGuard)
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() dto: RefreshTokenDto): Promise<TokenPairDto> {
+    return this.authService.refresh(dto.refreshToken);
   }
 
   @Post('change-password')

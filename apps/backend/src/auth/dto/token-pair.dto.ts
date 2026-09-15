@@ -9,7 +9,8 @@ import { UserResponseDto } from "../../users/dto/user-response.dto";
 export class TokenPairDto {
     accessToken!: string;
     refreshToken!: string;
-    expiresIn!: number;    // access-token lifetime in seconds
+    expiresIn!: number;           // access-token lifetime in seconds
+    refreshExpiresIn!: number;    // refresh-token lifetime in seconds
     tokenType!: 'Bearer';
     user!: UserResponseDto;
 }

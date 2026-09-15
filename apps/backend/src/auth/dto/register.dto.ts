@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { IsEmail, IsIn, IsNotEmpty, IsString, MinLength, MaxLength, Matches, ValidateIf, IsOptional } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsNotEmpty, IsString, MinLength, MaxLength, Matches, ValidateIf, IsOptional } from 'class-validator';
 import { Role } from '../../common/enums/role.enums';
 
 export class RegisterDto {
@@ -43,4 +43,9 @@ export class RegisterDto {
     @MaxLength(80)
     @IsOptional()
     studyCenter?: string;
+
+    // See LoginDto. The web sends false, the mobile app sends nothing.
+    @IsOptional()
+    @IsBoolean()
+    rememberMe?: boolean;
 }

@@ -12,6 +12,7 @@ import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
+import { usePollWhileActive } from '@/lib/user-activity';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
 import type { EventStatus } from '@/lib/event-view';
@@ -156,25 +157,17 @@ export default function EventsPage() {
         loadEvents(true);
     }, [loadEvents]);
 
-    // 'n Ref sodat die 60s-opname hieronder altyd die jongste datumfilter
-    // gebruik, sonder dat 'n filterklik die opname self herbegin.
-    const loadEventsRef = useRef(loadEvents);
-    useEffect(() => {
-        loadEventsRef.current = loadEvents;
-    }, [loadEvents]);
-
-    // Onafhanklike opname vir geleenthede en RSVP-status, losstaande van die
-    // datumfilter sodat 'n filterklik nie die 60s-opname herbegin nie.
     useEffect(() => {
         loadRsvps();
-
-        const interval = setInterval(() => {
-            loadEventsRef.current(false);
-            loadRsvps();
-        }, 60000);
-
-        return () => clearInterval(interval);
     }, [loadRsvps]);
+
+    // Haal elke 60 s die geleenthede en RSVP-status weer op, maar net terwyl die gebruiker
+    // die bladsy gebruik. Die hook gebruik altyd die jongste datumfilter, sonder dat 'n
+    // filterklik die opname herbegin.
+    usePollWhileActive(() => {
+        loadEvents(false);
+        loadRsvps();
+    }, 60000);
 
     const filtered = events
         .filter((event) => {

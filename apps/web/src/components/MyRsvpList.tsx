@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Calendar, MapPin, X, Loader2, Search } from 'lucide-react';
 import type { MyRsvp, RsvpStatus } from '@/lib/api/rsvp';
 import { formatDateLong } from '@/lib/format-date';
+import { usePollWhileActive } from '@/lib/user-activity';
 import { cancelRsvpAction, getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
 import RsvpQrButton from '@/components/RsvpQrButton';
 import { Pill } from '@/components/ui/Pill';
@@ -58,19 +59,9 @@ export default function MyRsvpList({ initialRsvps, initialDateFrom, initialDateT
         loadRsvps();
     }, [loadRsvps]);
 
-    // 'n Ref sodat die 60s-opname hieronder altyd die jongste datumfilter gebruik,
-    // sonder dat 'n filterklik die opname self herbegin.
-    const loadRsvpsRef = useRef(loadRsvps);
-    useEffect(() => {
-        loadRsvpsRef.current = loadRsvps;
-    }, [loadRsvps]);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            loadRsvpsRef.current();
-        }, 60000);
-        return () => clearInterval(interval);
-    }, []);
+    // Haal elke 60 s die lys weer op, maar net terwyl die gebruiker die bladsy gebruik. Die
+    // hook gebruik altyd die jongste datumfilter, sonder dat 'n filterklik die opname herbegin.
+    usePollWhileActive(loadRsvps, 60000);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
