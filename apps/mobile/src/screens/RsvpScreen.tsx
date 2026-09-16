@@ -18,7 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useThemeColors, useIsDark } from '../theme/theme';
-import { MONTHS_SHORT_AF } from '../lib/event-status';
+import { getEventStatus, MONTHS_SHORT_AF } from '../lib/event-status';
 import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
 import {
   getMyRsvps,
@@ -314,6 +314,7 @@ export function RsvpScreen() {
               icon: RSVP_STATUS_ICONS[status],
             };
             const { day, month } = formatDate(event.date);
+            const isExpired = getEventStatus(event) === 'past';
             const showQr = openQrIds.has(_id);
             const showPlusOneQr = !!plusOneRsvpId && openQrIds.has(plusOneRsvpId);
             const plusOneFullName = [plusOneName, plusOneSurname].filter(Boolean).join(' ');
@@ -395,7 +396,12 @@ export function RsvpScreen() {
                   </ViewShot>
                 )}
 
+
+                  
                 <View style={styles.rsvpActions}>
+                  { isExpired ? (
+                      <Text style={styles.expiredLabel}>Verby - QR nie meer beskikbaar nie</Text>
+                  ) : (
                   <TouchableOpacity
                     style={styles.qrBtn}
                     onPress={() => toggleQr(_id)}
@@ -404,8 +410,9 @@ export function RsvpScreen() {
                     <Feather name="maximize" size={13} color={colors.primary} />
                     <Text style={styles.qrBtnText}>{showQr ? 'Versteek QR' : 'Wys QR'}</Text>
                   </TouchableOpacity>
+                  )}
 
-                  {plusOneRsvpId && (
+                  {plusOneRsvpId && !isExpired && (
                     <TouchableOpacity
                       style={styles.qrBtn}
                       onPress={() => toggleQr(plusOneRsvpId)}
@@ -614,6 +621,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 6,
     },
     qrBtnText: { fontSize: 16, fontWeight: '800', color: colors.primary },
+    expiredLabel: { fontSize: 13, fontWeight: '700', color: colors.textSubtle },
     qrBox: {
       alignSelf: 'center',
       width: 200,
