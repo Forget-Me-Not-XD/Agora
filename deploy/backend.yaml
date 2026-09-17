@@ -31,7 +31,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
       containers:
         - name: api
-          image: ghcr.io/koek1/span4-backend:65ffe21c
+          image: ghcr.io/koek1/span4-backend:7738f721
           ports:
             - containerPort: 3000
           env:
