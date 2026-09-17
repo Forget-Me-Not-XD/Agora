@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Modal,
   Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -28,8 +27,9 @@ import {
   type EventStatus,
 } from '../lib/event-status';
 import { canCreateEvents } from '../lib/rbac';
-import { takeEventsPrefetch } from '../lib/prefetch';
+import { useEventsStore } from '../stores/events.store';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { toIsoRange } from '../lib/date-range';
 import { typography } from '../theme/typography';
@@ -44,9 +44,16 @@ export function EventsScreen() {
   const isDark = useIsDark();
   const insets = useSafeAreaInsets();
 
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const cachedEvents = useEventsStore((s) => s.events);
+  const cachedLoading = useEventsStore((s) => s.isLoading);
+  const cachedError = useEventsStore((s) => s.error);
+  const ensureEventsLoaded = useEventsStore((s) => s.ensureLoaded);
+
+  // 'n Datumgefiltreerde navraag gaan altyd reguit netwerk toe (die gedeelde
+  // kas geld net vir die ongefiltreerde lys), so dié twee bly plaaslike state.
+  const [filteredEvents, setFilteredEvents] = useState<EventResponse[] | null>(null);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
@@ -68,27 +75,37 @@ export function EventsScreen() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      const range = toIsoRange(dateFrom, dateTo);
+
+      if (!range) {
+        // Onbeperkte lys -- gebruik die gedeelde kas (dikwels oombliklik as
+        // Dashboard/Kalender/KI dit al hierdie sessie geraadpleeg het).
+        setFilteredEvents(null);
+        setFilterError(null);
+        ensureEventsLoaded().catch(() => {});
+        return () => { active = false; };
+      }
+
       (async () => {
-        setLoading(true);
-        setLoadError(null);
+        setFilterLoading(true);
+        setFilterError(null);
         try {
-          // Die datumreeks word backend-kant afgedwing (from/to), nie hier nie,
-          // sodat 'n reeks buite die voorafgehaalde stel ook werk. Die
-          // voorafhaling geld dus net vir die onbeperkte lys.
-          const range = toIsoRange(dateFrom, dateTo);
-          const result = range
-            ? await listEvents(range.from, range.to)
-            : await (takeEventsPrefetch() ?? listEvents());
-          if (active) setEvents(result);
+          const result = await listEvents(range.from, range.to);
+          if (active) setFilteredEvents(result);
         } catch {
-          if (active) setLoadError('Kon nie funksies laai nie.');
+          if (active) setFilterError('Kon nie funksies laai nie.');
         } finally {
-          if (active) setLoading(false);
+          if (active) setFilterLoading(false);
         }
       })();
       return () => { active = false; };
-    }, [dateFrom, dateTo]),
+    }, [dateFrom, dateTo, ensureEventsLoaded]),
   );
+
+  const hasDateFilter = filteredEvents !== null;
+  const events = hasDateFilter ? filteredEvents : cachedEvents;
+  const loading = hasDateFilter ? filterLoading : (cachedLoading && cachedEvents.length === 0);
+  const loadError = hasDateFilter ? filterError : (cachedEvents.length === 0 ? cachedError : null);
 
   const filtered = useMemo(() => {
     return events.filter((e) => {
@@ -193,7 +210,7 @@ export function EventsScreen() {
       {/* ── Event list ── */}
       {loading ? (
         <View style={styles.centerFill}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       ) : loadError ? (
         <View style={styles.centerFill}>

@@ -12,6 +12,7 @@ import { canCreateEvents } from '@/lib/rbac';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
+import { getPaymentStatusAction } from '@/lib/actions/payments.actions';
 import { usePollWhileActive } from '@/lib/user-activity';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
@@ -68,24 +69,13 @@ export default function EventsPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [newEventId, setNewEventId] = useState<string | null>(null);
-    const [paymentNotice, setPaymentNotice] = useState<'success' | 'cancelled' | null>(null);
+    const [paymentNotice, setPaymentNotice] = useState<'confirming' | 'success' | 'cancelled' | 'pending' | null>(null);
 
     useEffect(() => {
         const created = searchParams.get('created');
         if (created) {
             setNewEventId(created);
             router.replace('/events'); // vee die query-param uit sodat 'n verfris nie die gloed herhaal nie
-        }
-    }, [searchParams, router]);
-
-    // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
-    // /payments/return en /cancel) -- PayFast se eie ITN bevestig die kaartjie
-    // reeds op die agtergrond, hierdie is bloot terugvoer vir die gebruiker.
-    useEffect(() => {
-        const payment = searchParams.get('payment');
-        if (payment === 'success' || payment === 'cancelled') {
-            setPaymentNotice(payment);
-            router.replace('/events');
         }
     }, [searchParams, router]);
 
@@ -152,6 +142,65 @@ export default function EventsPage() {
         }
     }, []);
 
+    // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
+    // /payments/return en /cancel). PayFast se eie ITN skep die kaartjie
+    // heeltemal server-tot-server, onafhanklik van wanneer die blaaier hierheen
+    // herlei -- die twee gebeure is NIE gewaarborg in enige volgorde nie (sien
+    // die kommentaar daaroor in payments.controller.ts). Sonder hierdie peiling
+    // sou die RSVP-lys/kaartjie soms eenvoudig ontbreek totdat iets anders
+    // toevallig 'n herlaai veroorsaak.
+    useEffect(() => {
+        const payment = searchParams.get('payment');
+        const reference = searchParams.get('reference');
+
+        if (payment === 'cancelled') {
+            setPaymentNotice('cancelled');
+            router.replace('/events');
+            return;
+        }
+
+        if (payment !== 'success') return;
+        router.replace('/events');
+
+        if (!reference) {
+            // Behoort nie te gebeur nie (return_url dra dit altyd), maar los
+            // liewer 'n opgevoede boodskap as om te crash.
+            setPaymentNotice('success');
+            loadEvents(false);
+            loadRsvps();
+            return;
+        }
+
+        setPaymentNotice('confirming');
+        let active = true;
+        const POLL_INTERVAL_MS = 1500;
+        const POLL_MAX_ATTEMPTS = 12; // ~18s -- ruim bo wat 'n ITN normaalweg neem
+
+        (async () => {
+            for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+                const statusResult = await getPaymentStatusAction(reference);
+                if (!active) return;
+
+                if (statusResult.result?.status === 'VOLTOOI') {
+                    setPaymentNotice('success');
+                    loadEvents(false);
+                    loadRsvps();
+                    return;
+                }
+                if (statusResult.result?.status === 'MISLUK') {
+                    setPaymentNotice(null);
+                    return;
+                }
+                await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            }
+            // Nog steeds HANGENDE ná al ons pogings -- die geld is heel moontlik
+            // reeds gehef, so wys 'n sagter boodskap i.p.v. 'n fout.
+            if (active) setPaymentNotice('pending');
+        })();
+
+        return () => { active = false; };
+    }, [searchParams, router, loadEvents, loadRsvps]);
+
     // Herlaai die geleenthede sodra die datumfilter verander (of by die eerste laai).
     useEffect(() => {
         loadEvents(true);
@@ -204,17 +253,25 @@ export default function EventsPage() {
                     className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${
                         paymentNotice === 'success'
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
+                            : paymentNotice === 'confirming'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
                             : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
                     }`}
                 >
                     <span>
-                        {paymentNotice === 'success'
-                            ? 'Jou betaling is ontvang — jou kaartjie word tans bevestig.'
+                        {paymentNotice === 'confirming'
+                            ? 'Jou betaling word bevestig…'
+                            : paymentNotice === 'success'
+                            ? 'Jou kaartjie is bevestig — kyk by "My RSVPs".'
+                            : paymentNotice === 'pending'
+                            ? 'Jou betaling neem langer as gewoonlik om te bevestig. Jou kaartjie sal binnekort by "My RSVPs" verskyn.'
                             : 'Die betaling is gekanselleer.'}
                     </span>
-                    <button onClick={() => setPaymentNotice(null)} className="text-xs underline shrink-0">
-                        Maak toe
-                    </button>
+                    {paymentNotice !== 'confirming' && (
+                        <button onClick={() => setPaymentNotice(null)} className="text-xs underline shrink-0">
+                            Maak toe
+                        </button>
+                    )}
                 </div>
             )}
 

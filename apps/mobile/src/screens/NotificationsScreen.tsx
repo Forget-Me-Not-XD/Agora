@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,6 +12,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useThemeColors } from "../theme/theme";
 import { useNotificationsStore } from "../stores/notifications.store";
 import { ScreenHeader } from '../components/ScreenHeader';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 
 const AF_MONTHS = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -46,7 +46,7 @@ export function NotificationsScreen() {
 
       {isLoading && items.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
+          <LoadingSpinner size={72} />
         </View>
       ) : error ? (
         <View style={styles.emptyState}>

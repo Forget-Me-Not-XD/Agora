@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
@@ -9,13 +9,14 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { MainTabParamList } from '../navigation/MainTabs';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { listEvents, type EventResponse } from '../api/events';
-import { getMyRsvps, type RsvpWithEvent } from '../api/rsvp';
-import { getPrediction, type PredictionResult } from '../api/analytics';
+import type { PredictionResult } from '../api/analytics';
 import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from '../lib/event-status';
-import { takeEventsPrefetch, takeMyRsvpsPrefetch, takePredictionPrefetch } from '../lib/prefetch';
+import { useEventsStore } from '../stores/events.store';
+import { useRsvpsStore } from '../stores/rsvps.store';
+import { usePredictionsStore } from '../stores/predictions.store';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ProfileModal } from '../components/ProfileModal';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 
 export function DashboardScreen() {
@@ -27,59 +28,56 @@ export function DashboardScreen() {
   const [aiInfoOpen, setAiInfoOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [myRsvps, setMyRsvps] = useState<RsvpWithEvent[]>([]);
-  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
   const isStaff = user?.role === 'ADMIN' || user?.role === 'DOSENT';
+
+  // Gedeelde kaslae (sien stores/) -- ander oortjies (Funksies, Kalender, KI,
+  // RSVP) lees/vul dieselfde data, so 'n oortjie-wisseling hier is dikwels
+  // oombliklik i.p.v. 'n nuwe netwerk-wagtyd.
+  const events = useEventsStore((s) => s.events);
+  const eventsLoading = useEventsStore((s) => s.isLoading);
+  const eventsError = useEventsStore((s) => s.error);
+  const ensureEventsLoaded = useEventsStore((s) => s.ensureLoaded);
+
+  const storeRsvps = useRsvpsStore((s) => s.rsvps);
+  const rsvpsLoading = useRsvpsStore((s) => s.isLoading);
+  const ensureRsvpsLoaded = useRsvpsStore((s) => s.ensureLoaded);
+  const myRsvps = isStaff ? [] : storeRsvps;
+
+  const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
 
   // Laai elke keer wat hierdie oortjie fokus kry (nie net met die eerste
   // koppeling nie) -- sonder dit sou 'n RSVP wat elders gekanselleer is, of 'n
   // nuwe funksie wat geskep is, nooit hier opgedateer wys totdat die hele app
-  // herbegin word nie.
+  // herbegin word nie. Die kaslae self besluit of dit 'n regte netwerkversoek
+  // moet wees, of net die reeds-vars data kan teruggee.
   useFocusEffect(
     useCallback(() => {
       if (!user) return;
-      let active = true;
-
-      // Herbruik die agtergrond-voorlaai wat tydens onboarding begin het as dit nog
-      // vars is -- dan is daar hier glad geen nuwe netwerkversoek nodig nie.
-      const prefetchedPrediction = takePredictionPrefetch();
-
-      (async () => {
-        setLoading(true);
-        setLoadError(null);
-        try {
-          const eventList = await (takeEventsPrefetch() ?? listEvents());
-          if (!active) return;
-          setEvents(eventList);
-
-          if (!isStaff) {
-            const rsvpList = await (takeMyRsvpsPrefetch() ?? getMyRsvps());
-            if (active) setMyRsvps(rsvpList);
-          }
-
-          const upcoming = eventList.filter((e) => getEventStatus(e) !== 'past');
-          if (isStaff && upcoming.length > 0) {
-            try {
-              const pred = await (prefetchedPrediction ?? getPrediction(upcoming[0].id));
-              if (active) setPrediction(pred);
-            } catch {
-              if (active) setPrediction(null);
-            }
-          }
-        } catch {
-          if (active) setLoadError('Kon nie paneelbord-data laai nie.');
-        } finally {
-          if (active) setLoading(false);
-        }
-      })();
-
-      return () => { active = false; };
-    }, [user?.id, isStaff]),
+      ensureEventsLoaded().catch(() => {});
+      if (!isStaff) ensureRsvpsLoaded().catch(() => {});
+    }, [user?.id, isStaff, ensureEventsLoaded, ensureRsvpsLoaded]),
   );
+
+  // Die KI-voorspelling is per-funksie, so dit volg eers sodra ons weet wat
+  // die eersvolgende aankomende funksie is.
+  useEffect(() => {
+    if (!isStaff) { setPrediction(null); return; }
+    const upcoming = events.filter((e) => getEventStatus(e) !== 'past');
+    if (upcoming.length === 0) { setPrediction(null); return; }
+    let active = true;
+    ensurePrediction(upcoming[0].id)
+      .then((p) => { if (active) setPrediction(p); })
+      .catch(() => { if (active) setPrediction(null); });
+    return () => { active = false; };
+  }, [isStaff, events, ensurePrediction]);
+
+  // Spinner net met 'n regte eerste laai (nog geen gekaste data nie); 'n
+  // agtergrond-verversing wat misluk mag nie 'n reeds-gewysigde skerm met 'n
+  // foutboodskap oorval nie -- die (moontlik effe verouderde) data bly wys.
+  const loading = eventsLoading && events.length === 0;
+  const loadError = events.length === 0 ? eventsError : null;
+  void rsvpsLoading;
 
   if (!user) return null;
 
@@ -148,7 +146,7 @@ export function DashboardScreen() {
 
         {loading && (
           <View style={styles.card}>
-            <ActivityIndicator color={colors.primary} />
+            <LoadingSpinner size={48} />
           </View>
         )}
 

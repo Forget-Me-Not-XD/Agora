@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import {
     StyleSheet, Modal, Pressable, TouchableOpacity, ScrollView,
-    KeyboardAvoidingView, Platform,
+    KeyboardAvoidingView, Platform, useWindowDimensions,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors, type ThemeColors } from '../theme/theme';
@@ -19,7 +19,8 @@ interface Props {
  */
 export function ProfileModal({ visible, onClose }: Props) {
     const colors = useThemeColors();
-    const styles = useMemo(() => makeStyles(colors), [colors]);
+    const { height: windowHeight } = useWindowDimensions();
+    const styles = useMemo(() => makeStyles(colors, windowHeight), [colors, windowHeight]);
     const [phase, setPhase] = useState<Phase>('view');
 
     // Terwyl daar geredigeer word, mag die kaart nie per ongeluk toegaan nie
@@ -42,7 +43,7 @@ export function ProfileModal({ visible, onClose }: Props) {
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 >
                     <Pressable style={styles.card} onPress={() => {}}>
-                        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                        <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                             { visible && <ProfilePanel onPhaseChange={setPhase} />}
                         </ScrollView>
 
@@ -63,7 +64,7 @@ export function ProfileModal({ visible, onClose }: Props) {
     );
 }
 
-function makeStyles(colors: ThemeColors) {
+function makeStyles(colors: ThemeColors, windowHeight: number) {
     return StyleSheet.create({
         backdrop: {
             flex: 1,
@@ -81,11 +82,13 @@ function makeStyles(colors: ThemeColors) {
             borderRadius: 16,
             borderWidth: 1,
             borderColor: colors.border,
-            // Bind die hoogte sodat die ScrollView binne-in kan rol wanneer die
-            // sleutelbord oop is of die inhoud langer is as die skerm.
-            maxHeight: '88%',
             overflow: 'hidden',
         },
+        // Die ScrollView kry sy eie maxHeight direk -- flex:1 teen 'n ouer wat
+        // self net 'n auto/maxHeight-hoogte het (nie 'n bepaalde hoogte nie)
+        // los nooit werklik op in Yoga nie, en die ScrollView val dan inmekaar
+        // na sy inhoud se natuurlike (klein) grootte.
+        scroll: { maxHeight: windowHeight * 0.88 },
         closeBtn: { position: 'absolute', top: 12, right: 12, padding: 4 },
     });
 }

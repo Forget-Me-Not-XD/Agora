@@ -21,9 +21,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useResponse } from '../providers/ResponseProvider';
 import { scanQr, getEventRsvps, registerWalkIn, type RsvpWithUser } from '../api/rsvp';
 import { getEvent, type EventResponse } from '../api/events';
-import { formatEventTime } from '../lib/event-status';
+import { getEventStatus, formatEventTime } from '../lib/event-status';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
+import { useEventsStore } from '../stores/events.store';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
@@ -39,6 +41,7 @@ export function QrScannerScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [rsvps, setRsvps] = useState<RsvpWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +55,8 @@ export function QrScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const scanLock = useRef(false);
+
+  const isExpired = event ? getEventStatus(event) === 'past' : false;
 
   const loadData = useCallback(async () => {
     try {
@@ -84,7 +89,7 @@ export function QrScannerScreen() {
   }
 
   async function handleBarCodeScanned({ data }: { type: string; data: string }) {
-    if (scanLock.current) return;
+    if (scanLock.current || isExpired) return;
     scanLock.current = true;
     setScanned(true);
     showLoading(true);
@@ -94,6 +99,7 @@ export function QrScannerScreen() {
       setLastScannedName(res.guestName);
       showSuccess(res, resetScanner);
       loadData(); // haal die opgedateerde inteken-lys vanaf die bediener
+      invalidateEvents(); // checkedInCount het verander
     } catch (err) {
       showLoading(false);
       const status = (err as any)?.response?.status;
@@ -127,6 +133,7 @@ export function QrScannerScreen() {
       await registerWalkIn(route.params.eventId, name);
       setWalkInName('');
       loadData(); // haal die bygewerkte lys vanaf die bediener
+      invalidateEvents(); // confirmedAttendees het verander
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       Alert.alert(
@@ -156,6 +163,14 @@ export function QrScannerScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ── Camera viewfinder ── */}
+        {isExpired ? (
+          <View style={styles.camera}>
+            <Feather name="alert-circle" size={28} color={colors.textSubtle} />
+            <Text style={styles.expiredCameraText}>
+              Hierdie funksie is reeds verby - skandering is nie meer moontlik nie
+            </Text>
+          </View>
+        ) : (
         <View style={styles.camera}>
           {permission?.granted && (
             <CameraView
@@ -188,11 +203,12 @@ export function QrScannerScreen() {
             <Text style={styles.scanHint}>Geen kamera-toegang nie</Text>
           )}
         </View>
+        )}
 
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           {loading ? (
-            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 8 }} />
+            <LoadingSpinner size={32} style={{ paddingVertical: 8 }} />
           ) : (
             <>
               <View style={styles.statItem}>
@@ -253,6 +269,7 @@ export function QrScannerScreen() {
         </View>
 
         {/* ── Walk-in registration ── */}
+        { !isExpired && (
         <View style={styles.walkInCard}>
           <Text style={styles.walkInTitle}>Registreer persoon sonder RSVP</Text>
           <Text style={styles.walkInSubtitle}>
@@ -285,6 +302,7 @@ export function QrScannerScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {/* ── Recent check-ins ── */}
         {checkedIn.length > 0 && (
@@ -368,6 +386,14 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontSize: 16,
       color: 'rgba(255,255,255,0.6)',
       fontWeight: '600',
+    },
+    expiredCameraText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginTop: 8,
     },
 
     // Stats

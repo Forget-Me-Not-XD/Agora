@@ -6,11 +6,26 @@ import * as Linking from 'expo-linking';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
-import { initiatePayment, notifyPayment, type InitiatePaymentResponse } from '../api/payments';
+import { initiatePayment, notifyPayment, getPaymentStatus, type InitiatePaymentResponse } from '../api/payments';
 import { API_URL } from '../api/client';
 import type { EventResponse } from '../api/events';
 
-type Step = 'closed' | 'processing' | 'gateway' | 'redirecting' | 'success' | 'error';
+type Step = 'closed' | 'processing' | 'gateway' | 'redirecting' | 'confirming' | 'success' | 'pending' | 'error';
+
+// PayFast se eie ITN skep die kaartjie server-tot-server, heeltemal onafhanklik
+// van wanneer ons blaaier na /payments/return herlei (sien die kommentaar
+// daaroor in payments.controller.ts) -- die twee gebeure is NIE gewaarborg in
+// enige volgorde nie. 'n Suksesvolle herleiding beteken dus net "PayFast is
+// klaar met die gebruiker", nie "die kaartjie bestaan reeds" nie. Sonder hierdie
+// peiling sou ons soms 'n kaartjie as bevestig wys (of erger, die RSVP-lys
+// verfris) voordat dit werklik geskep is, en die nuwe RSVP sou eenvoudig
+// ontbreek totdat iets anders toevallig 'n herlaai veroorsaak.
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 12; // ~18s -- ruim bo wat 'n ITN normaalweg neem
+
+function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 type PaymentModalProps = {
   event: EventResponse;
@@ -77,8 +92,9 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
 
     const { queryParams } = Linking.parse(result.url);
     if (queryParams?.payment === 'success') {
-      setStep('success');
-      onPurchased?.();
+      // Herleiding was suksesvol -- dit sê niks oor of die ITN al klaar gehardloop
+      // het nie, dus bevestig eers werklik voordat ons "voltooi" wys.
+      await confirmPayment(paymentResult.reference);
     } else {
       setError('Die betaling is gekanselleer of het misluk.');
       setStep('error');
@@ -103,6 +119,35 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
     }
   }
 
+  // Peil /payments/:reference/status totdat dit werklik VOLTOOI (of MISLUK) is,
+  // i.p.v. om aan te neem dat 'n suksesvolle blaaier-herleiding self genoeg is.
+  async function confirmPayment(reference: string): Promise<void> {
+    setStep('confirming');
+    for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+      try {
+        const result = await getPaymentStatus(reference);
+        if (result.status === 'VOLTOOI') {
+          setStep('success');
+          onPurchased?.();
+          return;
+        }
+        if (result.status === 'MISLUK') {
+          setError('Die betaling is gekanselleer of het misluk.');
+          setStep('error');
+          return;
+        }
+      } catch {
+        // 'n Enkele mislukte peiling (bv. 'n kortstondige netwerkwipe) is nie
+        // genoeg rede om op te gee nie -- probeer eenvoudig weer.
+      }
+      await wait(POLL_INTERVAL_MS);
+    }
+    // Nog steeds HANGENDE ná al ons pogings -- PayFast se ITN kan om watter rede
+    // ook al stadiger as gewoonlik wees. Die geld is heel moontlik reeds gehef,
+    // so dit as 'n fout wys sou misleidend wees; wys eerder 'n sagter boodskap.
+    setStep('pending');
+  }
+
   return (
     <>
       <TouchableOpacity
@@ -120,7 +165,7 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
       <Modal visible={step !== 'closed'} transparent animationType="fade" onRequestClose={close}>
         <Pressable
           style={styles.backdrop}
-          onPress={step === 'success' || step === 'error' ? close : undefined}
+          onPress={step === 'success' || step === 'error' || step === 'pending' ? close : undefined}
         >
           <Pressable style={styles.card} onPress={() => {}}>
             <View style={styles.header}>
@@ -135,11 +180,15 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
               </TouchableOpacity>
             </View>
 
-            {(step === 'processing' || step === 'redirecting') && (
+            {(step === 'processing' || step === 'redirecting' || step === 'confirming') && (
               <View style={styles.centerBlock}>
                 <ActivityIndicator color={colors.primary} size="large" />
                 <Text style={styles.centerText}>
-                  {step === 'redirecting' ? 'Word na PayFast herlei…' : 'Besig…'}
+                  {step === 'redirecting'
+                    ? 'Word na PayFast herlei…'
+                    : step === 'confirming'
+                    ? 'Bevestig jou betaling…'
+                    : 'Besig…'}
                 </Text>
               </View>
             )}
@@ -191,6 +240,20 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
                   Verwerk deur PayFast se sandbox-omgewing — toetsmodus, geen regte geld nie
                 </Text>
                 <Text style={styles.centerHint}>Kyk by &quot;My RSVPs&quot; vir jou QR-kode.</Text>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={close}>
+                  <Text style={styles.secondaryBtnText}>Maak toe</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {step === 'pending' && (
+              <View style={styles.centerBlock}>
+                <Feather name="clock" size={32} color={colors.textSubtle} />
+                <Text style={styles.centerTitle}>Jou betaling word steeds verwerk</Text>
+                <Text style={styles.centerText}>
+                  Dit neem soms 'n bietjie langer as gewoonlik. Jou kaartjie sal binnekort by
+                  &quot;My RSVPs&quot; verskyn sodra dit bevestig is.
+                </Text>
                 <TouchableOpacity style={styles.secondaryBtn} onPress={close}>
                   <Text style={styles.secondaryBtnText}>Maak toe</Text>
                 </TouchableOpacity>

@@ -41,6 +41,11 @@ export interface PaymentNotifyResult {
     status: 'HANGENDE' | 'VOLTOOI' | 'MISLUK';
 }
 
+export interface PaymentStatusResult {
+    status: 'HANGENDE' | 'VOLTOOI' | 'MISLUK';
+    rsvpId: string | null;
+}
+
 async function throwHttpError(res: Response): Promise<never> {
     const body = await res.json().catch(() => ({})) as { message?: string | string[] };
     const msg  = body.message ?? res.statusText;
@@ -74,4 +79,20 @@ export async function notifyPayment(payload: SimulatedPayfastNotify): Promise<Pa
 
     if (!res.ok) await throwHttpError(res);
     return res.json() as Promise<PaymentNotifyResult>;
+}
+
+// PayFast se ITN skep die kaartjie server-tot-server, heeltemal onafhanklik van
+// wanneer die blaaier na ons /payments/return herlei (sien die kommentaar
+// daaroor in payments.controller.ts). Word gepeil ná 'n suksesvolle herleiding
+// totdat status regtig VOLTOOI is, i.p.v. om net op die herleiding te vertrou.
+export async function getPaymentStatus(reference: string): Promise<PaymentStatusResult> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/payments/${encodeURIComponent(reference)}/status`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<PaymentStatusResult>;
 }

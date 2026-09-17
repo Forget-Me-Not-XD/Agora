@@ -1,7 +1,7 @@
 // ========== Imports: ==========
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-// Mirror backend: UserTitle enumerator 
+// Mirror backend: UserTitle enumerator
 export enum UserTitle {
     DR   = 'Dr.',
     PROF = 'Prof.',
@@ -31,10 +31,13 @@ export interface UserResponseDto {
 
 // Mirror backend: UpdateUserDto
 export interface UpdateUserDto {
-    name?:    string;
-    surname?: string;
-    title?:   UserTitle;
-    tags?:    UserTag[];
+    name?:        string;
+    surname?:     string;
+    title?:       UserTitle;
+    tags?:        UserTag[];
+    role?:        string;
+    studyCenter?: string;
+    isActive?:    boolean;
 }
 
 export async function updateUser(id: string, payload: UpdateUserDto, token?: string): Promise<UserResponseDto> {
@@ -92,6 +95,59 @@ export async function searchUsersByTag(tag: UserTag, q?: string, token?: string)
     }
 
     return res.json() as Promise<UserResponseDto[]>;
+}
+
+// GET /api/v1/users?search=<teks> -- vrye-teks soek oor naam en van, vir die admin Gebruikers-bladsy
+export async function searchUsers(search: string, token?: string): Promise<UserResponseDto[]> {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search.trim());
+
+    const res = await fetch(`${BASE_URL}/api/v1/users?${params.toString()}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
+
+    return res.json() as Promise<UserResponseDto[]>;
+}
+
+// DELETE /api/v1/users/:id -- admin verwyder 'n ander gebruiker permanent (204 No Content)
+export async function deleteUser(id: string, token?: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/api/v1/users/${id}`, {
+        method:  'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
+}
+
+// POST /api/v1/users/:id/reset-password -- admin herstel 'n gebruiker se wagwoord,
+// die nuwe tydelike wagwoord kom eenmalig terug om vir die gebruiker oor te dra
+export async function resetUserPassword(id: string, token?: string): Promise<string> {
+    const res = await fetch(`${BASE_URL}/api/v1/users/${id}/reset-password`, {
+        method:  'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        const msg  = body.message ?? res.statusText;
+        throw new Error(typeof msg === 'string' ? msg : msg.join(', '));
+    }
+
+    const data = await res.json() as { temporaryPassword: string };
+    return data.temporaryPassword;
 }
 
 // DELETE /api/v1/users/me -- verwyder jou eie rekening (204 No Content)

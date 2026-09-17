@@ -5,6 +5,9 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { apiClient, API_URL, UserResponse } from '../api/client';
 import type { TokenPair } from '../api/client';
+import { useEventsStore } from './events.store';
+import { useRsvpsStore } from './rsvps.store';
+import { usePredictionsStore } from './predictions.store';
 
 export type SsoProvider = 'google' | 'microsoft';
 
@@ -172,6 +175,13 @@ logout: async () => {
     await apiClient.clearTokens();
   }
   set({ user: null, error: null });
+
+  // 'n Volgende sessie (moontlik 'n ander gebruiker, op dieselfde toestel
+  // sonder om die app heeltemal toe te maak) mag nooit hierdie een se
+  // gekaste funksies/RSVPs/voorspellings selfs vlugtig sien nie.
+  useEventsStore.getState().reset();
+  useRsvpsStore.getState().reset();
+  usePredictionsStore.getState().reset();
 },
 
 clearError: () => set({ error: null }),

@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { getAllUsers, updateUser, ALL_USER_TAGS, getTagLabel } from '../api/users';
 import { useAuthStore } from '../stores/auth.store';
 import { getRoleLabel } from '../lib/rbac';
@@ -200,7 +201,7 @@ export function AdminUsersScreen() {
 
       {loading ? (
         <View style={styles.centerFill}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       ) : loadError ? (
         <View style={styles.centerFill}>

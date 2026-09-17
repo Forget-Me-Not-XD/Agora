@@ -38,6 +38,11 @@ export interface PaymentNotifyResult {
     status: 'HANGENDE' | 'VOLTOOI' | 'MISLUK';
 }
 
+export interface PaymentStatusResult {
+    status: 'HANGENDE' | 'VOLTOOI' | 'MISLUK';
+    rsvpId: string | null;
+}
+
 export async function initiatePayment(eventId: string): Promise<InitiatePaymentResponse> {
     return apiClient.post<InitiatePaymentResponse, { eventId: string; platform: 'mobile' }>(
         '/payments/initiate',
@@ -47,4 +52,12 @@ export async function initiatePayment(eventId: string): Promise<InitiatePaymentR
 
 export async function notifyPayment(payload: SimulatedPayfastNotify): Promise<PaymentNotifyResult> {
     return apiClient.post<PaymentNotifyResult, SimulatedPayfastNotify>('/payments/notify', payload);
+}
+
+// PayFast se ITN bevestig die kaartjie server-tot-server, onafhanklik van
+// wanneer die blaaier na ons /payments/return herlei -- sien die kommentaar
+// daaroor in payments.controller.ts. Word gepeil ná 'n suksesvolle herleiding
+// totdat status regtig VOLTOOI is, i.p.v. om net op die herleiding te vertrou.
+export async function getPaymentStatus(reference: string): Promise<PaymentStatusResult> {
+    return apiClient.get<PaymentStatusResult>(`/payments/${reference}/status`);
 }

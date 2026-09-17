@@ -12,6 +12,7 @@ import { UsersService } from "../users/users.service";
 import { CalendarSyncService } from "../calendar/calendar-sync.service";
 import { Role } from '../common/enums/role.enums';
 import { User } from '../users/schemas/user.schema';
+import { EventDocument } from "../events/schemas/event.schema";
 
 export interface ScanResponse {
     guestName: string;
@@ -50,10 +51,7 @@ export class RsvpService {
             throw new ForbiddenException('Hierdie geleentheid laat nie \'n plus-een toe nie');
         }
 
-        const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
-        if (effectiveEnd.getTime() < Date.now()) {
-            throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
-        }
+        this.assertEventNotExpired(event);
 
         const existing = await this.rsvpModel
         .findOne({ event: dto.eventId, user: userId })
@@ -149,6 +147,10 @@ export class RsvpService {
     }
 
     async createPaidTicket(eventId: string, userId: string, paymentId: string): Promise<RsvpDocument> {
+        
+        const event = await this.eventsService.findById(eventId);
+        this.assertEventNotExpired(event);
+
         const existing = await this.rsvpModel
         .findOne({ event: eventId, user: userId })
         .exec();
@@ -288,6 +290,15 @@ export class RsvpService {
         }
     }
 
+    // Word gebruik wanneer die Event alreeds verloop het om te verseker dat daar nie geRSVP kan word nie.
+    // Publiek sodat PaymentsService dieselfde toets voor betaal-bevestiging kan doen.
+    assertEventNotExpired(event: EventDocument): void {
+    const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
+    if (effectiveEnd.getTime() < Date.now()) {
+        throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
+    }
+}
+
     // Gebruik wanneer 'n gebruiker sy rekening verwyder: kanselleer al sy aktiewe RSVP's
     // sodat geleentheidkapasiteit en gekoppelde kalender-inskrywings korrek vrygestel word,
     // eerder as om weeskop-RSVP's met 'n verwysing na 'n nie-bestaande gebruiker agter te laat.
@@ -314,6 +325,7 @@ export class RsvpService {
 
         const event = await this.eventsService.findById(rsvp.event.toString());
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         if (rsvp.status === RsvpStatus.GEKANSELLEER) {
             throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
@@ -369,6 +381,7 @@ export class RsvpService {
 
         const event = await this.eventsService.findById(rsvp.event.toString());
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         if (rsvp.status === RsvpStatus.GEKANSELLEER) {
             throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
@@ -398,6 +411,7 @@ export class RsvpService {
     async registerWalkIn(dto: CreateWalkInDto, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         await this.eventsService.incrementConfirmedAttendees(dto.eventId);
         await this.eventsService.incrementCheckedInCount(dto.eventId);

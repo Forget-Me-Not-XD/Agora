@@ -18,7 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { useThemeColors, useIsDark } from '../theme/theme';
-import { MONTHS_SHORT_AF } from '../lib/event-status';
+import { getEventStatus, MONTHS_SHORT_AF } from '../lib/event-status';
 import { RSVP_STATUS_LABELS, RSVP_STATUS_ICONS, getRsvpStatusColors } from '../lib/rsvp-status';
 import {
   getMyRsvps,
@@ -28,8 +28,10 @@ import {
   type RsvpStatus,
 } from '../api/rsvp';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
-import { takeMyRsvpsPrefetch, clearMyRsvpsPrefetch } from '../lib/prefetch';
+import { useRsvpsStore } from '../stores/rsvps.store';
+import { useEventsStore } from '../stores/events.store';
 import { useAuthStore } from '../stores/auth.store';
 
 
@@ -40,9 +42,19 @@ export function RsvpScreen() {
 
   const [filter, setFilter] = useState<RsvpStatus | 'alles'>('alles');
 
-  const [rsvps, setRsvps] = useState<RsvpWithEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const storeRsvps = useRsvpsStore((s) => s.rsvps);
+  const storeLoading = useRsvpsStore((s) => s.isLoading);
+  const storeError = useRsvpsStore((s) => s.error);
+  const ensureRsvpsLoaded = useRsvpsStore((s) => s.ensureLoaded);
+  const invalidateRsvps = useRsvpsStore((s) => s.invalidate);
+  const removeRsvpLocally = useRsvpsStore((s) => s.removeLocally);
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
+
+  // 'n Datumgefiltreerde navraag gaan altyd reguit netwerk toe (die gedeelde
+  // kas geld net vir die ongefiltreerde lys).
+  const [dateFilteredRsvps, setDateFilteredRsvps] = useState<RsvpWithEvent[] | null>(null);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
 
   // QR per inskrywing -- 'n Set (nie 'n enkele id nie) sodat 'n primêre en 'n
   // +1 se QR onafhanklik van mekaar oop/besig-om-te-laai kan wees.
@@ -67,26 +79,33 @@ export function RsvpScreen() {
   // is nie, ook enige uit 'n vorige sessie).
   // Die datumreeks filter nou by die BACKEND (sien rsvp.service.ts se findMyRsvps) nie plaaslik nie
   const fetchRsvps = useCallback((active: { current: boolean }) => {
+    const hasDateFilter = !!(dateFrom || dateTo);
+
+    if (!hasDateFilter) {
+      // Ongefiltreerde lys -- gebruik die gedeelde kas (sien stores/rsvps.store.ts),
+      // dikwels oombliklik as Dashboard dit al hierdie sessie geraadpleeg het.
+      setDateFilteredRsvps(null);
+      setFilterError(null);
+      ensureRsvpsLoaded().catch(() => {});
+      return;
+    }
+
     (async () => {
-      setLoading(true);
-      setLoadError(null);
+      setFilterLoading(true);
+      setFilterError(null);
       try {
-        const hasDateFilter = !!(dateFrom || dateTo);
-        // Die prefetch-kas is net vir die ongefiltreerde standaardlys -- as 'n
-        // datumfilter aktief is, moet ons regtig 'n vars, gefiltreerde versoek stuur.
-        const prefetched = hasDateFilter ? null : takeMyRsvpsPrefetch();
-        const data = await (prefetched ?? getMyRsvps(
+        const data = await getMyRsvps(
           dateFrom ? dateFrom.toISOString() : undefined,
           dateTo ? dateTo.toISOString() : undefined,
-        ));
-        if (active.current) setRsvps(data.filter((r) => r.status !== 'GEKANSELLEER'));
+        );
+        if (active.current) setDateFilteredRsvps(data);
       } catch {
-        if (active.current) setLoadError('Kon nie jou RSVPs laai nie.');
+        if (active.current) setFilterError('Kon nie jou RSVPs laai nie.');
       } finally {
-        if (active.current) setLoading(false);
+        if (active.current) setFilterLoading(false);
       }
     })();
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, ensureRsvpsLoaded]);
 
   // Laai elke keer wat die oortjie fokus kry, sodat 'n vars kaartjie-aankoop
   // of -kansellasie altyd raakgesien word.
@@ -97,6 +116,17 @@ export function RsvpScreen() {
       return () => { active.current = false; };
     }, [fetchRsvps]),
   );
+
+  const hasDateFilter = dateFilteredRsvps !== null;
+  const rawRsvps = hasDateFilter ? dateFilteredRsvps : storeRsvps;
+  const rsvps = useMemo(
+    () => rawRsvps.filter((r) => r.status !== 'GEKANSELLEER'),
+    [rawRsvps],
+  );
+  const loading = hasDateFilter ? filterLoading : (storeLoading && storeRsvps.length === 0);
+  const loadError = hasDateFilter
+    ? filterError
+    : (storeRsvps.length === 0 ? storeError : null);
 
   // Teks-soek bly plaaslik (backend het nie teks-soek nie) datum is reeds
   // deur die backend gefiltreer teen hierdie punt.
@@ -164,8 +194,13 @@ export function RsvpScreen() {
             setCancelingId(rsvpId);
             try {
               await cancelRsvp(rsvpId);
-              clearMyRsvpsPrefetch();
-              setRsvps((prev) => prev.filter((r) => r._id !== rsvpId));
+              // Oombliklike optimistiese verwydering plus 'n kasongeldigverklaring --
+              // kansellasie maak ook plek in die funksie se kapasiteit, so die
+              // funksielys (confirmedAttendees) moet ook vars herlaai.
+              removeRsvpLocally(rsvpId);
+              invalidateRsvps();
+              invalidateEvents();
+              setDateFilteredRsvps((prev) => prev ? prev.filter((r) => r._id !== rsvpId) : prev);
             } catch {
               Alert.alert('Kanselleer', 'Kon nie die RSVP kanselleer nie. Probeer asseblief weer.');
             } finally {
@@ -289,7 +324,7 @@ export function RsvpScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {loading ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator color={colors.primary} />
+            <LoadingSpinner size={80} />
           </View>
         ) : loadError ? (
           <View style={styles.emptyState}>
@@ -314,6 +349,7 @@ export function RsvpScreen() {
               icon: RSVP_STATUS_ICONS[status],
             };
             const { day, month } = formatDate(event.date);
+            const isExpired = getEventStatus(event) === 'past';
             const showQr = openQrIds.has(_id);
             const showPlusOneQr = !!plusOneRsvpId && openQrIds.has(plusOneRsvpId);
             const plusOneFullName = [plusOneName, plusOneSurname].filter(Boolean).join(' ');
@@ -395,7 +431,12 @@ export function RsvpScreen() {
                   </ViewShot>
                 )}
 
+
+                  
                 <View style={styles.rsvpActions}>
+                  { isExpired ? (
+                      <Text style={styles.expiredLabel}>Verby - QR nie meer beskikbaar nie</Text>
+                  ) : (
                   <TouchableOpacity
                     style={styles.qrBtn}
                     onPress={() => toggleQr(_id)}
@@ -404,8 +445,9 @@ export function RsvpScreen() {
                     <Feather name="maximize" size={13} color={colors.primary} />
                     <Text style={styles.qrBtnText}>{showQr ? 'Versteek QR' : 'Wys QR'}</Text>
                   </TouchableOpacity>
+                  )}
 
-                  {plusOneRsvpId && (
+                  {plusOneRsvpId && !isExpired && (
                     <TouchableOpacity
                       style={styles.qrBtn}
                       onPress={() => toggleQr(plusOneRsvpId)}
@@ -614,6 +656,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       paddingVertical: 6,
     },
     qrBtnText: { fontSize: 16, fontWeight: '800', color: colors.primary },
+    expiredLabel: { fontSize: 13, fontWeight: '700', color: colors.textSubtle },
     qrBox: {
       alignSelf: 'center',
       width: 200,

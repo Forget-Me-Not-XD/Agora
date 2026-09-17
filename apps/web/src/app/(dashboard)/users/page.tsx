@@ -3,11 +3,18 @@ import { AlertCircle, Users } from 'lucide-react';
 import { canManageUsers } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
-import { getUsers } from '@/lib/api/users';
+import { getUsers, searchUsers } from '@/lib/api/users';
 import CreateUserForm from './create-user-form';
+import UserSearchBar from './user-search-bar';
 import UserRow from './user-row';
 
-export default function UsersPage() {
+export const dynamic = 'force-dynamic';
+
+export default function UsersPage({
+    searchParams,
+}: {
+    searchParams: { search?: string };
+}) {
     const user = getCurrentUser();
 
     if (!canManageUsers(user.role)) {
@@ -33,20 +40,22 @@ export default function UsersPage() {
 
             <CreateUserForm />
 
-            <Suspense fallback={<UsersTableSkeleton />}>
-                <UsersTable />
+            <UserSearchBar />
+
+            <Suspense key={searchParams.search ?? ''} fallback={<UsersTableSkeleton />}>
+                <UsersTable search={searchParams.search} />
             </Suspense>
         </div>
     );
 }
 
 // Haal en wys alle gebruikers (slegs bereikbaar vir admins via die bladsy-hek)
-async function UsersTable() {
+async function UsersTable({ search }: { search?: string }) {
     const token = getToken();
 
     let users;
     try {
-        users = await getUsers(token);
+        users = search?.trim() ? await searchUsers(search, token) : await getUsers(token);
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'Onbekende fout';
         return (
