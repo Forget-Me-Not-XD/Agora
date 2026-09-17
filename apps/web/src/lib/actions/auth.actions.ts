@@ -15,6 +15,7 @@ import {
   DEFAULT_ACCESS_EXPIRY,
   remainingSessionSeconds,
 } from '@/lib/auth-cookies';
+import { clientIpHeaders } from '@/lib/client-ip';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 
@@ -35,7 +36,8 @@ export async function loginAction(
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Die backend throttle login per IP, so dit moet die gebruiker s'n wees en nie die web-pod s'n nie
+      headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
       // Stuur altyd rememberMe, anders gee die backend 'n lang sessie (dis vir mobiel)
       body:    JSON.stringify({ ...rest, rememberMe }),
       cache:   'no-store',
@@ -77,7 +79,7 @@ export async function registerAction(payload: {
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/register`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
       // Registrasie het nie 'n onthou-my keuse nie, so dit is 'n gewone sessie
       body:    JSON.stringify({ ...payload, rememberMe: false }),
       cache:   'no-store',

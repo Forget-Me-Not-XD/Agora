@@ -11,7 +11,6 @@ import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth, TicketRevenueSummary, EventRevenue, RevenuePerMonth } from './analytics.service';
 import { Trend } from './dto/trend.dto';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
-import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 interface EventsSummaryResponse {
     eventsPerMonth: EventsPerMonth[];
@@ -41,9 +40,7 @@ export class AnalyticsController {
     }
 
     @Get('events-summary')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getEventsSummary(): Promise<EventsSummaryResponse> {
         const [eventsPerMonth, top5Events] = await Promise.all([
@@ -54,9 +51,7 @@ export class AnalyticsController {
     }
 
     @Get('rsvp-summary')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRsvpSummary(): Promise<RsvpSummaryResponse> {
         const [rsvpsPerEvent, averageFillRate] = await Promise.all([
@@ -67,63 +62,49 @@ export class AnalyticsController {
     }
 
     @Get('admin-kpis')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getAdminKpis(): Promise <AdminKpis> {
         return this.analyticsService.getAdminKpis();
     }
 
     @Get('rsvps-per-month')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRsvpsPerMonth(): Promise <EventsPerMonth[]> {
         return this.analyticsService.getRsvpsPerMonth();
     }
 
     @Get('recent-rsvps')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRecentRsvps(@Query('limit') limit?: string): Promise <RecentRsvp[]> {
         return this.analyticsService.getRecentRsvps(limit ? parseInt(limit, 10) : 10);
     }
 
     @Get('rsvp-status-breakdown')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRsvpStatusBreakdown(): Promise<RsvpStatusCount[]> {
         return this.analyticsService.getRsvpStatusBreakdown();
     }
 
     @Get ('ticket-revenue-summary')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getTicketRevenueSummary(): Promise <TicketRevenueSummary> {
         return this.analyticsService.getTicketRevenueSummary();
     }
 
     @Get('revenue-per-event')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRevenuePerEvent(): Promise <EventRevenue[]> {
         return this.analyticsService.getRevenuePerEvent();
     }
 
     @Get('revenue-per-month')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async getRevenuePerMonth(): Promise <RevenuePerMonth[]> {
         return this.analyticsService.getRevenuePerMonth();
@@ -162,9 +143,6 @@ export class AnalyticsController {
     // Finansies-toegekende persoon) toegewys is, of 'n leë lys as hulle aan niks
     // toegewys is nie.
     @Get('budget-per-month')
-    @UseGuards(ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
     async getBudgetPerMonth(@CurrentUser() user: JwtPayload): Promise<BudgetPerMonth[]> {
         const assignedToUserId = user.role === Role.ADMIN ? undefined : user.sub;
         return this.analyticsService.getBudgetPerMonth(assignedToUserId);
@@ -187,9 +165,7 @@ export class AnalyticsController {
     // Wether a trained KI-model exists on disk right now, and how accurate it was during training - 
     // lets the 'Insigte' page show a status indicator without needing to run the real prediction first
     @Get('model-status')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({ polling: {limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
     async getModelStatus(): Promise<ModelStatus> {
         return this.lstmService.getModelStatus();
@@ -205,9 +181,6 @@ export class AnalyticsController {
     }
 
     @Get('prediction')
-    @UseGuards(ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
     async getAttendancePrediction(
         @Query('eventId') eventId: string,
         @CurrentUser() user: JwtPayload,
@@ -228,9 +201,7 @@ export class AnalyticsController {
     // Report-card view: for a set of completed events, how close was the model's
     // forward-looking guess to what actually happened.
     @Get('prediction-accuracy')
-    @UseGuards(RolesGuard, ThrottlerGuard)
-    @Throttle({polling: { limit: 60, ttl: 60000}})
-    @SkipThrottle({ default: true })
+    @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
     async getPredictionAccuracy(
         @Query('eventIds') eventIds: string | undefined,

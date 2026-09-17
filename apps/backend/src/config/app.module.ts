@@ -1,8 +1,10 @@
 ﻿// ========== Imports: ==========
 import * as path from 'path';
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { JwtService } from '@nestjs/jwt';
 
 import configuration from './configuration';
 import { AuthModule } from '../auth/auth.module';
@@ -20,8 +22,9 @@ import { PhotographersModule } from '../photographers/photographers.module';
 import { ExportModule } from '../export/export.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { AccountModule } from '../account/account.module';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from '../health/health.module';
+import { createThrottlerOptions } from '../common/throttler/throttler.config';
 
 
 @Module({
@@ -43,23 +46,12 @@ import { HealthModule } from '../health/health.module';
     }),
 
     // ========== Throttler Module for Requests ==========
-    // 'default' bly streng - vir sensitiewe aksies soos login/registrasie.
-    // 'polling' is ruimer - vir periodieke leesroetes wat AutoRefresh (web)
-    // en useFocusEffect (mobile) elke 60s herhaal, moontlik oor verskeie
-    // gelyktydige panele/kaarte op een bladsy (bv. Insights).
-    ThrottlerModule.forRoot({
-        throttlers: [
-            {
-                name: 'default',
-                ttl: 60000,
-                limit: 10,
-            },
-            {
-                name: 'polling',
-                ttl: 60000,
-                limit: 60,
-            },
-        ],
+    // Setup and reasoning live in createThrottlerOptions, the limits in THROTTLE_LIMITS.
+    // The JwtService is only used to read who a token belongs to, so it needs the secret and nothing else.
+    ThrottlerModule.forRootAsync({
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) =>
+            createThrottlerOptions(new JwtService({ secret: config.get<string>('jwt.secret') })),
     }),
 
     // ========== Domain modules ==========
@@ -79,6 +71,11 @@ import { HealthModule } from '../health/health.module';
     ExportModule,
     CalendarModule,
     AccountModule,
+    ],
+    providers: [
+        // Global, so every route is throttled, including ones added later. Use @SkipAllThrottles
+        // for the few that must never be turned away.
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
     ],
 })
 export class AppModule {}

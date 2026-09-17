@@ -3,10 +3,14 @@ import { Controller, Get, Res, HttpStatus } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import type { Response } from 'express';
+import { SkipAllThrottles } from '../common/throttler/throttle.decorators';
 
 // Liveness/readiness endpoints for the k8s probes — deliberately outside
-// auth/throttling so the kubelet can always reach them.
+// auth/throttling so the kubelet can always reach them. The throttler is global,
+// so it has to be switched off here explicitly. A 429 on a probe would make k8s
+// restart a perfectly healthy pod.
 @Controller('health')
+@SkipAllThrottles()
 export class HealthController {
     constructor(@InjectConnection() private readonly mongoConnection: Connection) {}
 

@@ -9,6 +9,7 @@ import { PaymentsService } from './payments.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiatePaymentResponseDto } from './dto/initiate-payment-response.dto';
 import { PayfastNotifyDto, PayfastNotifyResultDto } from './dto/payfast-notify.dto';
+import { SkipAllThrottles } from '../common/throttler/throttle.decorators';
 
 // Slegs hierdie velde word ooit as verskuilde form-inputs uitgevoer -- 'n
 // onverwagte query-parameter word eenvoudig geïgnoreer i.p.v. in die HTML
@@ -44,7 +45,11 @@ export class PaymentsController {
         return this.paymentsService.initiate(dto.eventId, user.sub, dto.platform);
     }
 
+    // Dit is PayFast self wat hier bevestig dat 'n betaling deur is. Kry hulle 'n 429, word die
+    // kaartjie dalk nooit geskep nie, al het die gebruiker betaal. Die handtekening word reeds
+    // in handleNotify nagegaan, so ons throttle dit glad nie.
     @Post('notify')
+    @SkipAllThrottles()
     @HttpCode(HttpStatus.OK)
     async notify(@Body() dto: PayfastNotifyDto): Promise<PayfastNotifyResultDto> {
         return this.paymentsService.handleNotify(dto);
