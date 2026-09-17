@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ComponentProps } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -8,10 +8,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
-import { listEvents, type EventResponse } from '../api/events';
-import { getPrediction, type PredictionResult } from '../api/analytics';
-import { formatEventTime } from '../lib/event-status';
+import type { EventResponse } from '../api/events';
+import type { PredictionResult } from '../api/analytics';
+import { formatEventTime, getEventStatus } from '../lib/event-status';
+import { useEventsStore } from '../stores/events.store';
+import { usePredictionsStore } from '../stores/predictions.store';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 
 
@@ -32,8 +35,16 @@ export function AiScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  // Gedeelde funksielys-kas (sien stores/events.store.ts) -- geen aparte
+  // "vanaf vandag"-netwerkversoek meer nie, ons filter eenvoudig dieselfde
+  // lys wat Dashboard/Funksies/Kalender ook gebruik.
+  const events = useEventsStore((s) => s.events);
+  const eventsLoading = useEventsStore((s) => s.isLoading);
+  const ensureEventsLoaded = useEventsStore((s) => s.ensureLoaded);
+  const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
+
   const [forecasts, setForecasts] = useState<Forecast[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [predictionsLoading, setPredictionsLoading] = useState(true);
 
   const role = user?.role ?? 'STUDENT';
   const canViewAi = role === 'ADMIN' || role === 'DOSENT';
@@ -41,41 +52,47 @@ export function AiScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!canViewAi) return;
-      let active = true;
-      (async () => {
-        setLoading(true);
-        try {
-          const allUpcoming = await listEvents(new Date().toISOString());
-          const ownUpcoming = role === 'DOSENT'
-            ? allUpcoming.filter((e) => e.createdBy === user?.id)
-            : allUpcoming;
-          const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
-          // Sequential, not Promise.all -- each prediction spawns a fresh Python
-          // process on the backend that loads TensorFlow from scratch (predict.py
-          // has no model caching), so firing up to MAX_FORECASTS of these at once
-          // can overload the machine and make otherwise-healthy predictions fail.
-          const results: Array<PredictionResult | null> = [];
-          for (const event of upcoming) {
-            try {
-              results.push(await getPrediction(event.id));
-            } catch {
-              results.push(null);
-            }
-          }
-          if (!active) return;
-          setForecasts(
-            upcoming.map((event, i) => ({
-              event,
-              prediction: results[i],
-            })),
-          );
-        } finally {
-          if (active) setLoading(false);
-        }
-      })();
-      return () => { active = false; };
-    }, [canViewAi, role, user?.id]),
+      ensureEventsLoaded().catch(() => {});
+    }, [canViewAi, ensureEventsLoaded]),
   );
+
+  useEffect(() => {
+    if (!canViewAi) return;
+    let active = true;
+    (async () => {
+      setPredictionsLoading(true);
+      const allUpcoming = events.filter((e) => getEventStatus(e) !== 'past');
+      const ownUpcoming = role === 'DOSENT'
+        ? allUpcoming.filter((e) => e.createdBy === user?.id)
+        : allUpcoming;
+      const upcoming = ownUpcoming.slice(0, MAX_FORECASTS);
+      // Sequential, not Promise.all -- each prediction spawns a fresh Python
+      // process on the backend that loads TensorFlow from scratch (predict.py
+      // has no model caching), so firing up to MAX_FORECASTS of these at once
+      // can overload the machine and make otherwise-healthy predictions fail.
+      // ensurePrediction() still shares/caches per event, so a prediction
+      // Dashboard already warmed up resolves here instantly.
+      const results: Array<PredictionResult | null> = [];
+      for (const event of upcoming) {
+        try {
+          results.push(await ensurePrediction(event.id));
+        } catch {
+          results.push(null);
+        }
+      }
+      if (!active) return;
+      setForecasts(
+        upcoming.map((event, i) => ({
+          event,
+          prediction: results[i],
+        })),
+      );
+      setPredictionsLoading(false);
+    })();
+    return () => { active = false; };
+  }, [canViewAi, role, user?.id, events, ensurePrediction]);
+
+  const loading = (eventsLoading && events.length === 0) || predictionsLoading;
 
   if (!canViewAi) {
     return (
@@ -143,7 +160,7 @@ export function AiScreen() {
         <Text style={styles.sectionTitle}>VOORSPELLINGS PER FUNKSIE</Text>
         {loading ? (
           <View style={styles.emptyCard}>
-            <ActivityIndicator color={colors.primary} />
+            <LoadingSpinner size={48} />
           </View>
         ) : forecasts.length === 0 ? (
           <View style={styles.emptyCard}>

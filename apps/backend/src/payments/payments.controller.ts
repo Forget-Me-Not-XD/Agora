@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { PaymentsService } from './payments.service';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { InitiatePaymentResponseDto } from './dto/initiate-payment-response.dto';
 import { PayfastNotifyDto, PayfastNotifyResultDto } from './dto/payfast-notify.dto';
+import { PaymentStatusResponseDto } from './dto/payment-status-response.dto';
 
 // Slegs hierdie velde word ooit as verskuilde form-inputs uitgevoer -- 'n
 // onverwagte query-parameter word eenvoudig geïgnoreer i.p.v. in die HTML
@@ -50,13 +51,30 @@ export class PaymentsController {
         return this.paymentsService.handleNotify(dto);
     }
 
+    // Front-ends (web en mobiel) peil hierdie ná 'n "payment=success"-herleiding
+    // totdat status regtig VOLTOOI is -- sien die kommentaar by getStatusByReference
+    // in payments.service.ts vir waarom die herleiding self nie genoeg is nie.
+    @Get(':reference/status')
+    @UseGuards(JwtAuthGuard)
+    async getStatus(
+        @Param('reference') reference: string,
+        @CurrentUser() user: JwtPayload,
+    ): Promise<PaymentStatusResponseDto> {
+        return this.paymentsService.getStatusByReference(reference, user.sub);
+    }
+
     // PayFast POST ons eie ITN (notify) direk server-tot-server om die kaartjie te
     // skep -- hierdie twee roetes hieronder is bloot die blaaier-herleiding ná
     // afloop, sodat die gebruiker weer by die regte app (web of mobiel) uitkom.
     // Moenie hierop staatmaak vir betaalbevestiging nie, net vir navigasie.
     @Get('return')
-    handleReturn(@Query('platform') platform: string | undefined, @Res() res: Response): void {
-        res.redirect(this.buildLandingUrl(platform, 'payment=success'));
+    handleReturn(
+        @Query('platform') platform: string | undefined,
+        @Query('reference') reference: string | undefined,
+        @Res() res: Response,
+    ): void {
+        const query = reference ? `payment=success&reference=${encodeURIComponent(reference)}` : 'payment=success';
+        res.redirect(this.buildLandingUrl(platform, query));
     }
 
     @Get('cancel')

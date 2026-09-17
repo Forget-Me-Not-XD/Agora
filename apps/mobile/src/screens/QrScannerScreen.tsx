@@ -24,6 +24,8 @@ import { getEvent, type EventResponse } from '../api/events';
 import { getEventStatus, formatEventTime } from '../lib/event-status';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
+import { useEventsStore } from '../stores/events.store';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
@@ -39,6 +41,7 @@ export function QrScannerScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [rsvps, setRsvps] = useState<RsvpWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +99,7 @@ export function QrScannerScreen() {
       setLastScannedName(res.guestName);
       showSuccess(res, resetScanner);
       loadData(); // haal die opgedateerde inteken-lys vanaf die bediener
+      invalidateEvents(); // checkedInCount het verander
     } catch (err) {
       showLoading(false);
       const status = (err as any)?.response?.status;
@@ -129,6 +133,7 @@ export function QrScannerScreen() {
       await registerWalkIn(route.params.eventId, name);
       setWalkInName('');
       loadData(); // haal die bygewerkte lys vanaf die bediener
+      invalidateEvents(); // confirmedAttendees het verander
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       Alert.alert(
@@ -203,7 +208,7 @@ export function QrScannerScreen() {
         {/* ── Stats row ── */}
         <View style={styles.statsRow}>
           {loading ? (
-            <ActivityIndicator color={colors.primary} style={{ paddingVertical: 8 }} />
+            <LoadingSpinner size={32} style={{ paddingVertical: 8 }} />
           ) : (
             <>
               <View style={styles.statItem}>
