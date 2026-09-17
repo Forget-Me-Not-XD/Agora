@@ -2,6 +2,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, FilterQuery } from 'mongoose';
+import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from './schemas/user.schema';
 import { CalendarConnection } from './schemas/calendar-connection.schema';
 import { Role } from '../common/enums/role.enums';
@@ -9,9 +10,12 @@ import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { UserTag } from '../common/enums/user-tag.enum';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { generateTempPassword } from '../common/utils/generate-temp-password';
 
 @Injectable()
 export class UsersService {
+  private readonly BCRYPT_ROUNDS = 12;
+
   constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
 
   async findByEmail(email: string): Promise<UserDocument | null> {
@@ -156,5 +160,22 @@ export class UsersService {
   async deleteById(userId: string): Promise<void> {
     const result = await this.userModel.deleteOne({ _id: userId }).exec();
     if (result.deletedCount === 0) throw new NotFoundException(`User ${userId} not found`);
+  }
+
+  // Admin-geïnisieerde wagwoordherstel: genereer 'n nuwe tydelike wagwoord, hash dit,
+  // en forseer 'n wagwoordverandering by die volgende aanmelding. Daar is geen e-posdiens
+  // nie, so die nuwe wagwoord word terug na die controller gegee om eenmalig gewys te word.
+  async resetPassword(userId: string): Promise<string> {
+    const temporaryPassword = generateTempPassword();
+    const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS);
+    const passwordHash = await bcrypt.hash(temporaryPassword, salt);
+
+    const result = await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { passwordHash, mustChangePassword: true, passwordChangedAt: new Date(), passwordHistory: [] } },
+    ).exec();
+    if (result.matchedCount === 0) throw new NotFoundException(`User ${userId} not found`);
+
+    return temporaryPassword;
   }
 }
