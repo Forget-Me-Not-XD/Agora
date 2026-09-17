@@ -23,12 +23,15 @@ import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from
 import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput';
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
-import { getDraftPrediction, getPrediction } from '../api/analytics';
+import { getDraftPrediction } from '../api/analytics';
 import type { PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
-import { clearMyRsvpsPrefetch } from '../lib/prefetch';
+import { useEventsStore } from '../stores/events.store';
+import { useRsvpsStore } from '../stores/rsvps.store';
+import { usePredictionsStore } from '../stores/predictions.store';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -49,9 +52,20 @@ export function EventDetailScreen() {
 
   const isCreating = route.params.eventId === 'new';
 
-  const [event, setEvent] = useState<EventResponse | null>(null);
+  // Die gedeelde funksielys-kas hou dikwels reeds hierdie presiese funksie
+  // (van watter skerm ook al hierheen genavigeer is), so ons kan dit dadelik
+  // wys terwyl getEvent() in die agtergrond die outoritatiewe/varsste weergawe
+  // gaan haal -- geen leë-skerm-wagtyd vir 'n reeds-geziene funksie nie.
+  const cachedEvent = useEventsStore((s) => (isCreating ? undefined : s.getEvent(route.params.eventId)));
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
+  const invalidateRsvps = useRsvpsStore((s) => s.invalidate);
+  const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
+
+  const [fetchedEvent, setFetchedEvent] = useState<EventResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  const event = fetchedEvent ?? cachedEvent ?? null;
 
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [predictionLoading, setPredictionLoading] = useState(true);
@@ -61,11 +75,10 @@ export function EventDetailScreen() {
     if (isCreating) return;
     let active = true;
     (async () => {
-      setLoading(true);
       setLoadFailed(false);
       try {
         const data = await getEvent(route.params.eventId);
-        if (active) setEvent(data);
+        if (active) setFetchedEvent(data);
       } catch (err: unknown) {
         const axiosErr = err as { message?: string; response?: { status?: number; data?: unknown } };
         console.error(
@@ -73,12 +86,15 @@ export function EventDetailScreen() {
           axiosErr?.response?.status,
           axiosErr?.response?.data ?? axiosErr?.message,
         );
-        if (active) setLoadFailed(true);
+        // As ons reeds 'n gekaste weergawe wys, hou eerder daarby as om 'n
+        // "nie gevind nie"-skerm oor bestaande, bruikbare inhoud te plaas.
+        if (active && !cachedEvent) setLoadFailed(true);
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreating, route.params.eventId]);
 
   useEffect(() => {
@@ -93,12 +109,12 @@ export function EventDetailScreen() {
     let cancelled = false;
     setPredictionLoading(true);
     setPredictionUnavailable(false);
-    getPrediction(event.id)
+    ensurePrediction(event.id)
       .then((r) => { if (!cancelled) setPrediction(r); })
       .catch(() => { if (!cancelled) setPredictionUnavailable(true); })
       .finally(() => { if (!cancelled) setPredictionLoading(false); });
     return () => { cancelled = true; };
-  }, [isCreating, event]);
+  }, [isCreating, event, ensurePrediction]);
 
   if (isCreating) {
     return (
@@ -112,17 +128,17 @@ export function EventDetailScreen() {
 
   const role = user?.role ?? 'STUDENT';
 
-  if (loading) {
+  if (loading && !event) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorWrap}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (loadFailed || !event) {
+  if ((loadFailed && !event) || !event) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorWrap}>
@@ -165,7 +181,10 @@ export function EventDetailScreen() {
           ? { name: plusOneName.trim(), surname: plusOneSurname.trim(), email: plusOneEmail.trim() }
           : undefined,
       );
-      clearMyRsvpsPrefetch();
+      // RSVP verander die funksie se confirmedAttendees en die gebruiker se
+      // eie RSVP-lys, so albei gedeelde kaslae moet weer vars laai.
+      invalidateEvents();
+      invalidateRsvps();
       Alert.alert(
         'Ingeskryf!',
         wantsPlusOne
@@ -254,7 +273,7 @@ export function EventDetailScreen() {
         {status !== 'past' && (
           <View style={styles.aiCard}>
             {predictionLoading ? (
-              <ActivityIndicator color={colors.primary} />
+              <LoadingSpinner size={40} />
             ) : predictionUnavailable || !prediction ? (
               <Text style={styles.aiSubtitle}>KI-voorspelling nie tans beskikbaar vir hierdie funksie nie.</Text>
             ) : (
@@ -347,7 +366,17 @@ export function EventDetailScreen() {
 
         {(status === 'upcoming' || status === 'ongoing') && (
           event.sellsTickets ? (
-            <PaymentModal event={event} />
+            <PaymentModal
+              event={event}
+              onPurchased={() => {
+                // Deur hierdie punt is die betaling bevestig VOLTOOI (PaymentModal
+                // het reeds self gepeil totdat die RSVP werklik bestaan), so 'n
+                // dadelike verfris hier is veilig -- nie net 'n ongeldigverklaring
+                // wat op die volgende natuurlike laai moet wag nie.
+                invalidateEvents();
+                useRsvpsStore.getState().refresh();
+              }}
+            />
           ) : (
             <>
               {event.allowsPlusOne && (
@@ -467,6 +496,7 @@ function CreateEventForm({
   const [useVenue, setUseVenue] = useState(false);
   const [selectedCampus, setSelectedCampus] = useState('');
   const [venueId, setVenueId] = useState('');
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
 
   useEffect(() => {
 
@@ -639,6 +669,7 @@ useEffect(() => {
         ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
         allowsPlusOne,
       });
+      invalidateEvents();
       safeGoBack(navigation);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
