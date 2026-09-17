@@ -3,7 +3,15 @@
 // ========== Imports: ==========
 import { cookies }                from 'next/headers';
 import { revalidatePath }         from 'next/cache';
-import { updateUser, UserTitle, searchUsersByTag, type UserTag, type UserResponseDto } from '@/lib/api/users';
+import {
+    updateUser,
+    UserTitle,
+    searchUsersByTag,
+    deleteUser,
+    resetUserPassword,
+    type UserTag,
+    type UserResponseDto,
+} from '@/lib/api/users';
 import { getSession, getToken }    from '@/lib/session';
 import { COOKIE_NAME, COOKIE_REFRESH_NAME, COOKIE_USER_NAME, remainingSessionSeconds, setUserCookie } from '@/lib/auth-cookies';
 import type { UserResponse }      from '@/lib/types';
@@ -47,7 +55,7 @@ function getSessionUserId(): string | undefined {
 /**
  * Stoor die ingetekende gebruiker se eie profielvelde (naam, van en titel).
  *
- * Die ID kom uit die sessie en NIE uit die kliënt nie: 'n aksie wat 'n ID as
+ * Die ID kom uit die sessie en NIE uit die kliÃ«nt nie: 'n aksie wat 'n ID as
  * parameter aanvaar, laat die blaaier kies wie se rekening geskryf word. Die
  * backend keer wel 'n vreemde ID vir gewone gebruikers, maar 'n administrateur
  * sou so per ongeluk iemand anders se naam in sy eie sessie-cookie kon skryf.
@@ -121,6 +129,51 @@ export async function updateUserTagsAction(
         return {};
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Stoor het misluk.' };
+    }
+}
+
+/**
+ * ADMIN-pad: verander 'n gebruiker se rol, studiesentrum of aktief-status.
+ *
+ * Die backend keer hierdie velde vir enigeen wat nie ADMIN is nie met 'n 403 --
+ * hierdie aksie bestaan net vir die admin-Gebruikers-bladsy.
+ */
+export async function updateUserAdminAction(
+    userId: string,
+    patch:  { role?: string; studyCenter?: string; isActive?: boolean },
+): Promise<{ error?: string; user?: UserResponseDto }> {
+    try {
+        const token   = getToken();
+        const updated = await updateUser(userId, patch, token);
+        revalidatePath('/users');
+        return { user: updated };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Stoor het misluk.' };
+    }
+}
+
+// ADMIN-pad: verwyder 'n gebruiker permanent
+export async function deleteUserAction(userId: string): Promise<{ error?: string }> {
+    try {
+        const token = getToken();
+        await deleteUser(userId, token);
+        revalidatePath('/users');
+        return {};
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Verwydering het misluk.' };
+    }
+}
+
+// ADMIN-pad: herstel 'n gebruiker se wagwoord na 'n nuwe tydelike wagwoord
+export async function resetPasswordAction(
+    userId: string,
+): Promise<{ error?: string; temporaryPassword?: string }> {
+    try {
+        const token = getToken();
+        const temporaryPassword = await resetUserPassword(userId, token);
+        return { temporaryPassword };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Wagwoordherstel het misluk.' };
     }
 }
 
