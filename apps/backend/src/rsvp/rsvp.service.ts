@@ -291,7 +291,8 @@ export class RsvpService {
     }
 
     // Word gebruik wanneer die Event alreeds verloop het om te verseker dat daar nie geRSVP kan word nie.
-    private assertEventNotExpired(event: EventDocument): void {
+    // Publiek sodat PaymentsService dieselfde toets voor betaal-bevestiging kan doen.
+    assertEventNotExpired(event: EventDocument): void {
     const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
     if (effectiveEnd.getTime() < Date.now()) {
         throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
@@ -410,6 +411,7 @@ export class RsvpService {
     async registerWalkIn(dto: CreateWalkInDto, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         await this.eventsService.incrementConfirmedAttendees(dto.eventId);
         await this.eventsService.incrementCheckedInCount(dto.eventId);

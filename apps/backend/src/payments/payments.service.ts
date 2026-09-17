@@ -131,6 +131,19 @@ export class PaymentsService {
             return { status: PaymentStatus.MISLUK };
         }
 
+        // Toets verval vroeg, voordat die betaling geëis of kaartjievoorraad
+        // aangepas word: 'n geleentheid wat intussen verval het (bv. 'n
+        // vertraagde/herhaalde ITN) moet nooit VOLTOOI-status of 'n
+        // kaartjie-aftrekking kry wat weer teruggerol moet word nie.
+        const event = await this.eventsService.findById(payment.event.toString());
+        try {
+            this.rsvpService.assertEventNotExpired(event);
+        } catch (err) {
+            payment.status = PaymentStatus.MISLUK;
+            await payment.save();
+            throw err;
+        }
+
         // Atomies "eis" hierdie betaling voordat 'n kaartjie geskep word — PayFast
         // stuur soms meer as een ITN-oproep vir dieselfde transaksie. Slegs die
         // versoek wat werklik van HANGENDE na VOLTOOI oorgaan, mag voortgaan; enige
