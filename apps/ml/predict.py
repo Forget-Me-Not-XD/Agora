@@ -3,20 +3,26 @@ predict.py - LSTM Inference Script: Event Attendance Prediction
 ======================================================================
 
 What this script will do:
-1. Accepts a JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, daysInAdvance]
+1. Accepts a JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]
    rows as a single CLI argument - oldest event first, target event last
 2. Loads scaler.pkl (MinMaxScaler from training) and normalises the sequence
 3. Runs the TFLite interpreter on the real sequence to obtain fillRate and noShowRate
 4. Computes a cost estimate from the predictions
 5. Generates rules-based reasoning strings from the target event's own features
-6. Prints a single JSON object to stdout (NestJS reads via spawn)
+6. Optionally (--alternatives) swaps the last row of the sequence for each alternative
+   target row and scores it with the same loaded interpreter
+7. Prints a single JSON object to stdout (NestJS reads via spawn)
 
 Usage:
-    python predict.py '<JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, daysInAdvance] rows>'
+    python predict.py '<JSON array of SEQUENCE_LENGTH [capacity, dayOfWeek, month, dayOfMonth, daysInAdvance] rows>'
+    python predict.py '<sequence>' --alternatives '<JSON array of [capacity, dayOfWeek, month, dayOfMonth, daysInAdvance] rows>'
 
 Example:
-    python predict.py '[[180,3,2,40],[220,5,2,35],...,[200,5,2,30]]'
+    python predict.py '[[180,3,2,14,40],[220,5,2,16,35],...,[200,5,2,23,30]]'
     (10 rows: 9 real preceding events, then the target event as the final row)
+
+    python predict.py '[[180,3,2,14,40],...,[200,5,2,23,30]]' --alternatives '[[200,4,2,22,29],[200,5,3,2,37]]'
+    (the output gains an "alternatives" list with one prediction per alternative row)
 
     Exit code 0 on success, non-zero on any error
     Errors go to stderr; only the JSON result goes to stdout.
@@ -53,6 +59,10 @@ except ImportError:
 # Following values must match train.py EXACTLY - saved model was compiled with these dimensions and cannot accept any other input shape
 SEQUENCE_LENGTH = 10    # timesteps the LSTM expects per sample
 NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos(month), sin(dom), cos(dom), log1p(daysInAdvance)]
+
+NUM_RAW_FEATURES = 5
+RAW_FEATURE_NAMES = '[capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]'
+MAX_ALTERNATIVES = 20
 
 
 # ============================================================
@@ -132,6 +142,64 @@ def invoke(interpreter, input_array: np.ndarray) -> tuple:
     
     output = interpreter.get_tensor(output_details[0]['index'])
     return float(output[0][0]), float(output[0][1])
+
+def clamp_rate(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+# ============================================================
+# ALTERNATIVE TARGET ROWS
+# ============================================================
+
+def is_valid_row(row) -> bool:
+    return (
+        isinstance(row, list)
+        and len(row) == NUM_RAW_FEATURES
+        and all(isinstance(value, (int, float)) and not isinstance(value, bool) for value in row)
+    )
+
+def parse_alternatives(raw_json: str) -> list:
+    rows = json.loads(raw_json)
+    
+    if not isinstance(rows, list) or len(rows) > MAX_ALTERNATIVES:
+        raise ValueError(f"alternatives must be a JSON array with at most {MAX_ALTERNATIVES} rows")
+    
+    if not all(is_valid_row(row) for row in rows):
+        raise ValueError(f"each alternative row must have exactly {NUM_RAW_FEATURES} numeric values {RAW_FEATURE_NAMES}")
+    
+    return rows
+
+def score_alternatives(rows: list, raw_features: np.ndarray, scaler, interpreter) -> list:
+    alternatives = []
+    
+    for row in rows:
+        alternative_sequence = raw_features.copy()
+        alternative_sequence[-1] = np.array(row, dtype = np.float32)
+        
+        fill_rate, no_show_rate = explain.score_sequence(
+            alternative_sequence, scaler, engineer_features, lambda arr: invoke(interpreter, arr),
+        )
+        
+        capacity, dow, month, dom, days_advance = (int(value) for value in row)
+        alternatives.append({
+            "capacity":             capacity,
+            "dayOfWeek":            dow,
+            "month":                month,
+            "dayOfMonth":           dom,
+            "daysInAdvance":        days_advance,
+            "predictedFillRate":    round(clamp_rate(fill_rate), 4),
+            "predictedNoShowRate":  round(clamp_rate(no_show_rate), 4),
+        })
+
+    return alternatives
+
+def build_alternatives(raw_json: str, raw_features: np.ndarray, scaler, interpreter) -> list:
+    try:
+        rows = parse_alternatives(raw_json)
+        return score_alternatives(rows, raw_features, scaler, interpreter)
+    except Exception as exc:
+        sys.stderr.write(f"WARNING: alternatives skipped: {exc}\n")
+        return []
 
 
 # ============================================================
@@ -292,7 +360,11 @@ def main() -> None:
     )
     parser.add_argument(
         'sequence', type = str,
-        help = f'JSON array of exactly {SEQUENCE_LENGTH} [capacity, dayOfWeek, month, daysInAdvance] rows, oldest first, target event last',
+        help = f'JSON array of exactly {SEQUENCE_LENGTH} {RAW_FEATURE_NAMES} rows, oldest first, target event last',
+    )
+    parser.add_argument(
+        '--alternatives', type = str, default = None,
+        help = f'Optional JSON array of up to {MAX_ALTERNATIVES} {RAW_FEATURE_NAMES} rows; each one replaces the last row of the sequence and is scored with the same interpreter',
     )
     args = parser.parse_args()
 
@@ -308,8 +380,8 @@ def main() -> None:
         sys.exit(1)
 
     for row in sequence:
-        if not isinstance(row, list) or len(row) != 5:
-            sys.stderr.write("ERROR: each sequence row must have exactly 4 values [capacity, dayOfWeek, month, daysInAdvance]\n")
+        if not is_valid_row(row):
+            sys.stderr.write(f"ERROR: each sequence row must have exactly {NUM_RAW_FEATURES} numeric values {RAW_FEATURE_NAMES}\n")
             sys.exit(1)
 
     # Resolve the dir this script lives in:
@@ -317,9 +389,9 @@ def main() -> None:
     scaler, model_path = load_artifacts(script_dir)
 
     # Build the raw sequence, engineer + scale it exactly like training:
-    raw_features = np.array(sequence, dtype = np.float32)      # Shape (SEQUENCE_LENGTH, 4)
-    engineered = engineer_features(raw_features)                # Shape (SEQUENCE_LENGTH, 6)
-    scaled = scaler.transform(engineered)                       # Shape (SEQUENCE_LENGTH, 6)
+    raw_features = np.array(sequence, dtype = np.float32)      # Shape (SEQUENCE_LENGTH, NUM_RAW_FEATURES)
+    engineered = engineer_features(raw_features)                # Shape (SEQUENCE_LENGTH, NUM_FEATURES)
+    scaled = scaler.transform(engineered)                       # Shape (SEQUENCE_LENGTH, NUM_FEATURES)
 
     input_array = scaled.reshape(1, SEQUENCE_LENGTH, NUM_FEATURES).astype(np.float32)
 
@@ -327,8 +399,8 @@ def main() -> None:
     fill_rate, no_show_rate = invoke(interpreter, input_array)
 
     # Sigmoid output is theoretically [0, 1]
-    fill_rate = max(0.0, min(1.0, fill_rate))
-    no_show_rate = max(0.0, min(1.0, no_show_rate))
+    fill_rate = clamp_rate(fill_rate)
+    no_show_rate = clamp_rate(no_show_rate)
 
     # The target event is always the LAST row of the sequence - use its own raw
     # values for the budget estimate and reasoning strings, not any historical row.
@@ -360,6 +432,9 @@ def main() -> None:
         "estimatedBudgetZAR":  budget,
         "reasoning":           reasoning,
     }
+
+    if args.alternatives is not None:
+        result["alternatives"] = build_alternatives(args.alternatives, raw_features, scaler, interpreter)
     
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
