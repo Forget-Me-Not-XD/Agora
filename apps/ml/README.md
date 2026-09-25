@@ -123,7 +123,7 @@ uitgebrei word voordat dit die netwerk ingaan (sien 3.3):
 | 4 | `daysInAdvance` | Dae tussen die skep van die geleentheid en die datum — promosietyd |
 
 Dit is dieselfde 5 rou kenmerke wat die NestJS `LstmService.computeFeatures()`/
-`computeDraftFeatures()`-metodes vanuit die databasis (of konsep-DTO) bou, sodat
+`computeFeaturesAt()`-metodes vanuit die databasis (of konsep-DTO) bou, sodat
 opleidingsdata en regstreekse voorspellingsdata altyd dieselfde vorm het.
 
 `dayOfMonth` vang die beurs-/toelaagbetalingsiklus vas: NSFAS en die meeste
@@ -253,8 +253,9 @@ se kenmerke 10 keer herhaal om aan die LSTM se invoervorm te voldoen — dit
 het die LSTM se hele waarde (om van 'n reeks te leer) tydens regstreekse
 voorspelling weggegooi.
 
-Fase 2 het dit reggestel: `LstmService.buildFeatureSequence()` haal nou die
-9 werklike mees-onlangse gebeure strek voor die teiken-datum op, bereken hul
+Fase 2 het dit reggestel: `LstmService.findRecentHistory()` haal nou die
+9 werklike mees-onlangse gebeure strek voor die teiken-datum op,
+`buildFeatureSequence()` bereken hul
 kenmerke presies soos opleiding dit doen, en voeg die teikengebeurtenis se
 eie kenmerke by as die laaste tydstap:
 
@@ -524,6 +525,19 @@ python predict.py "[[300,1,3,10,60],[300,1,3,10,55],[300,1,3,10,50],[300,1,3,10,
 mv model.tflite.bak model.tflite
 ```
 
+**Model-gebaseerde alternatiewe (`--alternatives`):**
+
+Die opsionele `--alternatives`-argument neem 'n JSON-lys (hoogstens 20) van
+teikenrye in dieselfde 5-waarde-formaat. Elke ry vervang die laaste ry van die
+reeks en word met dieselfde gelaaide interpreteerder voorspel — steeds een
+Python-proses. Sonder die argument is die uitset identies aan voorheen.
+
+```bash
+python predict.py "[[300,1,3,10,60],[300,1,3,10,55],[300,1,3,10,50],[300,1,3,10,45],[300,1,3,10,40],[300,1,3,10,35],[300,1,3,10,30],[300,1,3,10,25],[300,1,3,10,20],[200,5,2,10,30]]" --alternatives "[[200,4,2,9,29],[200,5,2,17,37],[160,5,2,10,30]]"
+# Ongeldige alternatiewe (bv. --alternatives "nope") gee 'n WARNING op stderr,
+# "alternatives": [] en steeds kode 0 — die hoofvoorspelling bly ongeskonde.
+```
+
 ---
 
 ## 8. Die Uitvoer JSON Verstaan
@@ -553,6 +567,7 @@ mv model.tflite.bak model.tflite
 | `estimatedAttendees` | `rsvps × (1 - noShowRate)` | Getal mense wat verwag word om fisies aan te kom |
 | `estimatedBudgetZAR` | `byeeners×R250 + lokaalverhuur` | Beraamde geleentheidskostes in Suid-Afrikaanse Rand |
 | `reasoning` | `explain.py` (occlusion), met `generate_reasoning()` in `predict.py` as terugval | 1–3 Afrikaanse sinne wat elk 'n **gemete** effek beskryf: hoeveel die voorspelling regtig verander het toe een kenmerk van die teikengebeurtenis vervang is met wat tipies was vir die 9 voorafgaande werklike gebeure. Sien afdeling 12. |
+| `alternatives` | Slegs met `--alternatives` | Een objek per alternatiewe ry: `capacity`, `dayOfWeek`, `month`, `dayOfMonth`, `daysInAdvance`, `predictedFillRate`, `predictedNoShowRate`. NestJS voeg `kind` (`sameWeek`/`laterWeek`/`recommendedCapacity`) en die volle ISO-`date` by. |
 
 **Begrotingsuiteensetting:**
 
