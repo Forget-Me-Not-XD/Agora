@@ -10,7 +10,9 @@ What this script will do:
 4. Computes a cost estimate from the predictions
 5. Generates rules-based reasoning strings from the target event's own features
 6. Optionally (--alternatives) swaps the last row of the sequence for each alternative
-   target row and scores it with the same loaded interpreter
+   target row and scores it with the same loaded interpreter, plus the target row with the
+   recommended capacity ceil(estimatedRsvps x 1.1)
+
 7. Prints a single JSON object to stdout (NestJS reads via spawn)
 
 Usage:
@@ -36,6 +38,7 @@ import pickle
 import sys
 import numpy as np
 import explain
+import math
 
 try:
     import ai_edge_litert.interpreter as tflite         # Pi: lightweight runtime (tflite-runtime's successor;
@@ -63,6 +66,8 @@ NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos
 NUM_RAW_FEATURES = 5
 RAW_FEATURE_NAMES = '[capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]'
 MAX_ALTERNATIVES = 20
+
+CAPACITY_HEADROOM_PERCENT = 110
 
 
 # ============================================================
@@ -200,6 +205,14 @@ def build_alternatives(raw_json: str, raw_features: np.ndarray, scaler, interpre
     except Exception as exc:
         sys.stderr.write(f"WARNING: alternatives skipped: {exc}\n")
         return []
+
+def build_recommended_capacity(target_row: list, estimated_rsvps: int, raw_features: np.ndarray, scaler, interpreter):
+    try:
+        capacity = max(1, math.ceil(estimated_rsvps * CAPACITY_HEADROOM_PERCENT / 100))
+        return score_alternatives([[capacity, *target_row[1:]]], raw_features, scaler, interpreter)[0]
+    except Exception as exc:
+        sys.stderr.write(f"WARNING: recommended capacity skipped: {exc}\n")
+        return None
 
 
 # ============================================================
@@ -435,6 +448,7 @@ def main() -> None:
 
     if args.alternatives is not None:
         result["alternatives"] = build_alternatives(args.alternatives, raw_features, scaler, interpreter)
+        result["recommendedCapacity"] = build_recommended_capacity(sequence[-1], estimated_rsvps, raw_features, scaler, interpreter)
     
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
