@@ -5,14 +5,16 @@ import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import type { PredictionResult } from '@/lib/api/analytics';
 import { getDraftAttendancePredictionAction } from '@/lib/actions/analytics.actions';
+import PredictionAdvice from '@/components/PredictionAdvice';
 
 interface EventPredictionPanelProps {
     date: string;
     capacity: string;
     onApplyBudget: (budget: number) => void;
+    onApplyAlternative: (date: string, capacity: number) => void;
 }
 
-export default function EventPredictionPanel({ date, capacity, onApplyBudget }: EventPredictionPanelProps) {
+export default function EventPredictionPanel({ date, capacity, onApplyBudget, onApplyAlternative }: EventPredictionPanelProps) {
     const [prediction, setPrediction] = useState<PredictionResult | null>(null);
     const [loading, setLoading]       = useState(false);
     const [unavailable, setUnavailable] = useState(false);
@@ -110,6 +112,11 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
                     >
                         Gebruik Voorgestelde Begroting
                     </button>
+
+                    <PredictionAdvice
+                        prediction={prediction}
+                        onChooseAlternative={(alternative) => onApplyAlternative(alternative.date.slice(0, 10), alternative.capacity)}
+                    />
 
                     <div>
                         <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">
