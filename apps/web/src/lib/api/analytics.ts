@@ -171,6 +171,33 @@ export async function getModelStatus(): Promise<ModelStatus> {
     return apiFetch<ModelStatus>('/api/v1/analytics/model-status');
 }
 
+export type AlternativeKind = 'sameWeek' | 'laterWeek' | 'recommendedCapacity';
+
+export interface AlternativePrediction {
+    kind:                AlternativeKind;
+    date:                string;
+    capacity:            number;
+    dayOfWeek:           number;
+    month:               number;
+    dayOfMonth:          number;
+    daysInAdvance:       number;
+    predictedFillRate:   number;
+    predictedNoShowRate: number;
+    estimatedRsvps:      number;
+    estimatedAttendees:  number;
+}
+
+export type RecommendationType = 'day' | 'capacity' | 'noShow' | 'budget';
+
+export type RecommendationSeverity = 'high' | 'medium' | 'low';
+
+export interface Recommendation {
+    type:           RecommendationType;
+    severity:       RecommendationSeverity;
+    message:        string;
+    expectedImpact: string;
+}
+
 export interface PredictionResult {
     predictedFillRate:   number;
     estimatedRsvps:      number;
@@ -178,6 +205,8 @@ export interface PredictionResult {
     estimatedAttendees:  number;
     estimatedBudgetZAR:  number;
     reasoning:           string[];
+    alternatives:        AlternativePrediction[];
+    recommendations:     Recommendation[];
 }
 
 export class PredictionUnavailableError extends Error {}

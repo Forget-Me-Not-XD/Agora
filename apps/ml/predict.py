@@ -65,7 +65,7 @@ NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos
 
 NUM_RAW_FEATURES = 5
 RAW_FEATURE_NAMES = '[capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]'
-MAX_ALTERNATIVES = 20
+MAX_ALTERNATIVES = 31
 
 CAPACITY_HEADROOM_PERCENT = 110
 
@@ -184,16 +184,21 @@ def score_alternatives(rows: list, raw_features: np.ndarray, scaler, interpreter
         fill_rate, no_show_rate = explain.score_sequence(
             alternative_sequence, scaler, engineer_features, lambda arr: invoke(interpreter, arr),
         )
-        
+        fill_rate = clamp_rate(fill_rate)
+        no_show_rate = clamp_rate(no_show_rate)
+
         capacity, dow, month, dom, days_advance = (int(value) for value in row)
+        estimated_rsvps, estimated_attendees, _budget = compute_budget(fill_rate, no_show_rate, capacity)
         alternatives.append({
             "capacity":             capacity,
             "dayOfWeek":            dow,
             "month":                month,
             "dayOfMonth":           dom,
             "daysInAdvance":        days_advance,
-            "predictedFillRate":    round(clamp_rate(fill_rate), 4),
-            "predictedNoShowRate":  round(clamp_rate(no_show_rate), 4),
+            "predictedFillRate":    round(fill_rate, 4),
+            "predictedNoShowRate":  round(no_show_rate, 4),
+            "estimatedRsvps":       estimated_rsvps,
+            "estimatedAttendees":   estimated_attendees,
         })
 
     return alternatives
@@ -207,8 +212,12 @@ def build_alternatives(raw_json: str, raw_features: np.ndarray, scaler, interpre
         return []
 
 def build_recommended_capacity(target_row: list, estimated_rsvps: int, raw_features: np.ndarray, scaler, interpreter):
+    # No expected bookings -> no meaningful room size (same rule as NestJS' capacityRecommendation)
+    if estimated_rsvps <= 0:
+        return None
+
     try:
-        capacity = max(1, math.ceil(estimated_rsvps * CAPACITY_HEADROOM_PERCENT / 100))
+        capacity = math.ceil(estimated_rsvps * CAPACITY_HEADROOM_PERCENT / 100)
         return score_alternatives([[capacity, *target_row[1:]]], raw_features, scaler, interpreter)[0]
     except Exception as exc:
         sys.stderr.write(f"WARNING: recommended capacity skipped: {exc}\n")

@@ -527,7 +527,7 @@ mv model.tflite.bak model.tflite
 
 **Model-gebaseerde alternatiewe (`--alternatives`):**
 
-Die opsionele `--alternatives`-argument neem 'n JSON-lys (hoogstens 20) van
+Die opsionele `--alternatives`-argument neem 'n JSON-lys (hoogstens 31) van
 teikenrye in dieselfde 5-waarde-formaat. Elke ry vervang die laaste ry van die
 reeks en word met dieselfde gelaaide interpreteerder voorspel — steeds een
 Python-proses. Sonder die argument is die uitset identies aan voorheen.
@@ -567,7 +567,7 @@ python predict.py "[[300,1,3,10,60],[300,1,3,10,55],[300,1,3,10,50],[300,1,3,10,
 | `estimatedAttendees` | `rsvps × (1 - noShowRate)` | Getal mense wat verwag word om fisies aan te kom |
 | `estimatedBudgetZAR` | `byeeners×R250 + lokaalverhuur` | Beraamde geleentheidskostes in Suid-Afrikaanse Rand |
 | `reasoning` | `explain.py` (occlusion), met `generate_reasoning()` in `predict.py` as terugval | 1–3 Afrikaanse sinne wat elk 'n **gemete** effek beskryf: hoeveel die voorspelling regtig verander het toe een kenmerk van die teikengebeurtenis vervang is met wat tipies was vir die 9 voorafgaande werklike gebeure. Sien afdeling 12. |
-| `alternatives` | Slegs met `--alternatives` | Een objek per alternatiewe ry: `capacity`, `dayOfWeek`, `month`, `dayOfMonth`, `daysInAdvance`, `predictedFillRate`, `predictedNoShowRate`. NestJS voeg `kind` (`sameWeek`/`laterWeek`/`recommendedCapacity`) en die volle ISO-`date` by. |
+| `alternatives` | Slegs met `--alternatives` | Een objek per alternatiewe ry: `capacity`, `dayOfWeek`, `month`, `dayOfMonth`, `daysInAdvance`, `predictedFillRate`, `predictedNoShowRate`, `estimatedRsvps`, `estimatedAttendees`. NestJS voeg `kind` (`sameWeek`/`laterWeek`/`recommendedCapacity`) en die volle ISO-`date` by, en stuur slegs die (hoogstens 5) opsies terug wat meer verwagte bywoners as die huidige keuse gee. Met `--alternatives` voeg Python ook `recommendedCapacity` by: die teikenry met `ceil(estimatedRsvps × 1.1)` sitplekke. |
 
 **Begrotingsuiteensetting:**
 
