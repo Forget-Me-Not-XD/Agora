@@ -3,9 +3,10 @@
 // ========== Imports: ==========
 import { useEffect, useState } from 'react';
 import { Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import type { PredictionResult } from '@/lib/api/analytics';
+import type { AlternativePrediction, PredictionResult } from '@/lib/api/analytics';
 import DatePicker from '@/components/DatePicker';
 import { previewEventAction } from '@/lib/actions/event-planner.actions';
+import PredictionAdvice from '@/components/PredictionAdvice';
 
 interface EventPlannerSandboxProps {
     initialDate:     string;
@@ -63,6 +64,11 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
     function handleReset() {
         setSandboxDate('');
         setSandboxCapacity('');
+    }
+
+    function handleChooseAlternative(alternative: AlternativePrediction) {
+        setSandboxDate(alternative.date.slice(0, 10));
+        setSandboxCapacity(String(alternative.capacity));
     }
 
     function handleApply() {
@@ -152,6 +158,8 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
                     >
                         Pas hierdie instellings toe op die vorm
                     </button>
+
+                    <PredictionAdvice prediction={prediction} onChooseAlternative={handleChooseAlternative} />
 
                     <div>
                         <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">

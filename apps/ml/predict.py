@@ -10,7 +10,9 @@ What this script will do:
 4. Computes a cost estimate from the predictions
 5. Generates rules-based reasoning strings from the target event's own features
 6. Optionally (--alternatives) swaps the last row of the sequence for each alternative
-   target row and scores it with the same loaded interpreter
+   target row and scores it with the same loaded interpreter, plus the target row with the
+   recommended capacity ceil(estimatedRsvps x 1.1)
+
 7. Prints a single JSON object to stdout (NestJS reads via spawn)
 
 Usage:
@@ -36,6 +38,7 @@ import pickle
 import sys
 import numpy as np
 import explain
+import math
 
 try:
     import ai_edge_litert.interpreter as tflite         # Pi: lightweight runtime (tflite-runtime's successor;
@@ -62,7 +65,9 @@ NUM_FEATURES = 8    # engineered: [capacity, sin(dow), cos(dow), sin(month), cos
 
 NUM_RAW_FEATURES = 5
 RAW_FEATURE_NAMES = '[capacity, dayOfWeek, month, dayOfMonth, daysInAdvance]'
-MAX_ALTERNATIVES = 20
+MAX_ALTERNATIVES = 31
+
+CAPACITY_HEADROOM_PERCENT = 110
 
 
 # ============================================================
@@ -179,16 +184,21 @@ def score_alternatives(rows: list, raw_features: np.ndarray, scaler, interpreter
         fill_rate, no_show_rate = explain.score_sequence(
             alternative_sequence, scaler, engineer_features, lambda arr: invoke(interpreter, arr),
         )
-        
+        fill_rate = clamp_rate(fill_rate)
+        no_show_rate = clamp_rate(no_show_rate)
+
         capacity, dow, month, dom, days_advance = (int(value) for value in row)
+        estimated_rsvps, estimated_attendees, _budget = compute_budget(fill_rate, no_show_rate, capacity)
         alternatives.append({
             "capacity":             capacity,
             "dayOfWeek":            dow,
             "month":                month,
             "dayOfMonth":           dom,
             "daysInAdvance":        days_advance,
-            "predictedFillRate":    round(clamp_rate(fill_rate), 4),
-            "predictedNoShowRate":  round(clamp_rate(no_show_rate), 4),
+            "predictedFillRate":    round(fill_rate, 4),
+            "predictedNoShowRate":  round(no_show_rate, 4),
+            "estimatedRsvps":       estimated_rsvps,
+            "estimatedAttendees":   estimated_attendees,
         })
 
     return alternatives
@@ -200,6 +210,18 @@ def build_alternatives(raw_json: str, raw_features: np.ndarray, scaler, interpre
     except Exception as exc:
         sys.stderr.write(f"WARNING: alternatives skipped: {exc}\n")
         return []
+
+def build_recommended_capacity(target_row: list, estimated_rsvps: int, raw_features: np.ndarray, scaler, interpreter):
+    # No expected bookings -> no meaningful room size (same rule as NestJS' capacityRecommendation)
+    if estimated_rsvps <= 0:
+        return None
+
+    try:
+        capacity = math.ceil(estimated_rsvps * CAPACITY_HEADROOM_PERCENT / 100)
+        return score_alternatives([[capacity, *target_row[1:]]], raw_features, scaler, interpreter)[0]
+    except Exception as exc:
+        sys.stderr.write(f"WARNING: recommended capacity skipped: {exc}\n")
+        return None
 
 
 # ============================================================
@@ -435,6 +457,7 @@ def main() -> None:
 
     if args.alternatives is not None:
         result["alternatives"] = build_alternatives(args.alternatives, raw_features, scaler, interpreter)
+        result["recommendedCapacity"] = build_recommended_capacity(sequence[-1], estimated_rsvps, raw_features, scaler, interpreter)
     
     print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)

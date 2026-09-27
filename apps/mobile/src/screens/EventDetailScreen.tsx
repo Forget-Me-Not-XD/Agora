@@ -16,7 +16,7 @@ import {
   formatFullDate,
   formatEventTime,
 } from '../lib/event-status';
-import { canViewBudget, canManageCheckIns } from '../lib/rbac';
+import { canViewBudget, canManageCheckIns, canViewInsights } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
@@ -24,10 +24,11 @@ import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
 import { getDraftPrediction } from '../api/analytics';
-import type { PredictionResult } from '../api/analytics';
+import type { AlternativePrediction, PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PredictionAdvice } from '../components/PredictionAdvice';
 import { typography } from '../theme/typography';
 import { useEventsStore } from '../stores/events.store';
 import { useRsvpsStore } from '../stores/rsvps.store';
@@ -296,6 +297,8 @@ export function EventDetailScreen() {
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
                 </View>
+
+                {canViewInsights(role) && <PredictionAdvice prediction={prediction} />}
               </>
             )}
           </View>
@@ -567,6 +570,11 @@ useEffect(() => {
 
   function handleApplyBudget() {
     if (prediction) setBudget(String(prediction.estimatedBudgetZAR));
+  }
+
+  function handleChooseAlternative(alternative: AlternativePrediction) {
+    setDate(new Date(alternative.date));
+    setMaxCapacity(String(alternative.capacity));
   }
 
   async function handleSubmit() {
@@ -1029,6 +1037,12 @@ useEffect(() => {
                     <Text style={styles.reasoningText}>{reason}</Text>
                   </View>
                 ))}
+
+                <PredictionAdvice
+                  prediction={prediction}
+                  onChooseAlternative={handleChooseAlternative}
+                  disabled={isSubmitting}
+                />
               </>
             )}
           </View>

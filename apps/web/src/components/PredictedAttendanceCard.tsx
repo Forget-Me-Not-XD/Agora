@@ -6,6 +6,7 @@ import type { PredictionResult } from '@/lib/api/analytics';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getAttendancePredictionAction } from '@/lib/actions/analytics.actions';
 import { deriveStatus } from '@/lib/event-view';
+import PredictionAdvice from '@/components/PredictionAdvice';
 
 export default function PredictedAttendanceCard() {
     const [events, setEvents] = useState<Event[]>([]);
@@ -125,6 +126,10 @@ export default function PredictedAttendanceCard() {
                                 </li>
                             ))}
                         </ul>
+                    </div>
+
+                    <div className="pt-2 border-t border-[var(--color-border)]">
+                        <PredictionAdvice prediction={prediction} />
                     </div>
                 </div>
             )}
