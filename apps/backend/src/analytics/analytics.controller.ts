@@ -9,7 +9,9 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService, TrainingDataItem, PredictionResult, PredictionAccuracyItem, ModelStatus } from './lstm.service';
 import { AnalyticsService, AttendancePrediction, EventsPerMonth, RsvpPerEvent, AdminKpis, RecentRsvp, RsvpStatusCount, BudgetPerMonth, TicketRevenueSummary, EventRevenue, RevenuePerMonth } from './analytics.service';
+import { Throttle } from '@nestjs/throttler';
 import { Trend } from './dto/trend.dto';
+import { THROTTLE_LIMITS } from '../common/throttler/throttle-limits';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 
 interface EventsSummaryResponse {
@@ -172,6 +174,7 @@ export class AnalyticsController {
     }
 
     @Get('predict/:eventId')
+    @Throttle({ default: THROTTLE_LIMITS.prediction })
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN)
     async predictAttendance(
@@ -181,6 +184,7 @@ export class AnalyticsController {
     }
 
     @Get('prediction')
+    @Throttle({ default: THROTTLE_LIMITS.prediction })
     async getAttendancePrediction(
         @Query('eventId') eventId: string,
         @CurrentUser() user: JwtPayload,
@@ -190,6 +194,7 @@ export class AnalyticsController {
     }
 
     @Post('predict-draft')
+    @Throttle({ default: THROTTLE_LIMITS.prediction })
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
     async predictDraftAttendance(
@@ -201,6 +206,7 @@ export class AnalyticsController {
     // Report-card view: for a set of completed events, how close was the model's
     // forward-looking guess to what actually happened.
     @Get('prediction-accuracy')
+    @Throttle({ default: THROTTLE_LIMITS.prediction })
     @UseGuards(RolesGuard)
     @Roles(Role.ADMIN, Role.DOSENT)
     async getPredictionAccuracy(

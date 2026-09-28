@@ -1,5 +1,6 @@
 // ========== Imports: ==========
 import { getToken } from '../session';
+import { httpErrorMessage } from './http-error';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -37,8 +38,7 @@ async function apiFetch<T>(path: string): Promise<T> {
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        const msg  = body.message ?? res.statusText;
-        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+        throw new Error(httpErrorMessage(res, body));
     }
 
     return res.json() as Promise<T>;
@@ -228,8 +228,7 @@ export async function getAttendancePrediction(eventId: string): Promise<Predicti
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        const msg  = body.message ?? res.statusText;
-        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+        throw new Error(httpErrorMessage(res, body));
     }
 
     return res.json() as Promise<PredictionResult>;
@@ -275,8 +274,7 @@ export async function getDraftAttendancePrediction(payload: PredictDraftPayload)
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        const msg  = body.message ?? res.statusText;
-        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+        throw new Error(httpErrorMessage(res, body));
     }
 
     return res.json() as Promise<PredictionResult>;

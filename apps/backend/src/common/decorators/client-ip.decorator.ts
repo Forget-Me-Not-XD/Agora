@@ -7,17 +7,16 @@ interface RequestWithIp {
 }
 
 /**
- * The IP address of the person behind the request.
+ * The IP of the user who made the request.
  *
- * req.ip on its own is no use in production. It's the address of whatever connected to us, which
- * is either a cloudflared pod or the web app's Next server, so every user looks the same.
+ * req.ip is the address of whatever connected to us, which is a cloudflared pod or the web app's
+ * Next server, so it's the same for every user.
  *
- * All outside traffic comes in through Cloudflare, and Cloudflare puts the visitor's address in
- * cf-connecting-ip. It overwrites anything the client sent in that header, so it can't be faked
- * from outside. The web app passes the header on when it calls login, register and refresh on
- * a user's behalf (see apps/web/src/lib/client-ip.ts).
+ * All outside traffic comes through Cloudflare, which sets cf-connecting-ip to the visitor's IP
+ * and overwrites any value the client sent, so we can trust it. The web app passes the header
+ * along when it calls login, register or refresh for a user (see apps/web/src/lib/client-ip.ts).
  *
- * Locally there's no Cloudflare, so we fall back to req.ip.
+ * Without Cloudflare there's no header, so we fall back to req.ip.
  */
 export function getClientIp(req: RequestWithIp): string {
     const cfIp = req.headers?.['cf-connecting-ip'];
@@ -27,13 +26,7 @@ export function getClientIp(req: RequestWithIp): string {
     return req.ip ?? 'unknown';
 }
 
-/**
- * Param decorator for getClientIp.
- *
- *   @example
- *   @Post('login')
- *   login(@ClientIp() ip: string) { ... }
- */
+/** Param decorator for getClientIp. */
 export const ClientIp = createParamDecorator(
     (_data: unknown, ctx: ExecutionContext): string => {
         return getClientIp(ctx.switchToHttp().getRequest());

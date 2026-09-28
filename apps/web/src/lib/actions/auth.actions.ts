@@ -36,7 +36,7 @@ export async function loginAction(
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/login`, {
       method:  'POST',
-      // Die backend throttle login per IP, so dit moet die gebruiker s'n wees en nie die web-pod s'n nie
+      // Die backend throttle login per IP, so dit moet die gebruiker se IP wees, nie die web-pod se een nie
       headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
       // Stuur altyd rememberMe, anders gee die backend 'n lang sessie (dis vir mobiel)
       body:    JSON.stringify({ ...rest, rememberMe }),

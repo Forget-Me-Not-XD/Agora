@@ -46,12 +46,15 @@ import { createThrottlerOptions } from '../common/throttler/throttler.config';
     }),
 
     // ========== Throttler Module for Requests ==========
-    // Setup and reasoning live in createThrottlerOptions, the limits in THROTTLE_LIMITS.
-    // The JwtService is only used to read who a token belongs to, so it needs the secret and nothing else.
+    // The setup lives in createThrottlerOptions and the limits in THROTTLE_LIMITS.
+    // JwtService only reads who a token belongs to here, so the secret is all it needs.
     ThrottlerModule.forRootAsync({
         inject: [ConfigService],
         useFactory: (config: ConfigService) =>
-            createThrottlerOptions(new JwtService({ secret: config.get<string>('jwt.secret') })),
+            createThrottlerOptions(
+                new JwtService({ secret: config.get<string>('jwt.secret') }),
+                config.get<string>('redisUrl'),
+            ),
     }),
 
     // ========== Domain modules ==========

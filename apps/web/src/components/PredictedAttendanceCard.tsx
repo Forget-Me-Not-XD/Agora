@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Event } from '@/lib/api/events';
 import type { PredictionResult } from '@/lib/api/analytics';
 import { listEventsAction } from '@/lib/actions/event.actions';
-import { getAttendancePredictionAction } from '@/lib/actions/analytics.actions';
+import { usePredictionsStore } from '@/lib/stores/predictions.store';
 import { deriveStatus } from '@/lib/event-view';
 import PredictionAdvice from '@/components/PredictionAdvice';
 
@@ -14,6 +14,7 @@ export default function PredictedAttendanceCard() {
     const [prediction, setPrediction] = useState<PredictionResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [unavailable, setUnavailable] = useState(false);
+    const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
 
     // Die model voorspel net vooruit uit kapasiteit/datum -- dit ken die regte
     // uitkoms van 'n geleentheid wat reeds plaasgevind het glad nie, so dit gee
@@ -25,8 +26,12 @@ export default function PredictedAttendanceCard() {
         );
     }, []);
 
+    const selectedEvent = events.find((e) => e.id === selectedEventId);
+    const selectedDate = selectedEvent?.date;
+    const selectedCapacity = selectedEvent?.maxCapacity;
+
     useEffect(() => {
-        if (!selectedEventId) {
+        if (!selectedEventId || selectedDate === undefined || selectedCapacity === undefined) {
             setPrediction(null);
             setUnavailable(false);
             return;
@@ -36,7 +41,7 @@ export default function PredictedAttendanceCard() {
         setLoading(true);
         setUnavailable(false);
 
-        getAttendancePredictionAction(selectedEventId)
+        ensurePrediction({ id: selectedEventId, date: selectedDate, maxCapacity: selectedCapacity })
             .then((result) => {
                 if (cancelled) return;
                 if (result.prediction) {
@@ -54,9 +59,8 @@ export default function PredictedAttendanceCard() {
             });
 
         return () => { cancelled = true; };
-    }, [selectedEventId]);
+    }, [selectedEventId, selectedDate, selectedCapacity, ensurePrediction]);
 
-    const selectedEvent = events.find((e) => e.id === selectedEventId);
     const fillPercent = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
 
     return (

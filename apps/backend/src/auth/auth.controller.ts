@@ -52,12 +52,13 @@ export class AuthController {
   }
 
   /**
-   * Counted per IP and per email, and both have to allow it.
+   * Counted per IP and per email, and both have to let the request through.
    *
-   * Per email on its own misses password spraying: one common password tried against hundreds
-   * of accounts is only one attempt per email. Per IP on its own would have to be tight, and a
-   * whole campus can sit behind one address. Together the IP limit can stay loose.
-   * The account lockout after 5 wrong passwords still applies on top of this.
+   * Per email alone misses password spraying, where one common password is tried against hundreds
+   * of accounts and no single email ever sees more than one attempt. Per IP alone would have to be
+   * tight, and a whole study centre can sit behind one address. With both, the IP limit can stay
+   * loose and the email limit protects each account. The lockout after 5 wrong passwords still
+   * applies.
    */
   @Throttle({ default: { ...THROTTLE_LIMITS.loginPerIp, getTracker: ipTracker } })
   @ThrottleExtra({ ...THROTTLE_LIMITS.loginPerEmail, getTracker: emailTracker })
@@ -76,12 +77,11 @@ export class AuthController {
    *
    * We limit per refresh token, with a looser per-IP limit on top. The web app forwards the
    * user's own IP, but students on the same network still share one address, so the per-token
-   * limit is the one that keeps people apart.
+   * limit is what separates them.
    */
   @Throttle({ default: { ...THROTTLE_LIMITS.refreshPerToken, getTracker: refreshTokenTracker } })
-  // Per IP. Someone sending made-up tokens gets a fresh per-token bucket every time, and this
-  // still catches them. The tracker is set on purpose. Without it, any caller that happens to send
-  // an access token along would be counted per user here instead of per IP.
+  // Per IP on top, to catch made-up tokens, since each one gets a new per-token bucket. The
+  // tracker is set explicitly so a caller that also sends an access token isn't counted per user.
   @ThrottleExtra({ ...THROTTLE_LIMITS.refreshPerIp, getTracker: ipTracker })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)

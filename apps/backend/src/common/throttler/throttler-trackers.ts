@@ -20,13 +20,13 @@ export function ipTracker(req: TrackableRequest): string {
 /**
  * Per signed-in user, or per IP when there's no usable token.
  *
- * The throttler runs as a global guard, which means it runs before JwtAuthGuard and req.user
- * doesn't exist yet. So we check the token's signature ourselves.
+ * The throttler is a global guard, so it runs before JwtAuthGuard and req.user isn't there yet.
+ * That's why we check the token's signature ourselves.
  *
- * Expired tokens still count as their user. The signature proves who they belong to, and the
- * moment a token expires is exactly when the web sends a burst of requests that need a clean
- * 401 so they can refresh. If those fell back to the IP they'd share a bucket and could get a
- * 429 instead. A made-up or tampered token fails the signature check and counts per IP.
+ * Expired tokens still count as their user, because the signature proves who they belong to. When
+ * a token expires the web sends a burst of requests that need a 401 to trigger a refresh. Counted
+ * per IP they'd share one bucket and could get a 429 instead. A made-up or tampered token fails
+ * the check and is counted per IP.
  */
 export function createUserOrIpTracker(jwt: JwtService): (req: TrackableRequest) => string {
     // Every request goes through several throttlers, so remember the answer instead of verifying
