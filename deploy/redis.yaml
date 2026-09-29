@@ -43,7 +43,8 @@ spec:
               mountPath: /data
           resources:
             requests: { cpu: 50m, memory: 64Mi }
-            limits: { cpu: 250m, memory: 256Mi }
+            # Room above maxmemory (200mb) for fragmentation and the fork during a background save
+            limits: { cpu: 250m, memory: 512Mi }
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
