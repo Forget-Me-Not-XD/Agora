@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import type { AlternativePrediction, PredictionResult } from '@/lib/api/analytics';
 import DatePicker from '@/components/DatePicker';
-import { previewEventAction } from '@/lib/actions/event-planner.actions';
+import { usePredictionsStore } from '@/lib/stores/predictions.store';
 import PredictionAdvice from '@/components/PredictionAdvice';
 
 interface EventPlannerSandboxProps {
@@ -21,6 +21,7 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
     const [loading, setLoading]                 = useState(false);
     const [unavailable, setUnavailable]         = useState(false);
     const [error, setError]                     = useState<string | null>(null);
+    const ensureDraftPrediction = usePredictionsStore((s) => s.ensureDraftLoaded);
 
     useEffect(() => {
         const capacityNum = Number(sandboxCapacity);
@@ -39,7 +40,7 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
             setUnavailable(false);
             setError(null);
 
-            previewEventAction({ date: sandboxDate, maxCapacity: capacityNum })
+            ensureDraftPrediction({ date: sandboxDate, maxCapacity: capacityNum })
                 .then((result) => {
                     if (cancelled) return;
                     if (result.prediction) {
@@ -59,7 +60,7 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [sandboxDate, sandboxCapacity]);
+    }, [sandboxDate, sandboxCapacity, ensureDraftPrediction]);
 
     function handleReset() {
         setSandboxDate('');

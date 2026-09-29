@@ -1,5 +1,4 @@
-import { createHash } from 'crypto';
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Headers, Res, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Headers, Res, UseFilters, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
@@ -17,11 +16,15 @@ import { JwtPayload } from './strategies/jwt.strategy';
 import { SsoProfile } from './interfaces/sso-profile.interface';
 import { SsoProvider } from '../common/enums/sso-provider.enum';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
+import { ClientIp } from '../common/decorators/client-ip.decorator';
+import { THROTTLE_LIMITS } from '../common/throttler/throttle-limits';
+import { ThrottleExtra } from '../common/throttler/throttle.decorators';
+import { emailTracker, ipTracker, refreshTokenTracker } from '../common/throttler/throttler-trackers';
 
 @Controller('auth')
 export class AuthController {
@@ -30,7 +33,8 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
-  @UseGuards(ThrottlerGuard)
+  // Per IP. Registering always uses a brand new email, so there's nothing else to count by.
+  @Throttle({ default: { ...THROTTLE_LIMITS.register, getTracker: ipTracker } })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto): Promise<TokenPairDto> {
@@ -47,45 +51,38 @@ export class AuthController {
     return this.authService.adminCreateUser(dto)
   }
 
-  @UseGuards(ThrottlerGuard)
+  /**
+   * Counted per IP and per email, and both have to let the request through.
+   *
+   * Per email alone misses password spraying, where one common password is tried against hundreds
+   * of accounts and no single email ever sees more than one attempt. Per IP alone would have to be
+   * tight, and a whole study centre can sit behind one address. With both, the IP limit can stay
+   * loose and the email limit protects each account. The lockout after 5 wrong passwords still
+   * applies.
+   */
+  @Throttle({ default: { ...THROTTLE_LIMITS.loginPerIp, getTracker: ipTracker } })
+  @ThrottleExtra({ ...THROTTLE_LIMITS.loginPerEmail, getTracker: emailTracker })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
-    @Ip() ip: string,
-    @Headers('cf-connecting-ip') cfConnectingIp: string,
+    @ClientIp() ip: string,
     @Headers('user-agent') userAgent: string,
   ): Promise<TokenPairDto> {
-    return this.authService.login(dto, cfConnectingIp ?? ip, userAgent ?? 'unknown');
+    return this.authService.login(dto, ip, userAgent ?? 'unknown');
   }
 
   /**
    * Exchange a refresh token for a new token pair.
    *
-   * Every refresh from the web app arrives from the Next server's IP, so a plain per-IP
-   * limit would put all web users in one bucket. We limit per refresh token instead, with a
-   * looser per-IP limit on top.
+   * We limit per refresh token, with a looser per-IP limit on top. The web app forwards the
+   * user's own IP, but students on the same network still share one address, so the per-token
+   * limit is what separates them.
    */
-  @Throttle({
-    // Per refresh token. Each successful refresh hands out a new token, which gets its own bucket.
-    // The token is hashed so the raw value never ends up in the throttler's storage.
-    default: {
-      limit: 30,
-      ttl:   60_000,
-      getTracker: (req: { body?: { refreshToken?: unknown }; ip?: string }) => {
-        // Guards run before validation, so the body can contain anything here. createHash throws
-        // on a non-string, which would turn a bad request into a 500, so fall back to the IP.
-        const token = req.body?.refreshToken;
-        return typeof token === 'string' && token
-          ? `rt:${createHash('sha256').update(token).digest('base64url')}`
-          : `ip:${req.ip ?? 'unknown'}`;
-      },
-    },
-    // Per IP. Someone sending made-up tokens gets a fresh per-token bucket every time, and this
-    // still catches them. Keep in mind that all web users share the Next server's IP here.
-    polling: { limit: 300, ttl: 60_000 },
-  })
-  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ...THROTTLE_LIMITS.refreshPerToken, getTracker: refreshTokenTracker } })
+  // Per IP on top, to catch made-up tokens, since each one gets a new per-token bucket. The
+  // tracker is set explicitly so a caller that also sends an access token isn't counted per user.
+  @ThrottleExtra({ ...THROTTLE_LIMITS.refreshPerIp, getTracker: ipTracker })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto): Promise<TokenPairDto> {
@@ -93,6 +90,7 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @Throttle({ default: THROTTLE_LIMITS.changePassword })
   @UseGuards(JwtAuthGuard)
   @SkipPasswordCheck()
   @HttpCode(HttpStatus.OK)

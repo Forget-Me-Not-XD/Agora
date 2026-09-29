@@ -32,6 +32,10 @@ spec:
       containers:
         - name: redis
           image: redis:7.2-alpine
+          # Redis has no idea about the container's memory limit, so tell it. Without this it
+          # keeps filling until the kubelet kills the pod; with it, the keys closest to expiring
+          # are dropped instead. Every throttler key has an expiry, so they are all candidates.
+          args: ["redis-server", "--maxmemory", "200mb", "--maxmemory-policy", "volatile-ttl"]
           ports:
             - containerPort: 6379
           volumeMounts:
@@ -39,7 +43,8 @@ spec:
               mountPath: /data
           resources:
             requests: { cpu: 50m, memory: 64Mi }
-            limits: { cpu: 250m, memory: 256Mi }
+            # Room above maxmemory (200mb) for fragmentation and the fork during a background save
+            limits: { cpu: 250m, memory: 512Mi }
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
