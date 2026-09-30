@@ -192,6 +192,11 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
         if (errors.budget) setErrors((prev) => ({ ...prev, budget: '' }));
     }
 
+    function handleApplyAlternative(date: string, capacity: number) {
+        setFormData((prev) => ({ ...prev, date, capacity: String(capacity) }));
+        setErrors((prev) => ({ ...prev, date: '', capacity: '' }));
+    }
+
     function handleApplySandbox(date: string, capacity: number, budget: number) {
         setFormData((prev) => ({ ...prev, date, capacity: String(capacity), budget: String(budget) }));
         setErrors((prev) => ({ ...prev, date: '', capacity: '', budget: '' }));
@@ -531,6 +536,7 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                     date={formData.date}
                     capacity={formData.capacity}
                     onApplyBudget={handleApplyBudget}
+                    onApplyAlternative={handleApplyAlternative}
                 />
                 <EventPlannerSandbox
                     initialDate={formData.date}

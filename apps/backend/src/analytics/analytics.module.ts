@@ -7,6 +7,7 @@ import { Rsvp, RsvpSchema } from '../rsvp/schemas/rsvp.schema';
 import { Payment, PaymentSchema } from '../payments/schemas/payment.schema';
 import { LstmService } from './lstm.service';
 import { AnalyticsService } from './analytics.service';
+import { RecommendationService } from './recommendation.service';
 import { AnalyticsController } from './analytics.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
 
@@ -23,7 +24,7 @@ import { User, UserSchema } from '../users/schemas/user.schema';
             { name: Payment.name, schema: PaymentSchema },
         ]),
     ],
-    providers: [LstmService, AnalyticsService],
+    providers: [LstmService, AnalyticsService, RecommendationService],
     controllers: [AnalyticsController],
     exports: [LstmService],
 })

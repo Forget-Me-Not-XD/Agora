@@ -5,6 +5,7 @@ import { Sun, Moon, LogOut, Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCurrentUser } from './UserContext';
 import { logoutAction } from '@/lib/actions/auth.actions';
+import { usePredictionsStore } from '@/lib/stores/predictions.store';
 import ProfileModal from './ProfileModal';
 
 export default function Header() {
@@ -20,6 +21,8 @@ export default function Header() {
 
     function handleLogout() {
         startTransition(async () => {
+            // Die gekaste voorspellings hoort by die sessie wat nou eindig
+            usePredictionsStore.getState().reset();
             await logoutAction();
         });
     }

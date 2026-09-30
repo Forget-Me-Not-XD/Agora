@@ -10,6 +10,7 @@ import { EventsService } from "../events/events.service";
 import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
 import { Role } from '../common/enums/role.enums';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
+import { RecommendationService, Recommendation } from './recommendation.service';
 
 // ============================================================
 // This interface is the boundary between the NestJS world and the Python world
@@ -42,6 +43,8 @@ export interface AlternativePrediction {
     daysInAdvance:       number;
     predictedFillRate:   number;
     predictedNoShowRate: number;
+    estimatedRsvps:      number;
+    estimatedAttendees:  number;
 }
 
 // Mirrors the JSON object predict.py prints to stdout:
@@ -53,12 +56,16 @@ export interface PredictionResult {
     estimatedBudgetZAR:  number;
     reasoning:           string[];
     alternatives:        AlternativePrediction[];
+    recommendations:     Recommendation[];
 }
+
+type ModelPrediction = Omit<PredictionResult, 'recommendations'>;
 
 type ScriptAlternative = Omit<AlternativePrediction, 'kind' | 'date'>;
 
-interface PredictScriptOutput extends Omit<PredictionResult, 'alternatives'> {
-    alternatives?: ScriptAlternative[];
+interface PredictScriptOutput extends Omit<PredictionResult, 'alternatives' | 'recommendations'> {
+    alternatives?:        ScriptAlternative[];
+    recommendedCapacity?: ScriptAlternative | null;
 }
 
 interface AlternativeCandidate {
@@ -106,8 +113,8 @@ interface ModelMetaFile {
 const SEQUENCE_LENGTH = 10;
 
 const DAYS_PER_WEEK = 7;
-const LATER_WEEK_OFFSETS = [7, 14];
-const RECOMMENDED_CAPACITY_HEADROOM = 1.1;
+const WEEKS_AHEAD = 2;
+const MAX_SUGGESTED_ALTERNATIVES = 5;
 
 @Injectable()
 export class LstmService {
@@ -118,6 +125,7 @@ export class LstmService {
         private readonly eventsService: EventsService,
         // Direct injection of the RSVP model so we can run aggregate queries:
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        private readonly recommendationService: RecommendationService,
     ) {}
 
     // Returns training data for all past events, or for a single event by id:
@@ -238,30 +246,23 @@ export class LstmService {
 
     // Die 9-geleentheid-geskiedenis van die teikendatum word vir elke alternatief hergebruik.
     // Dit is 'n benadering wat net vir nabye datums geld: 'n alternatief tot 6 dae vroeër of
-    // 14 dae later sien nie die geleenthede wat tussen die teikendatum en sy eie datum val nie.
+    // 20 dae later sien nie die geleenthede wat tussen die teikendatum en sy eie datum val nie.
     private buildAlternativeCandidates(
         capacity: number,
         targetDate: Date,
         plannedAt: Date,
-        history: EventDocument[],
     ): AlternativeCandidate[] {
         const candidates: AlternativeCandidate[] = [];
         const daysSinceMonday = (targetDate.getDay() + 6) % DAYS_PER_WEEK;
+        const firstOffset = -daysSinceMonday;
+        const lastOffset = DAYS_PER_WEEK * (WEEKS_AHEAD + 1) - 1 - daysSinceMonday;
+        const firstOffsetOfNextWeek = DAYS_PER_WEEK - daysSinceMonday;
 
-        for (let dayIndex = 0; dayIndex < DAYS_PER_WEEK; dayIndex++) {
-            const offset = dayIndex - daysSinceMonday;
+        for (let offset = firstOffset; offset <= lastOffset; offset++) {
             if (offset !== 0) {
-                candidates.push(this.toCandidate('sameWeek', capacity, this.addDays(targetDate, offset), plannedAt));
+                const kind: AlternativeKind = offset < firstOffsetOfNextWeek ? 'sameWeek' : 'laterWeek';
+                candidates.push(this.toCandidate(kind, capacity, this.addDays(targetDate, offset), plannedAt));
             }
-        }
-
-        for (const offset of LATER_WEEK_OFFSETS) {
-            candidates.push(this.toCandidate('laterWeek', capacity, this.addDays(targetDate, offset), plannedAt));
-        }
-
-        const recommendedCapacity = this.computeRecommendedCapacity(capacity, history);
-        if (recommendedCapacity !== null) {
-            candidates.push(this.toCandidate('recommendedCapacity', recommendedCapacity, targetDate, plannedAt));
         }
 
         const now = Date.now();
@@ -279,20 +280,6 @@ export class LstmService {
             date,
             features: this.computeFeaturesAt(capacity, date, plannedAt),
         };
-    }
-
-    private computeRecommendedCapacity(capacity: number, history: EventDocument[]): number | null {
-        const fillRates = history
-            .filter(e => e.maxCapacity > 0 && this.isEventPast(e))
-            .map(e => e.confirmedAttendees / e.maxCapacity);
-
-        if (fillRates.length === 0) return null;
-
-        const averageFillRate = fillRates.reduce((sum, rate) => sum + rate, 0) / fillRates.length;
-        const recommended = Math.max(1, Math.ceil(capacity * averageFillRate * RECOMMENDED_CAPACITY_HEADROOM));
-
-        if (!Number.isFinite(recommended) || recommended === capacity) return null;
-        return recommended;
     }
 
     private addDays(date: Date, days: number): Date {
@@ -356,7 +343,7 @@ export class LstmService {
             const history = await this.findRecentHistory(event.date, event._id.toString());
             const sequence = this.buildFeatureSequence(this.computeFeatures(event), history);
 
-            let prediction: PredictionResult;
+            let prediction: PredictScriptOutput;
             try {
                 prediction = await this.runPredictScript(sequence);
             } catch {
@@ -396,15 +383,39 @@ export class LstmService {
     ): Promise<PredictionResult> {
         const targetFeatures = this.computeFeaturesAt(capacity, targetDate, plannedAt);
         const sequence = this.buildFeatureSequence(targetFeatures, history);
-        const candidates = this.buildAlternativeCandidates(capacity, targetDate, plannedAt, history);
+        const candidates = this.buildAlternativeCandidates(capacity, targetDate, plannedAt);
 
+        let output: PredictScriptOutput;
         try {
-            return await this.runPredictScript(sequence, candidates);
+            output = await this.runPredictScript(sequence, candidates);
         } catch (err) {
             throw new ServiceUnavailableException(
                 `Attendance prediction is currently unavailable: ${(err as Error).message}`,
             );
         }
+
+        const prediction = this.attachAlternatives(output, candidates, capacity, targetDate);
+        const improvements = this.selectImprovements(prediction.alternatives, prediction.estimatedAttendees, targetDate);
+        return {
+            ...prediction,
+            alternatives: improvements,
+            // Die volle lys bly nodig vir die kapasiteitsreël: 'n kleiner lokaal is selde 'n "verbetering".
+            recommendations: this.recommendationService.buildRecommendations(prediction, improvements, capacity, targetDate),
+        };
+    }
+
+    private selectImprovements(
+        alternatives: AlternativePrediction[],
+        currentAttendees: number,
+        targetDate: Date,
+    ): AlternativePrediction[] {
+        const distanceFromTarget = (alternative: AlternativePrediction) =>
+            Math.abs(new Date(alternative.date).getTime() - targetDate.getTime());
+
+        return alternatives
+            .filter(alternative => alternative.estimatedAttendees > currentAttendees)
+            .sort((a, b) => (b.estimatedAttendees - a.estimatedAttendees) || (distanceFromTarget(a) - distanceFromTarget(b)))
+            .slice(0, MAX_SUGGESTED_ALTERNATIVES);
     }
 
     // apps/ml is a sibling of apps/backend; dist/ mirrors src' so this relative septh holds both ts-node dev and the compiled build
@@ -457,7 +468,7 @@ export class LstmService {
     private runPredictScript(
         sequence: EventFeatures[],
         candidates: AlternativeCandidate[] = [],
-    ): Promise<PredictionResult> {
+    ): Promise<PredictScriptOutput> {
         const scriptPath = path.join(this.mlDir(), 'predict.py');
         // Always use the venv's own interpreter - the system 'python' on PATH
         // may point to an invalid Python install
@@ -495,7 +506,7 @@ export class LstmService {
                     return;
                 }
 
-                resolve(this.attachAlternatives(output, candidates));
+                resolve(output);
             });
         });
     }
@@ -503,21 +514,25 @@ export class LstmService {
     private attachAlternatives(
         output: PredictScriptOutput,
         candidates: AlternativeCandidate[],
-    ): PredictionResult {
-        const { alternatives, ...prediction } = output;
+        capacity: number,
+        targetDate: Date,
+    ): ModelPrediction {
+        const { alternatives, recommendedCapacity, ...prediction } = output;
         const scriptAlternatives = Array.isArray(alternatives) ? alternatives : [];
 
-        if (scriptAlternatives.length !== candidates.length) {
-            return { ...prediction, alternatives: [] };
-        }
-
-        return {
-            ...prediction,
-            alternatives: scriptAlternatives.map((alternative, index) => ({
+        const dayAlternatives: AlternativePrediction[] = scriptAlternatives.length === candidates.length
+            ? scriptAlternatives.map((alternative, index) => ({
                 ...alternative,
                 kind: candidates[index].kind,
                 date: candidates[index].date.toISOString(),
-            })),
-        };
+            }))
+            : [];
+
+        const capacityAlternatives: AlternativePrediction[] =
+            recommendedCapacity && recommendedCapacity.capacity !== capacity && targetDate.getTime() > Date.now()
+                ? [{ ...recommendedCapacity, kind: 'recommendedCapacity', date: targetDate.toISOString() }]
+                : [];
+
+        return { ...prediction, alternatives: [...dayAlternatives, ...capacityAlternatives] };
     }
 }

@@ -10,6 +10,7 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { Role } from '../common/enums/role.enums';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { LstmService } from './lstm.service';
+import { Recommendation } from './recommendation.service';
 import { Trend, TrendDirection } from './dto/trend.dto';
 
 export interface RsvpPerEvent {
@@ -76,6 +77,7 @@ export interface RevenuePerMonth {
 export interface AttendancePrediction {
     predictedFillRate: number;
     predictedAttendance: number;
+    recommendations: Recommendation[];
 }
 
 @Injectable()
@@ -524,6 +526,7 @@ async getRecentRsvps(limit: number): Promise<RecentRsvp[]> {
         return {
             predictedFillRate: result.predictedFillRate,
             predictedAttendance: result.estimatedAttendees,
+            recommendations: result.recommendations,
         };
     }
 }
