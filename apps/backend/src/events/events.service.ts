@@ -15,6 +15,10 @@ import { UsersService } from '../users/users.service';
 import { PlacesService } from '../places/places.service';
 import { PlaceDetailsDto } from '../places/dto/place-details.dto';
 import { findVenueByLocation, VENUES } from './data/venues';
+import { v4 as uuidv4 } from 'uuid';
+import { ReviewCategory } from './schemas/review-category.schema';
+import { ReviewCategoryInputDto } from './dto/review-category-input.dto';
+import { DEFAULT_REVIEW_CATEGORIES } from '../common/constants/review-categories';
 
 @Injectable()
 export class EventsService {
@@ -48,6 +52,7 @@ export class EventsService {
             lon:        place?.lon ?? null,
             createdBy:  creatorId,
             assignedTo: dto.assignedTo ? new Types.ObjectId(dto.assignedTo) : null,
+            reviewCategories: this.buildReviewCategories(dto.reviewCategories, []),
         });
         return created.save();
     }
@@ -297,11 +302,12 @@ export class EventsService {
             await this.assertValidAssignee(dto.assignedTo);
         }
 
-        const { date, endDate, address, placeId, lat, lon, ...rest } = dto;
+        const { date, endDate, address, placeId, lat, lon, reviewCategories, ...rest } = dto;
         Object.assign(event, rest);
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
+        if (reviewCategories) event.reviewCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
         if (address) {
             const place = await this.resolvePlace(address, lat, lon);
             event.address = place?.address ?? address;
@@ -359,6 +365,31 @@ export class EventsService {
         );
 
         return saved;
+    }
+
+    private buildReviewCategories(
+        input: ReviewCategoryInputDto[] | undefined,
+        existing: ReviewCategory[],
+    ): ReviewCategory[] {
+        if (!input) {
+            return DEFAULT_REVIEW_CATEGORIES.map((name) => ({ id: uuidv4(), name }));
+        }
+
+        const lowerNames = input.map((category) => category.name.toLowerCase());
+        if (new Set(lowerNames).size !== lowerNames.length) {
+            throw new BadRequestException('Elke resensie-kategorie moet \'n unieke naam hê');
+        }
+
+        const existingIds = new Set(existing.map((category) => category.id));
+        const usedIds = new Set<string>();
+
+        return input.map((category) => {
+            const id = category.id && existingIds.has(category.id) && !usedIds.has(category.id)
+                ? category.id
+                : uuidv4();
+            usedIds.add(id);
+            return { id, name: category.name };
+        });
     }
 
     private async assertValidPhotographers(photographerIds: string[]): Promise<void> {

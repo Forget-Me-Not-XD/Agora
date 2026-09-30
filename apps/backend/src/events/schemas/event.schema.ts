@@ -4,6 +4,7 @@ import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { Role } from '../../common/enums/role.enums';
 import { EventType } from '../../common/enums/event-type.enum';
 import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
+import { ReviewCategory, ReviewCategorySchema } from './review-category.schema';
 
 export type EventDocument = HydratedDocument<Event>;
 
@@ -83,6 +84,18 @@ export class Event {
 
     @Prop ({ default: false })
     allowsPlusOne!: boolean;
+
+    @Prop({ type: [ReviewCategorySchema], default: [] })
+    reviewCategories!: ReviewCategory[];
+
+    @Prop({ type: Number, default: null })
+    ratingAvg!: number | null;
+
+    @Prop ({ default: 0 })
+    ratingCount!: number;
+
+    @Prop({ type: Date, default: null })
+    reviewRequestsSentAt!: Date | null;
 
     createdAt?: Date;
     updatedAt?: Date;
