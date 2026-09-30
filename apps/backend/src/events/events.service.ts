@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ReviewCategory } from './schemas/review-category.schema';
 import { ReviewCategoryInputDto } from './dto/review-category-input.dto';
 import { DEFAULT_REVIEW_CATEGORIES } from '../common/constants/review-categories';
+import { ReviewsService } from '../reviews/reviews.service';
 
 @Injectable()
 export class EventsService {
@@ -27,6 +28,7 @@ export class EventsService {
         private readonly rabbitMQService: RabbitMQService,
         private readonly usersService: UsersService,
         private readonly placesService: PlacesService,
+        private readonly reviewsService: ReviewsService,
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
@@ -307,7 +309,10 @@ export class EventsService {
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
-        if (reviewCategories) event.reviewCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
+        if (reviewCategories) {
+            this.assertReviewCategoriesEditable(event, reviewCategories);
+            event.reviewCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
+        }
         if (address) {
             const place = await this.resolvePlace(address, lat, lon);
             event.address = place?.address ?? address;
@@ -334,6 +339,7 @@ export class EventsService {
         this.assertOwnership(event, requesterId, requesterRole);
 
         await event.deleteOne();
+        await this.reviewsService.deleteByEvent(id);
     }
 
     async assignPhotographer(
@@ -390,6 +396,18 @@ export class EventsService {
             usedIds.add(id);
             return { id, name: category.name };
         });
+    }
+
+    private assertReviewCategoriesEditable(event: EventDocument, input: ReviewCategoryInputDto[]): void {
+        if (!event.ratingCount) return;
+
+        const existingNames = new Map(event.reviewCategories.map((category) => [category.id, category.name]));
+        const isUnchanged = input.length === existingNames.size
+            && input.every((category) => category.id !== undefined && existingNames.get(category.id) === category.name);
+
+        if (!isUnchanged) {
+            throw new BadRequestException('Resensie-kategorieë kan nie verander word nadat resensies ontvang is nie');
+        }
     }
 
     private async assertValidPhotographers(photographerIds: string[]): Promise<void> {
