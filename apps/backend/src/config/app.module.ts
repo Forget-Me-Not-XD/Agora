@@ -22,6 +22,7 @@ import { PhotographersModule } from '../photographers/photographers.module';
 import { ExportModule } from '../export/export.module';
 import { CalendarModule } from '../calendar/calendar.module';
 import { AccountModule } from '../account/account.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { HealthModule } from '../health/health.module';
 import { createThrottlerOptions } from '../common/throttler/throttler.config';
@@ -74,6 +75,7 @@ import { createThrottlerOptions } from '../common/throttler/throttler.config';
     ExportModule,
     CalendarModule,
     AccountModule,
+    ReviewsModule,
     ],
     providers: [
         // Global, so every route is throttled, including ones added later. Use @SkipAllThrottles

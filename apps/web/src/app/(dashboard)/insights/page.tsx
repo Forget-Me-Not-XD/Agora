@@ -29,7 +29,7 @@ function isEventPast(event: Event): boolean {
 }
 
 function fillRateOf(event: Event): number {
-    return event.maxCapacity > 0 ? event.confirmedAttendees / event.maxCapacity : 0;
+    return event.maxCapacity > 0 ? event.checkedInCount / event.maxCapacity : 0;
 }
 
 export default async function InsightsPage() {
@@ -56,7 +56,7 @@ export default async function InsightsPage() {
         .sort((a, b) => b.date.localeCompare(a.date));
 
     const completedEvents = relevantEvents.filter(isEventPast);
-    const totalAttended = completedEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0);
+    const totalAttended = completedEvents.reduce((sum, e) => sum + e.checkedInCount, 0);
     const totalCapacity = completedEvents.reduce((sum, e) => sum + e.maxCapacity, 0);
     const overallRate = totalCapacity > 0 ? Math.round((totalAttended / totalCapacity) * 100) : 0;
 
@@ -257,7 +257,7 @@ function PerformerList({
                             <div className="min-w-0">
                                 <p className="text-sm font-medium text-[var(--color-text)] truncate">{event.title}</p>
                                 <p className="text-xs text-[var(--color-text-subtle)]">
-                                    {formatDateShort(event.date)} · {event.confirmedAttendees} / {event.maxCapacity}
+                                    {formatDateShort(event.date)} · {event.checkedInCount} / {event.maxCapacity}
                                 </p>
                             </div>
                             <Pill tone={attendanceColors(rate).tone} className="shrink-0 font-bold">{rate}%</Pill>

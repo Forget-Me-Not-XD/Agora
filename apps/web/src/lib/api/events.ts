@@ -25,6 +25,7 @@ export interface Event {
     photographerInstructions: string;
     assignedTo:               string | null;
     confirmedAttendees:       number;
+    checkedInCount:           number;
     intendedAttendance:       AttendanceRole;
     type:                     EventType;
     sellsTickets:             boolean;

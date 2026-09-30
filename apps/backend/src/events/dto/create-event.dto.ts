@@ -14,10 +14,16 @@ import {
     IsIn,
     IsEnum,
     ValidateIf,
+    ArrayMinSize,
+    ArrayMaxSize,
+    ValidateNested,
 } from 'class-validator';
 import { Role } from '../../common/enums/role.enums';
 import { EventType } from '../../common/enums/event-type.enum';
 import { ATTENDANCE_ROLES } from '../../common/rbac/event-visibility';
+import { Type } from 'class-transformer';
+import { ReviewCategoryInputDto } from './review-category-input.dto';
+import { REVIEW_CATEGORY_LIMITS } from '../../common/constants/review-categories';
 
 export class CreateEventDto {
     @IsString()
@@ -107,4 +113,16 @@ export class CreateEventDto {
     @IsOptional()
     @IsBoolean()
     allowsPlusOne?: boolean;
+
+    @IsOptional()
+    @IsArray({ message: 'reviewCategories moet \'n lys wees' })
+    @ArrayMinSize(REVIEW_CATEGORY_LIMITS.minCount, {
+        message: `Kies ten minste ${REVIEW_CATEGORY_LIMITS.minCount} resensie-kategorie`,
+    })
+    @ArrayMaxSize(REVIEW_CATEGORY_LIMITS.maxCount, {
+        message: `Jy mag hoogstens ${REVIEW_CATEGORY_LIMITS.maxCount} resensie-kategorieë hê`,
+    })
+    @ValidateNested({ each: true, message: 'Elke resensie-kategorie moet \'n naam hê' })
+    @Type(() => ReviewCategoryInputDto)
+    reviewCategories?: ReviewCategoryInputDto[];
 }
