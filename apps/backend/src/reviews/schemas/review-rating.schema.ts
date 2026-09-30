@@ -6,7 +6,7 @@ export class ReviewRating {
     @Prop({ required: true })
     categoryId!: string;
 
-    @Prop({ required: true, min: 1, max: 5 })
+    @Prop({ required: true, min: 0, max: 5 })
     score!: number;
 }
 

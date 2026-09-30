@@ -13,3 +13,10 @@ export const REVIEW_CATEGORY_LIMITS = {
     minNameLength: 2,
     maxNameLength: 40,
 } as const;
+
+export const REVIEW_LIMITS = {
+    minScore: 0,
+    maxScore: 5,
+    maxCommentLength: 1000,
+    windowDays: 14,
+} as const;
