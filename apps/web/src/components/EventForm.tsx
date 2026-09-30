@@ -15,8 +15,17 @@ import EventPlannerSandbox from '@/components/EventPlannerSandbox';
 import FinanceAssigneeSelect from '@/components/FinanceAssigneeSelect';
 import TimeRangeInput from '@/components/TimeRangeInput';
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
+import ReviewCategoryEditor from '@/components/ReviewCategoryEditor';
 import type { PlaceDetails } from '@/lib/api/places';
 import type { Venue } from '@/lib/api/events';
+import {
+    createDraft,
+    hasReviewCategoryErrors,
+    validateReviewCategories,
+    type ReviewCategoryDraft,
+    type ReviewCategoryErrors,
+    type ReviewCategoryInput,
+} from '@/lib/review-categories';
 
 export interface EventFormValues {
     title:              string;
@@ -40,15 +49,17 @@ export interface EventFormValues {
     ticketPrice:        string;
     ticketsAvailable:   string;
     allowsPlusOne:      boolean;
+    reviewCategories:   ReviewCategoryInput[];
 }
 
 interface EventFormProps {
     mode:          'create' | 'edit';
     eventId?:      string;
     initialValues: EventFormValues;
+    ratingCount?:  number;
 }
 
-export default function EventForm({ mode, eventId, initialValues }: EventFormProps) {
+export default function EventForm({ mode, eventId, initialValues, ratingCount = 0 }: EventFormProps) {
     const router = useRouter();
     const user = useCurrentUser();
 
@@ -57,6 +68,12 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     const [apiError, setApiError]       = useState<string | null>(null);
     const [isPending, startTransition]  = useTransition();
     const [errors, setErrors]           = useState<Record<string, string>>({});
+
+    const [reviewCategories, setReviewCategories] = useState<ReviewCategoryDraft[]>(
+        () => initialValues.reviewCategories.map((category) => createDraft(category)),
+    );
+    const [categoryErrors, setCategoryErrors] = useState<ReviewCategoryErrors>({ rows: {} });
+    const categoriesLocked = ratingCount > 0;
 
     const [venues, setVenues] = useState<Venue[]>([]);
     const [venuesError, setVenuesError] = useState<string | null>(null);
@@ -137,8 +154,10 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         const newErrors = validate();
-        if (Object.keys(newErrors).length > 0) {
+        const newCategoryErrors = categoriesLocked ? { rows: {} } : validateReviewCategories(reviewCategories);
+        if (Object.keys(newErrors).length > 0 || hasReviewCategoryErrors(newCategoryErrors)) {
             setErrors(newErrors);
+            setCategoryErrors(newCategoryErrors);
             return;
         }
         setApiError(null);
@@ -162,6 +181,10 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                 ticketPrice:        formData.sellsTickets ? Number(formData.ticketPrice) : undefined,
                 ticketsAvailable:   formData.sellsTickets ? Number(formData.ticketsAvailable) : undefined,
                 allowsPlusOne:      formData.allowsPlusOne,
+                // As daar al resensies is, los ons die kategorieë heeltemal uit die payload uit.
+                reviewCategories:   categoriesLocked
+                    ? undefined
+                    : reviewCategories.map(({ id, name }) => ({ id, name: name.trim() })),
             };
 
             if (mode === 'create') {
@@ -185,6 +208,13 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
     function handleChange(field: string, value: string) {
         setFormData((prev) => ({ ...prev, [field]: value }));
         if (errors[field]) setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
+
+    // Sodra daar foute op die skerm is, kyk ons die hele lys weer na met elke tikslag. 'n Duplikaat-fout
+    // staan dalk op 'n ander ry as die een waarin jy tik, so net daardie ry skoonmaak is nie genoeg nie.
+    function handleCategoriesChange(next: ReviewCategoryDraft[]) {
+        setReviewCategories(next);
+        if (hasReviewCategoryErrors(categoryErrors)) setCategoryErrors(validateReviewCategories(next));
     }
 
     function handleApplyBudget(budget: number) {
@@ -499,6 +529,13 @@ export default function EventForm({ mode, eventId, initialValues }: EventFormPro
                     />
                     Gaste kan 'n gas by hul RSVP voeg
                 </label>
+
+                <ReviewCategoryEditor
+                    categories={reviewCategories}
+                    onChange={handleCategoriesChange}
+                    errors={categoryErrors}
+                    ratingCount={ratingCount}
+                />
 
                 {apiError && (
                     <div

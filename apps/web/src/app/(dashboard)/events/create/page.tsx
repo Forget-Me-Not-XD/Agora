@@ -3,6 +3,7 @@
 // ========== Imports: ==========
 import { useCurrentUser } from '@/components/UserContext';
 import EventForm from '@/components/EventForm';
+import { defaultReviewCategories } from '@/lib/review-categories';
 
 export default function CreateEventPage() {
     const user = useCurrentUser();
@@ -40,6 +41,7 @@ export default function CreateEventPage() {
                     ticketPrice: '',
                     ticketsAvailable: '',
                     allowsPlusOne: false,
+                    reviewCategories: defaultReviewCategories(),
                 }}
             />
         </div>
