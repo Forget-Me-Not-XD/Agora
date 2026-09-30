@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { EventDocument } from '../schemas/event.schema';
 import { Role } from '../../common/enums/role.enums';
 import { EventType } from '../../common/enums/event-type.enum';
+import { ReviewCategory } from '../schemas/review-category.schema';
 
 /**
  * Public facing Event Shape
@@ -34,6 +35,9 @@ export class EventResponseDto {
     ticketPrice!: number | null;
     ticketsAvailable!: number | null;
     allowsPlusOne!: boolean;
+    reviewCategories!: ReviewCategory[];
+    ratingAvg!: number | null;
+    ratingCount!: number;
     createdAt!: Date;
     updatedAt!: Date;
 
@@ -63,6 +67,9 @@ export class EventResponseDto {
             ticketPrice:                event.ticketPrice,
             ticketsAvailable:           event.ticketsAvailable,
             allowsPlusOne:              event.allowsPlusOne,
+            reviewCategories:           event.reviewCategories.map((category: ReviewCategory) => ({ id: category.id, name: category.name })),
+            ratingAvg:                  event.ratingAvg ?? null,
+            ratingCount:                event.ratingCount ?? 0,
             createdAt:                  event.createdAt!,
             updatedAt:                  event.updatedAt!,
         };
