@@ -73,8 +73,7 @@ export function StarRating({ value, onChange, size = 24, label = 'Gradering' }: 
     const change = onChange;
     const rating = Math.round(clamp(value));
 
-    // Screen readers treat the row as one adjustable control (swipe up/down),
-    // the native counterpart of the web slider.
+    // Screen readers treat the row as one adjustable control (swipe up/down)
     function handleAccessibilityAction(e: AccessibilityActionEvent) {
         if (e.nativeEvent.actionName === 'increment' && rating < MAX) change(rating + 1);
         if (e.nativeEvent.actionName === 'decrement' && rating > 0) change(rating - 1);
@@ -100,6 +99,10 @@ export function StarRating({ value, onChange, size = 24, label = 'Gradering' }: 
                 return (
                     <Pressable
                         key={n}
+                        // Android keeps accessible children focusable even inside an accessible
+                        // parent, so hide the stars and let the row be the only TalkBack stop.
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
                         onPress={() => change(n === rating ? 0 : n)}
                         hitSlop={{ top: 8, bottom: 8 }}
                         style={styles.starButton}

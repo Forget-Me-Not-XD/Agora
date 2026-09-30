@@ -69,10 +69,11 @@ export function StarRating({ value, onChange, size = 20, label = 'Gradering', cl
 
     const change = onChange;
     const rating = Math.round(clamp(value));
-    const shown = hovered ?? rating;
+    // Hovering the current star previews the clear, since clicking it resets to 0.
+    const shown = hovered === rating ? 0 : (hovered ?? rating);
 
     function select(n: number) {
-        // Drop the preview so the click reads as a commit, not more hovering.
+        // Clear the hover preview so the new value shows straight away.
         setHovered(null);
         change(n === rating ? 0 : n);
     }
