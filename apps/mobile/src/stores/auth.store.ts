@@ -8,6 +8,7 @@ import type { TokenPair } from '../api/client';
 import { useEventsStore } from './events.store';
 import { useRsvpsStore } from './rsvps.store';
 import { usePredictionsStore } from './predictions.store';
+import { getErrorMessage, getErrorStatus } from '../lib/errors';
 
 export type SsoProvider = 'google' | 'microsoft';
 
@@ -83,9 +84,8 @@ login: async (email, password) => {
     const result = await apiClient.post<TokenPair>('/auth/login', { email, password });
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isLoading: false });
-  } catch (err: any) {
-    const msg = err?.response?.data?.message ?? 'Login failed';
-    set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Login failed', isLoading: false });
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Login Failed'),isLoading: false });
     throw err;
   }
 },
@@ -140,9 +140,8 @@ register: async (payload) => {
     const result = await apiClient.post<TokenPair>('/auth/register', payload);
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isLoading: false });
-  } catch (err: any) {
-    const msg = err?.response?.data?.message ?? 'Registration failed';
-    set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Registration failed', isLoading: false });
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Registration failed'), isLoading: false });
     throw err;
   }
 },
@@ -162,9 +161,9 @@ changePassword: async (currentPassword, newPassword) => {
     } else {
       set({ isLoading: false });
     }
-    }catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Password change failed';
-      set ({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Password change failed', isLoading: false});
+
+    } catch (err) {
+      set({ error: getErrorMessage(err, 'Password change failed'), isLoading: false });
       throw err;
   }
 },
@@ -257,9 +256,9 @@ loginWithBiometrics: async () => {
 
     const user = await apiClient.get<UserResponse>('/users/me');
     set({ user, isLoading: false });
-  } catch (err: any) {
+  } catch (err) {
     set({ isLoading: false });
-    if (err?.response) {
+    if (getErrorStatus(err) !== undefined) {
       throw new Error('Jou sessie het verval. Meld asseblief weer aan met jou wagwoord.');
     }
     throw err;

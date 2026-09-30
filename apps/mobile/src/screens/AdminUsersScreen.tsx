@@ -15,6 +15,7 @@ import { getAllUsers, updateUser, ALL_USER_TAGS, getTagLabel } from '../api/user
 import { useAuthStore } from '../stores/auth.store';
 import { getRoleLabel } from '../lib/rbac';
 import type { UserResponse, UserTag } from '../api/client';
+import { getErrorMessage } from '../lib/errors';
 
 export function AdminUsersScreen() {
   const colors = useThemeColors();
@@ -118,8 +119,8 @@ export function AdminUsersScreen() {
       if (useAuthStore.getState().user?.id === updated.id) {
         useAuthStore.setState({ user: updated });
       }
-    } catch (err: any) {
-      setNameError(err?.response?.data?.message ?? 'Kon nie die naam stoor nie.');
+    } catch (err) {
+      setNameError(getErrorMessage(err, 'Kon nie die naam stoor nie.'));
     } finally {
       setNameBusy(false);
     }

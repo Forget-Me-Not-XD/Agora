@@ -12,6 +12,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import { useThemeStore } from '../stores/theme.store';
 import { GoogleLogo, MicrosoftLogo } from '../components/BrandIcons';
+import { getErrorMessage } from '../lib/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -66,7 +67,7 @@ export function LoginScreen({ navigation }: Props) {
     } catch (err: any) {
       Alert.alert(
         'Biometriese aanmelding',
-        err?.message ?? 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord',
+        getErrorMessage(err, 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord'),
       );
     }
   };

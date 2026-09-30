@@ -26,6 +26,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
 import { useEventsStore } from '../stores/events.store';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
@@ -102,7 +103,7 @@ export function QrScannerScreen() {
       invalidateEvents(); // checkedInCount het verander
     } catch (err) {
       showLoading(false);
-      const status = (err as any)?.response?.status;
+      const status = getErrorStatus(err);
       if (status === 409) {
         showWarning('Gas het reeds ingecheck', resetScanner);
       } else if (status === 404) {
