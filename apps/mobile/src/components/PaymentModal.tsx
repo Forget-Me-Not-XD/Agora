@@ -9,6 +9,7 @@ import { typography } from '../theme/typography';
 import { initiatePayment, notifyPayment, getPaymentStatus, type InitiatePaymentResponse } from '../api/payments';
 import { API_URL } from '../api/client';
 import type { EventResponse } from '../api/events';
+import { getApiErrorMessage } from '../lib/errors';
 
 type Step = 'closed' | 'processing' | 'gateway' | 'redirecting' | 'confirming' | 'success' | 'pending' | 'error';
 
@@ -60,10 +61,8 @@ export function PaymentModal({ event, onPurchased }: PaymentModalProps) {
         setStep('redirecting');
         await openPayFastCheckout(result);
       }
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-      const raw = axiosErr?.response?.data?.message;
-      setError(typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie betaling begin nie.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Kon nie betaling begin nie.'));
       setStep('error');
     }
   }
