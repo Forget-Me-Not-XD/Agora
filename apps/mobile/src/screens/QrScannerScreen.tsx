@@ -135,8 +135,8 @@ export function QrScannerScreen() {
       setWalkInName('');
       loadData(); // haal die bygewerkte lys vanaf die bediener
       invalidateEvents(); // confirmedAttendees het verander
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
+    } catch (err) {
+      const status = getErrorStatus(err);
       Alert.alert(
         'Kon nie registreer nie',
         status === 409 ? 'Hierdie geleentheid is ongelukkig vol bespreek.' : 'Probeer asseblief weer.',

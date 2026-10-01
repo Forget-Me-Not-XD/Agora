@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { NotificationItem, getMyNotifications, markNotificationRead } from '../api/notifications';
-import { getErrorMessage, getErrorStatus } from '../lib/errors';
+import { getErrorMessage } from '../lib/errors';
 
 interface NotificationsState {
     items: NotificationItem[];
@@ -27,7 +27,6 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
                 unreadCount: items.filter((n) => !n.read).length,
                 isLoading: false,
             });
-            
         } catch (err) {
             set({
                 error: getErrorMessage(err, 'Kon nie kennisgewings laai nie'),

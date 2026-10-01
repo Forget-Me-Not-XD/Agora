@@ -15,6 +15,7 @@ import { typography } from '../theme/typography';
 import { safeGoBack } from '../lib/navigation';
 import { useEventsStore } from '../stores/events.store';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RsvpManagement'>;
 type Route = RouteProp<RootStackParamList, 'RsvpManagement'>;
@@ -64,8 +65,8 @@ export function RsvpManagementScreen() {
       const updated = await checkInRsvp(rsvp.id);
       setRsvps((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       invalidateEvents(); // checkedInCount het verander
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
+    } catch (err) {
+      const status = getErrorStatus(err);
       Alert.alert(
         'Kon nie inteken nie',
         status === 409 ? 'Hierdie gas het reeds ingeteken.' : 'Probeer asseblief weer.',

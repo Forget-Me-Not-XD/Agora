@@ -85,7 +85,7 @@ login: async (email, password) => {
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isLoading: false });
   } catch (err) {
-    set({ error: getErrorMessage(err, 'Login Failed'),isLoading: false });
+    set({ error: getErrorMessage(err, 'Login failed'), isLoading: false });
     throw err;
   }
 },
@@ -161,10 +161,9 @@ changePassword: async (currentPassword, newPassword) => {
     } else {
       set({ isLoading: false });
     }
-
-    } catch (err) {
-      set({ error: getErrorMessage(err, 'Password change failed'), isLoading: false });
-      throw err;
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Password change failed'), isLoading: false });
+    throw err;
   }
 },
 

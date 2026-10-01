@@ -33,6 +33,7 @@ import { typography } from '../theme/typography';
 import { useEventsStore } from '../stores/events.store';
 import { useRsvpsStore } from '../stores/rsvps.store';
 import { usePredictionsStore } from '../stores/predictions.store';
+import { getApiErrorMessage, getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -193,13 +194,9 @@ export function EventDetailScreen() {
           : 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
         [{ text: 'OK' }],
       );
-    } catch (err: unknown) {
-      const axiosErr = err as {
-        response?: { status?: number; data?: { message?: string | string[] } };
-      };
-      const status = axiosErr?.response?.status;
-      const raw = axiosErr?.response?.data?.message;
-      const backendMsg = Array.isArray(raw) ? raw.join(', ') : raw ?? '';
+    } catch (err) {
+      const status = getErrorStatus(err);
+      const backendMsg = getApiErrorMessage(err, '');
 
       const msg =
         status === 409
@@ -679,16 +676,8 @@ useEffect(() => {
       });
       invalidateEvents();
       safeGoBack(navigation);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-      const raw = axiosErr?.response?.data?.message;
-      const msg =
-        typeof raw === 'string'
-          ? raw
-          : Array.isArray(raw)
-          ? raw.join(', ')
-          : 'Kon nie funksie skep nie. Probeer weer.';
-      setError(msg);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Kon nie funksie skep nie. Probeer weer.'));
     } finally {
       setIsSubmitting(false);
     }

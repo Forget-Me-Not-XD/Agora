@@ -20,6 +20,7 @@ import { ModelStatusCard } from '../components/ModelStatusCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EventPickerModal } from '../components/EventPickerModal';
 import { PredictionAccuracyBarChart } from '../components/charts/PredictionAccuracyBarChart';
+import { getApiErrorMessage } from '../lib/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
 
@@ -87,10 +88,8 @@ export function InsightsScreen({ navigation }: Props) {
     try {
       const items = await getPredictionAccuracy([...selectedIds]);
       setAccuracyResults(items);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-      const raw = axiosErr?.response?.data?.message;
-      setAccuracyError(typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie akkuraatheid laai nie.');
+    } catch (err) {
+      setAccuracyError(getApiErrorMessage(err, 'Kon nie akkuraatheid laai nie.'));
     } finally {
       setAccuracyLoading(false);
     }

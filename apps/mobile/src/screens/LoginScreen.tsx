@@ -64,7 +64,7 @@ export function LoginScreen({ navigation }: Props) {
   const handleBiometricLogin = async () => {
     try {
       await loginWithBiometrics();
-    } catch (err: any) {
+    } catch (err) {
       Alert.alert(
         'Biometriese aanmelding',
         getErrorMessage(err, 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord'),
