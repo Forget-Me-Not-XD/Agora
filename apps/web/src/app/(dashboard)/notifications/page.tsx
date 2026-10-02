@@ -4,8 +4,6 @@ import NotificationsList from '@/components/NotificationsList';
 import { IconChip } from '@/components/ui/IconChip';
 import AutoRefresh from '@/components/AutoRefresh';
 
-export const dynamic = 'force-dynamic';
-
 export default async function NotificationsPage() {
     const notifications = await getMyNotifications().catch(() => []);
     const unreadCount = notifications.filter((n) => !n.read).length;

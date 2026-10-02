@@ -1,21 +1,6 @@
 'use server';
 
-import { getMyNotifications, markNotificationRead } from '@/lib/api/notifications';
-import type { NotificationItem } from '@/lib/api/notifications';
-
-export interface ListNotificationsResult {
-    notifications?: NotificationItem[];
-    error?:         string;
-}
-
-export async function listNotificationsAction(): Promise<ListNotificationsResult> {
-    try {
-        const notifications = await getMyNotifications();
-        return { notifications };
-    } catch (err) {
-        return { error: err instanceof Error ? err.message : 'Kon nie kennisgewings laai nie.' };
-    }
-}
+import { markNotificationRead } from '@/lib/api/notifications';
 
 export async function markNotificationReadAction(id: string): Promise<{ error?: string }> {
     try {
