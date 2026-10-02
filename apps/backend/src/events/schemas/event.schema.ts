@@ -97,6 +97,11 @@ export class Event {
     @Prop({ type: Date, default: null })
     reviewRequestsSentAt!: Date | null;
 
+    // Demo-/toetsdata (seed-demo-data.ts) -- word uitgesluit van die LSTM se
+    // opleidingsdata en voorspellingsgeskiedenis (EventsService.findTrainableEvents).
+    @Prop ({ default: false })
+    isDemo!: boolean;
+
     createdAt?: Date;
     updatedAt?: Date;
 }

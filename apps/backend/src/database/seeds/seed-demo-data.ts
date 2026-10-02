@@ -487,6 +487,7 @@ async function seed(): Promise<void> {
         ticketsAvailable: number | null;
         createdAt: Date;
         updatedAt: Date;
+        isDemo: boolean;
     }> = [];
 
     // Guarantee the named dosent has authored a handful of events for their dashboard
@@ -538,6 +539,7 @@ async function seed(): Promise<void> {
             ticketsAvailable,
             createdAt,
             updatedAt: date,
+            isDemo: true, // keeps demo events out of LSTM training and prediction history
         });
     }
 

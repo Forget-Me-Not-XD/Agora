@@ -35,6 +35,7 @@
 10. [Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate](#10-fase-1--kenmerkingenieurswese-en-verliesfunksie-resultate)
 11. [Fase 3 — Dag-van-die-Maand Kenmerk: Resultate](#11-fase-3--dag-van-die-maand-kenmerk-resultate)
 12. [Fase 4 — Data-gedrewe Verduidelikings (Occlusion-analise)](#12-fase-4--data-gedrewe-verduidelikings-occlusion-analise)
+13. [Kleiner Datastel — Hertreining en Vergelyking](#13-kleiner-datastel--hertreining-en-vergelyking)
 
 ---
 
@@ -290,7 +291,7 @@ ontsnapping nodig nie.
 As `train.py` met matplotlib geïnstalleer loop, stoor dit `training_curves.png`
 in `apps/ml/`. Die plot het twee panele:
 
-**Linkerpaneel — MAE-verlies oor epochs**
+**Linkerpaneel — Huber-verlies oor epochs**
 ```
 Verlies
 │╲
@@ -307,6 +308,23 @@ Verlies
   stop is ontwerp om dit te voorkom.  
 - As **beide lyne baie vroeg op 'n hoë waarde plato**, pas die model te min aan
   — oorweeg om `LSTM_UNITS` of `DENSE_UNITS` in `train.py` te verhoog.
+
+**"Konvergeer" beteken die lyne word plat — nie dat hulle mekaar raak nie.**
+Dit is normaal dat die opleidingslyn deurgaans *bo* die valideringslyn lê:
+
+1. **Dropout maak opleiding doelbewus moeiliker.** Tydens opleiding word 20%
+   van die neurone ewekansig afgeskakel; tydens validering werk almal. Soos om
+   met gewigte om die enkels te oefen en dit vir die wedstryd af te haal.
+2. **Steekproefgewigte** (`create_sample_weights`) laat verre-toekoms-gebeure
+   tot 5× swaarder in die opleidingsverlies tel; validering het geen gewigte nie
+   (raak net die linkerpaneel).
+3. **Die twee periodes verskil.** Opleiding dek die hele akademiese jaar
+   (Februarie-pieke én eksamen-laagtes); die valideringsvenster is korter en
+   minder gevarieerd, so dit is makliker om "naby" te wees.
+
+'n Groot gaping tussen die lyne bewys dus nie oorpassing nie, en 'n lae
+valideringslyn bewys ook nie dat die model goed is nie — sien afdeling 13.7
+vir hoe die model teen 'n eenvoudige basislyn getoets word.
 
 **Regterpaneel — MAE oor epochs**  
 MAE (Gemiddelde Absolute Fout) is meer interpreteerbaar as verlies: 'n MAE
@@ -362,8 +380,14 @@ cd apps/backend
 npx ts-node src/database/seeds/seed-analytics-mock-data.ts
 ```
 
-Dit voeg 300 sintetiese historiese gebeure in (Julie 2021 – Junie 2026) en
-~25,460 RSVP-dokumente met realistiese SA akademiese kalenderpatrone (Sal in die tokeoms maybe verhoog).
+Dit voeg ~120 sintetiese historiese gebeure in (Oktober 2023 – September 2026),
+~7 000–10 000 RSVP-dokumente en ~2 000–3 500 resensies met realistiese SA
+akademiese kalenderpatrone. Gebruik `--reset` om slegs hierdie skrip se eie data
+eers te verwyder en dan van voor af te saai.
+
+> As `seed-demo-data.ts` ook in dieselfde databasis geloop het, word sy
+> geleenthede (`isDemo: true`) outomaties uit die opleidingsdata gelaat —
+> sien afdeling 13.3.
 
 ### 5.5 Kry 'n Admin JWT-token
 
@@ -592,7 +616,7 @@ na stdout nie. Die NestJS-backend behandel enige nie-nul uitsluiting as
 
 ## 9. Heroplei Soos Werklike Gebeure Ophoop
 
-Die model is aanvanklik op 300 sintetiese gebeure opgelei. Soos werklike
+Die model is aanvanklik op ~120 sintetiese gebeure opgelei (sien afdeling 13). Soos werklike
 gebeure plaasvind en RSVP-data aangeteken word, sal heropleiding op werklike
 data die akkuraatheid verbeter.
 
@@ -620,7 +644,9 @@ python train.py --json data.json
 ```
 
 **3. Hersien die valideringsstatistieke** wat aan die einde van opleiding gedruk
-word. Vergelyk die nuwe MAE-waardes met die vorige lopie. As MAE verbeter het,
+word. Kontroleer eers die `== Baseline ==`-blok: as die LSTM nie die basislyn
+(altyd die opleidingsgemiddelde voorspel) klop nie, het dit geen werklike patroon
+geleer nie (sien afdeling 13.7). Vergelyk dan die nuwe MAE-waardes met die vorige lopie. As MAE verbeter het,
 is die nuwe model beter. As dit slegter geword het, ondersoek of die nuwe data
 ongewone patrone het of of meer data benodig word voor heropleiding.
 
@@ -815,3 +841,255 @@ aanneem dat kenmerke nie wesenlik interaktief is in hoe hulle die uitvoer
 beïnvloed nie. Dit is 'n reële vereenvoudiging (die LSTM kan wel interaksies
 oor die 10 tydstappe modelleer), maar 'n standaard, goed-verstane
 verhandelingspunt — 6 vorentoegange in plaas van tot 32.
+
+---
+
+## 13. Kleiner Datastel — Hertreining en Vergelyking
+
+### 13.1 Wat beteken MAE? (in gewone taal)
+
+MAE (*Mean Absolute Error*, Gemiddelde Absolute Fout) is die gemiddelde van hoe
+ver elke voorspelling van die werklike waarde af was — ongeag of die model te
+hoog of te laag geskat het. Laer is beter; 0 sou perfek wees.
+
+Albei uitsette van die model is koerse tussen 0 en 1, so 'n MAE lees direk as
+'n persentasie:
+
+- **Vulkoers-MAE 0.12** = die voorspelling is gemiddeld **±12% van die
+  kapasiteit** af. Voorbeeld: 'n lokaal met 200 sitplekke, en die model
+  voorspel 60% vol (120 mense). Met 'n MAE van 0.12 is die werklike bywoning
+  tipies tussen 96 en 144 mense (120 ± 24).
+- **Nie-opkoms-MAE 0.05** = van die mense wat hul bywoning bevestig het, is die
+  voorspelde persentasie wat nie opdaag nie gemiddeld **±5 persentasiepunte**
+  af. Voorbeeld: 100 bevestigings en 20% voorspelde nie-opkoms (20 mense) —
+  werklik tipies tussen 15 en 25 mense.
+- **RMSE** werk soortgelyk, maar straf groot foute swaarder. As RMSE heelwat
+  groter as MAE is, beteken dit die model mis af en toe met 'n groot marge.
+
+MAE is 'n gemiddelde, nie 'n waarborg nie: sommige gebeure sal verder af wees.
+
+### 13.2 Hoekom die datastel kleiner gemaak is
+
+`seed-analytics-mock-data.ts` is van 300 na ~120 gebeure verklein sodat die
+paneelborde leesbaar en verduidelikbaar bly. Hierdie afdeling bewys dat die
+LSTM met ~60% minder data steeds betroubaar is.
+
+### 13.3 Watter geleenthede tel as opleidingsdata
+
+Die eerste hertreining het heeltemal misluk (vulkoers-MAE 0.3574, beste epoch 1
+— die model het vir elke geleentheid ~0.76 voorspel). Die oorsaak was die data,
+nie die model nie: `GET /analytics/training-data` het **elke** verlede
+geleentheid teruggegee, insluitend 1 000 geleenthede van `seed-demo-data.ts`.
+Daardie demodata volg nie die akademiese kalenderpatrone nie, bevat
+plekhouer-geleenthede met kapasiteit 1, en het onlangse geleenthede sonder
+enige inskandering — wat die ou kode as "100% nie-opkoms" aangeteken het.
+
+`EventsService.findTrainableEvents()` pas nou een reël toe. 'n Geleentheid word
+slegs gebruik as dit:
+
+1. **nie demodata is nie** (`isDemo` is nie `true` nie) — die demo-seed merk sy
+   eie geleenthede;
+2. **klaar is** — `endDate` is verby, of (sonder `endDate`) dit het meer as 3 uur
+   gelede begin, sodat 'n geleentheid wat nog aan die gang is nie halwe
+   inskanderings as etiket gebruik nie;
+3. **minstens een inskandering het** (`checkedInCount > 0`). Sonder enige
+   inskandering is die nie-opkoms-koers *onbekend*, nie 100% nie.
+
+Dieselfde reël geld vir die 9-geleentheid-geskiedenis wat `LstmService` tydens
+voorspelling aan die model voer, sodat die model in gebruik presies dieselfde
+soort data sien as waarop dit opgelei is. Die etikette (`fillRate`,
+`noShowRate`) word nou direk van die geleentheid se eie `confirmedAttendees` en
+`checkedInCount` gelees — een databasisnavraag in plaas van een per geleentheid.
+
+### 13.4 Hoe die hertreining gedoen is
+
+```bash
+cd apps/backend
+npx ts-node src/database/seeds/seed-analytics-mock-data.ts --reset
+
+cd ../ml
+curl.exe -s -H "Authorization: Bearer JOU_ADMIN_JWT" http://localhost:3000/api/v1/analytics/training-data -o data.json
+python train.py --json data.json
+```
+
+> Gebruik op Windows PowerShell `curl.exe -o` en nie `curl ... > data.json` nie —
+> PowerShell 5.1 skryf met `>` 'n UTF-16-lêer wat `train.py` nie kan lees nie.
+
+Bestaande demogeleenthede (van voor die `isDemo`-veld bestaan het) is eenmalig
+gemerk met:
+
+```js
+db.events.updateMany(
+  { description: "Universiteitsgeleentheid geskep vir demonstrasie- en toetsdoeleindes met volledige voorbeelddata." },
+  { $set: { isDemo: true } }
+)
+```
+
+### 13.5 Resultate: oud teenoor nuut (enkele chronologiese verdeling)
+
+Hierdie syfers kom van `train.py` se standaard-evaluering: die laaste 20% van
+die gebeure (chronologies) word as valideringstel gebruik.
+
+| Statistiek | Oud (300 gebeure) | Eerste poging (gemengde data) | Nuut (gefilterde data) |
+|---|---|---|---|
+| Gebeure gebruik (`n_events`) | 300 | 582 (van 1 020) | 120 |
+| Beste epoch | 73 | 1 | 25 |
+| Vulkoers MAE | 0.1145 | 0.3574 | 0.0949 |
+| Vulkoers RMSE | 0.1382 | 0.4218 | 0.1500 |
+| Nie-opkoms MAE | 0.0478 | 0.3340 | 0.0475 |
+| Nie-opkoms RMSE | 0.0614 | 0.4857 | 0.0595 |
+| Verre-toekoms Vulkoers MAE (≥45 dae) | 0.1213 (n=16) | 0.3694 (n=30) | 0.0647 (n=3) |
+| Verre-toekoms Nie-opkoms MAE (≥45 dae) | 0.0457 (n=16) | 0.4137 (n=30) | 0.0299 (n=3) |
+| `GET /analytics/model-status` → `health` | fair | poor | good |
+
+### 13.6 Aanvaardingskriteria (enkele verdeling)
+
+| Vereiste | Drempel | Nuut | Geslaag? |
+|---|---|---|---|
+| Vulkoers MAE | ≤ 0.14 | 0.0949 | 
+| Nie-opkoms MAE | ≤ 0.07 | 0.0475 | 
+
+Op hierdie meting is die vulkoers-voorspelling gemiddeld ±9.5% van die
+kapasiteit af en die nie-opkoms-voorspelling ±4.75 persentasiepunte.
+**Afdeling 13.7 wys egter dat hierdie meting te optimisties is.**
+
+### 13.7 Eerlike evaluering: basislyn en tydreeks-kruisvalidering
+
+Die enkele verdeling hierbo het twee swakhede:
+
+1. **Geen basislyn nie.** 'n "Model" wat bloot altyd die opleidingsgemiddelde
+   voorspel (vulkoers 0.519, nie-opkoms 0.216), behaal op dieselfde 15
+   valideringsreekse **0.0899 / 0.0458** — effens *beter* as die LSTM se
+   0.0949 / 0.0475. Die voorspellings in die uitvoer lê ook almal tussen 0.51
+   en 0.55: die LSTM voorspel in wese die gemiddelde.
+2. **Die valideringstel is klein en bevoordeel die model.** 15 reekse uit een
+   halfjaar (April–September), en vroeë stop kies die beste epoch op dieselfde
+   15 reekse waarop die model daarna beoordeel word.
+
+`train.py` druk en stoor nou daarom ook `baseline_fill_mae` en
+`baseline_noshow_mae` in `model_meta.json` (vanaf die volgende opleidingslopie),
+en meld of die LSTM die basislyn klop.
+
+Om eerlik te meet, is **tydreeks-kruisvalidering** gebruik: lei op op die eerste
+60% / 70% / 80% / 90% van die tydlyn, voorspel telkens die volgende 10%, en
+beoordeel alle voorspellings saam (47–59 toetsgebeure oor 'n volle jaar). Vroeë
+stop gebruik slegs die laaste 15% van die *opleidings*venster. Dit is op 10
+datastelle gedoen: die werklike `data.json`, plus 4 ekstra stelle van ~120 en 5
+van ~150 gebeure uit dieselfde saaiskrip (in 'n aparte toetsdatabasis).
+
+| Model (gemiddelde vulkoers-MAE) | ~120 gebeure | ~150 gebeure |
+|---|---|---|
+| Altyd die algehele gemiddelde | 0.177 | 0.197 |
+| Gemiddelde vir daardie maand | 0.134 | 0.139 |
+| Huidige LSTM (64 eenhede) | 0.180 | 0.190 |
+| Kleiner LSTM (16 eenhede) | 0.174 | 0.193 |
+
+**Eerlik gemeet haal die huidige LSTM nie die drempel van 0.14 nie**, en 'n
+eenvoudige "maandgemiddelde"-opsoektabel is beter. Meer data (~150 gebeure,
+die kaartjie se terugvalopsie) of 'n kleiner netwerk help nie.
+
+**Hoekom:** die saaiskrip genereer elke geleentheid se bywoning onafhanklik uit
+sy eie maand, weekdag, kapasiteit en voorafkennisgewing — daar is geen verband
+tussen 'n geleentheid en die vorige geleenthede nie. 'n LSTM se enigste voordeel
+is juis om die vorige 10 geleenthede te lees, so op hierdie data het dit niks
+ekstra om te leer nie, terwyl ~20 000 gewigte op ~90 voorbeelde oorpas.
+
+### 13.8 Eksperimente om die LSTM te verbeter
+
+Al die eksperimente hieronder gebruik dieselfde kruisvalidering. "Slaag" beteken
+vulkoers ≤ 0.14 **en** nie-opkoms ≤ 0.07.
+
+**1. Maandgemiddeldes as kenmerk (*target encoding*).** Die opleidingsdata se
+gemiddelde vul- en nie-opkoms-koers vir die geleentheid se maand word as twee
+ekstra invoere bygevoeg (leave-one-out en na die algehele gemiddelde getrek,
+sodat 'n geleentheid nie sy eie antwoord kan "sien" nie).
+
+**2. Volgorde-kenmerke.** Die vorige geleentheid se werklike uitslag (hoe ver dit
+van sy maandgemiddelde was) en die aantal dae sedert die vorige geleentheid.
+Dit is wettig: wanneer 'n toekomstige geleentheid voorspel word, het die vorige
+geleenthede reeds plaasgevind.
+
+**3. Hibriede model.** 'n Lineêre deel (die "ruggraat") hanteer die voorspelbare
+effekte; 'n LSTM-deel leer korreksies bo-op, en begin by nul sodat dit net kan
+help.
+
+**4. 'n Saaiskrip met volgorde-patrone.** 'n Toetsweergawe van die saaiskrip het
+twee realistiese patrone bygevoeg: *moegheid* (elke ander geleentheid in die
+vorige 7 dae verlaag vulkoers met 7%) en *momentum* ('n verskuiwende
+kampus-betrokkenheidsvlak, ±~10%).
+
+| Model | Huidige saaidata: vul / nie-opkoms | Slaag | Saaidata met patrone: vul / nie-opkoms | Slaag |
+|---|---|---|---|---|
+| Gemiddelde vir daardie maand | 0.136 / 0.061 | 4/10 | 0.141 / 0.073 | 1/10 |
+| Lineêr + maandkenmerke | 0.101 / 0.055 | 10/10 | 0.119 / 0.066 | 7/10 |
+| Gewone LSTM + alle nuwe kenmerke | 0.160 / 0.075 | 0/10 | 0.169 / 0.081 | 0/10 |
+| **Hibried: lineêre ruggraat + LSTM** | **0.102 / 0.055** | **10/10** | **0.119 / 0.066** | **7/10** |
+
+Bevindinge:
+
+- **Die hibriede model is die enigste LSTM-ontwerp wat werk.** Dit is so goed
+  soos die beste model op albei soorte data, en kan nooit swakker as die
+  lineêre ruggraat word nie. As toekomstige (werklike) data wel patrone tussen
+  geleenthede het, kan die LSTM-deel dit optel.
+- **Eerlikheidshalwe kom byna al sy akkuraatheid uit die lineêre deel.** Selfs
+  op die saaidata met patrone het die LSTM-deel min bygedra bo 'n lineêre model
+  met dieselfde invoere.
+- **'n Gewone LSTM misluk in elke opstelling** — ~90 opleidingsvoorbeelde is te
+  min vir hom alleen.
+- **Die patrone in die saaiskrip het alles moeiliker gemaak, nie makliker nie.**
+  Momentum was so klein dat dit in die ander variasie verdrink het, en moegheid
+  het net ekstra variasie bygevoeg. Die saaiskrip is daarom **nie** verander
+  nie: data aanpas totdat 'n gekose model wen, sou die resultate ongeloofwaardig
+  maak.
+
+### 13.9 Besluit en volgende stap
+
+**Status: besluit geneem, nog nie geïmplementeer nie.** Die model wat tans in
+`model.tflite` ontplooi is, is steeds die oorspronklike LSTM (afdeling 13.5).
+
+Die besluit:
+
+1. **Vervang die huidige LSTM met die hibriede model** (lineêre ruggraat + LSTM),
+   met maandgemiddeldes, die vorige geleentheid se uitslag en dae-sedert-vorige
+   as invoere. Dit bly een TFLite-lêer vir die Raspberry Pi.
+2. **Hou die huidige saaiskrip** sonder moegheid/momentum.
+3. **Bou die eerlike evaluering in `train.py` in:** tydreeks-kruisvalidering,
+   basislyne, en vroeë stop wat nie na die toetsdata loer nie — sodat elke
+   toekomstige heropleiding, op watter data ook al, betroubare syfers rapporteer.
+
+Dit raak `train.py`, `predict.py`, `explain.py` en `LstmService` (die
+geskiedenis moet ook die vorige geleenthede se werklike uitslae stuur).
+
+### 13.10 Gevolgtrekking
+
+Die kleiner datastel (120 gebeure) is **nie** die probleem nie — die
+maandgemiddelde en die lineêre model presteer op 120 gebeure net so goed as op
+150. Twee groot lesse:
+
+1. **Data-kwaliteit het baie meer saak gemaak as hoeveelheid.** 582 gemengde
+   gebeure het 'n onbruikbare model opgelewer (vulkoers-MAE 0.3574); 120 skoon
+   gebeure 'n bruikbare een.
+2. **'n Lae MAE op een klein valideringstel bewys niks sonder 'n basislyn nie.**
+   Eerlik gemeet voorspel die huidige LSTM nie beter as 'n maandgemiddelde nie;
+   die hibriede model (13.9) haal die drempels op al 10 toetsdatastelle.
+
+### 13.11 Beperkings
+
+- **Sintetiese data.** Daar is geen werklike Akademia-bywoningsdata beskikbaar
+  nie. Alle syfers meet hoe goed die model die saaiskrip se aannames leer, nie
+  hoe goed dit Akademia se werklikheid voorspel nie.
+- **Klein valideringstel.** Met 120 gebeure het die enkele verdeling net 15
+  valideringsreekse; daarom die kruisvalidering in 13.7.
+- **Nie-deterministiese saaidata.** Die saaiskrip gebruik `Math.random()`
+  sonder 'n vaste saad, so elke `--reset` lewer effens ander data. Daarom is
+  oor 10 datastelle gemiddel.
+- **Verre-toekoms-onderstel.** Slegs 3 valideringsgebeure is ≥45 dae vooruit
+  beplan — te min om daardie syfers as betroubaar te beskou.
+- **Volgorde-kenmerke is effens optimisties in kruisvalidering.** Die toets
+  gebruik die direk vorige geleentheid se uitslag; in werklike gebruik is dit
+  die mees onlangse *voltooide* geleentheid, wat vir verre-toekoms-voorspellings
+  verder terug kan lê.
+- **'n Werklike 100%-nie-opkoms-geleentheid** (almal het ingeskryf, niemand het
+  opgedaag nie) word deur reël 3 (13.3) uitgesluit, omdat dit nie van
+  "inskandering is nooit gedoen nie" onderskei kan word nie. Dit is skaars
+  genoeg om die akkuraatheidswins werd te wees.
