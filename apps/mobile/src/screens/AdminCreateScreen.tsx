@@ -7,12 +7,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
-import { AxiosError } from 'axios';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { adminCreateUser, CreateUserPayload } from '../api/auth';
 import { useThemeColors } from '../theme/theme';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { safeGoBack } from '../lib/navigation';
+import { getApiErrorMessage } from '../lib/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminCreateUser'>;
 
@@ -63,9 +63,7 @@ export function AdminCreateUserScreen({ navigation }: Props) {
         setSuccess(true);
         setForm(EMPTY_FORM);
     } catch (err) {
-        const axiosErr = err as AxiosError<{ message?: string | string[] }>;
-        const msg = axiosErr.response?.data?.message ?? 'Kon nie die gebruiker skep nie.';
-        setError(typeof msg === 'string' ? msg : msg.join(', '));
+        setError(getApiErrorMessage(err, 'Kon nie die gebruiker skep nie.'));
     } finally {
         setIsLoading(false);
     }
