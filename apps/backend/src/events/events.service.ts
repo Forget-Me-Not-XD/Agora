@@ -21,6 +21,8 @@ import { ReviewCategoryInputDto } from './dto/review-category-input.dto';
 import { DEFAULT_REVIEW_CATEGORIES } from '../common/constants/review-categories';
 import { ReviewsService } from '../reviews/reviews.service';
 
+const DEFAULT_EVENT_DURATION_MS = 3 * 60 * 60 * 1000;
+
 @Injectable()
 export class EventsService {
     constructor(
@@ -132,6 +134,25 @@ export class EventsService {
         }
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
+    }
+
+    // Events the LSTM may learn from (and use as prediction history): not demo data,
+    // already finished, and with at least one recorded check-in - without a check-in
+    // the no-show rate is unknown, not 100%
+    async findTrainableEvents(before: Date): Promise<EventDocument[]> {
+        const startedBefore = new Date(before.getTime() - DEFAULT_EVENT_DURATION_MS);
+
+        return this.eventModel
+            .find({
+                isDemo: { $ne: true },
+                checkedInCount: { $gt: 0 },
+                $or: [
+                    { endDate: { $lt: before } },
+                    { endDate: { $in: [null, undefined] }, date: { $lt: startedBefore } },
+                ],
+            })
+            .sort({ date: 1 })
+            .exec();
     }
 
     async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {

@@ -1,14 +1,10 @@
 // ========== Imports: ==========
 import { Injectable, BadRequestException, ServiceUnavailableException } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from 'mongoose';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
-import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
-import { Role } from '../common/enums/role.enums';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
 import { RecommendationService, Recommendation } from './recommendation.service';
 
@@ -123,44 +119,28 @@ export class LstmService {
 
     constructor(
         private readonly eventsService: EventsService,
-        // Direct injection of the RSVP model so we can run aggregate queries:
-        @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
         private readonly recommendationService: RecommendationService,
     ) {}
 
-    // Returns training data for all past events, or for a single event by id:
-    // While fetching all we filter to events that already happened:
+    // Returns training data for all trainable events, or for a single event by id:
+    // trainable = not demo data, already finished, and at least one check-in recorded
     async getTrainingData(eventId ?: string): Promise <TrainingDataItem[]> {
         if (eventId !== undefined) {
             const event = await this.eventsService.findById(eventId);
-            return [await this.toTrainingItem(event)];
+            return [this.toTrainingItem(event)];
         }
 
-        // findAll supports an optional 'to' date filter - we use this to exclude future events
-        const events = await this.eventsService.findAll(
-            Role.ADMIN,
-            '',
-            undefined,
-            new Date().toISOString(),
-        );
-
-        // Promise.all runs all the RSVP queries concurrently instead of serially
-        return Promise.all(events.map(event => this.toTrainingItem(event)));
+        const events = await this.eventsService.findTrainableEvents(new Date());
+        return events.map(event => this.toTrainingItem(event));
     }
 
-    private async toTrainingItem(event: EventDocument): Promise <TrainingDataItem> {
-        // Feature: fill rate (Label not input - or else an expected output begin sent as input will caude ML leakage)
+    private toTrainingItem(event: EventDocument): TrainingDataItem {
         const fillRate = event.maxCapacity > 0
             ? event.confirmedAttendees / event.maxCapacity
-            : 0
-
-        // Label: no-show rate:
-        const checkedInCount = await this.rsvpModel
-            .countDocuments({ event: event._id, checkedIn: true })
-            .exec();
+            : 0;
 
         const noShowRate = event.confirmedAttendees > 0
-            ? 1 - checkedInCount / event.confirmedAttendees
+            ? 1 - event.checkedInCount / event.confirmedAttendees
             : 0;
 
         return {
@@ -201,14 +181,9 @@ export class LstmService {
         targetDate: Date,
         excludeEventId?: string,
     ): Promise<EventDocument[]> {
-        const candidates = await this.eventsService.findAll(
-            Role.ADMIN,
-            '',
-            undefined,
-            targetDate.toISOString(),
-        );
+        const candidates = await this.eventsService.findTrainableEvents(targetDate);
 
-        // findAll's `to` filter is inclusive and returns events sorted ascending by date -
+        // findTrainableEvents' result is sorted ascending by date -
         // keep only events strictly before the target, and defensively exclude the target's
         // own id in case of an exact date collision.
         const strictlyPast = candidates.filter(e =>
