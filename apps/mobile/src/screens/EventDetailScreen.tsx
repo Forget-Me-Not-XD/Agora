@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,15 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PredictionAdvice } from '../components/PredictionAdvice';
+import { ReviewCategoryEditor } from '../components/ReviewCategoryEditor';
+import {
+  createDraft,
+  defaultReviewCategories,
+  hasReviewCategoryErrors,
+  validateReviewCategories,
+  type ReviewCategoryDraft,
+  type ReviewCategoryErrors,
+} from '../lib/review-categories';
 import { typography } from '../theme/typography';
 import { useEventsStore } from '../stores/events.store';
 import { useRsvpsStore } from '../stores/rsvps.store';
@@ -484,6 +494,10 @@ function CreateEventForm({
   const [ticketPrice, setTicketPrice] = useState('');
   const [ticketsAvailable, setTicketsAvailable] = useState('');
   const [allowsPlusOne, setAllowsPlusOne] = useState(false);
+  const [reviewCategories, setReviewCategories] = useState<ReviewCategoryDraft[]>(
+    () => defaultReviewCategories().map((category) => createDraft(category)),
+  );
+  const [categoryErrors, setCategoryErrors] = useState<ReviewCategoryErrors>({ rows: {} });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -574,7 +588,19 @@ useEffect(() => {
     setMaxCapacity(String(alternative.capacity));
   }
 
+  // Sodra daar foute op die skerm is, kyk ons die hele lys weer na met elke tikslag. 'n Duplikaat-fout
+  // staan dalk op 'n ander ry as die een waarin jy tik, so net daardie ry skoonmaak is nie genoeg nie.
+  function handleCategoriesChange(next: ReviewCategoryDraft[]) {
+    setReviewCategories(next);
+    if (hasReviewCategoryErrors(categoryErrors)) setCategoryErrors(validateReviewCategories(next));
+  }
+
   async function handleSubmit() {
+    // Die kategorie-foute wys by die velde self, so ons stel hulle dadelik. Dan sien jy hulle saam
+    // met die ander fout bo-aan, eerder as eers nadat jy die res van die vorm reggemaak het.
+    const newCategoryErrors = validateReviewCategories(reviewCategories);
+    setCategoryErrors(newCategoryErrors);
+
     if (!title.trim() || !location.trim() || !maxCapacity.trim()) {
       setError('Vul asseblief alle velde in.');
       return;
@@ -639,6 +665,12 @@ useEffect(() => {
       }
     }
 
+    // Die res van die vorm is reg, so 'n ou foutboodskap bo-aan sou nou net verwar.
+    if (hasReviewCategoryErrors(newCategoryErrors)) {
+      setError(null);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -673,6 +705,7 @@ useEffect(() => {
         ticketPrice: sellsTickets ? ticketPriceNum : undefined,
         ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
         allowsPlusOne,
+        reviewCategories: reviewCategories.map(({ name }) => ({ name: name.trim() })),
       });
       invalidateEvents();
       safeGoBack(navigation);
@@ -691,15 +724,14 @@ useEffect(() => {
         backDisabled={isSubmitting}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-      <ScrollView
+      {/* Die kategorie-velde is van die laaste in 'n lang vorm. Hierdie ScrollView skuif die
+          gefokusde veld self bo die sleutelbord uit, op iOS en Android, ook onder edge-to-edge. */}
+      <KeyboardAwareScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
+        bottomOffset={24}
       >
         {error && (
           <View style={styles.errorBox}>
@@ -962,6 +994,13 @@ useEffect(() => {
               thumbColor={colors.surface}
             />
           </View>
+
+          <ReviewCategoryEditor
+            categories={reviewCategories}
+            onChange={handleCategoriesChange}
+            errors={categoryErrors}
+            disabled={isSubmitting}
+          />
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -1058,8 +1097,7 @@ useEffect(() => {
         >
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
         </TouchableOpacity>
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

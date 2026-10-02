@@ -5,6 +5,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import * as SystemUI from 'expo-system-ui';
 import { ActivityIndicator, View, StyleSheet, Appearance, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import ResponseProvider from './src/providers/ResponseProvider';
@@ -68,14 +69,18 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <InactivityProvider>
-        <ResponseProvider>
-          <NavigationContainer theme={navTheme}>
-            <AppNavigator />
-            <StatusBar style={statusBarStyle} />
-          </NavigationContainer>
-        </ResponseProvider>
-      </InactivityProvider>
+      {/* Nodig vir KeyboardAwareScrollView. Die app is reeds edge-to-edge, en die provider
+          respekteer dit, so skerms wat nog RN se eie KeyboardAvoidingView gebruik werk soos voorheen. */}
+      <KeyboardProvider>
+        <InactivityProvider>
+          <ResponseProvider>
+            <NavigationContainer theme={navTheme}>
+              <AppNavigator />
+              <StatusBar style={statusBarStyle} />
+            </NavigationContainer>
+          </ResponseProvider>
+        </InactivityProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
