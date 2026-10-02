@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { ReviewCategory, ReviewCategoryInput } from '../lib/review-categories';
 
 export type EventType = 'public' | 'internal_student' | 'private' | 'department';
 
@@ -26,6 +27,7 @@ export interface EventResponse {
   ticketPrice: number | null;
   ticketsAvailable: number | null;
   allowsPlusOne: boolean;
+  reviewCategories: ReviewCategory[];
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +52,7 @@ export interface CreateEventPayload {
   ticketPrice?: number;
   ticketsAvailable?: number;
   allowsPlusOne?: boolean;
+  reviewCategories?: ReviewCategoryInput[];
 }
 
 export type UpdateEventPayload = Partial<CreateEventPayload>;
