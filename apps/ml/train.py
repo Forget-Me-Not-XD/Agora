@@ -300,7 +300,7 @@ def convert_to_tflite(model: keras.Model, output_dir: str) -> None:
 # ============================================================
 # EVALUATION:
 # ============================================================
-def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_adnvance: np.ndarray, history=None) -> dict:
+def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_adnvance: np.ndarray, train_label_mean: np.ndarray, history=None) -> dict:
     preds = model.predict(X_val, verbose=0)    # shape (n_val, 2)
     
     def mae(a, b): return float(np.mean(np.abs(a - b)))
@@ -310,6 +310,11 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
     noshow_mae  =   mae(preds[:, 1], y_val[:, 1])
     fill_rmse   =   rmse(preds[:, 0], y_val[:, 0])
     noshow_rmse =   rmse(preds[:, 1], y_val[:, 1])
+
+    # Baseline: a "model" that always predicts the training-set average. The LSTM is only
+    # worth deploying if it beats this - otherwise it hasn't learned any real pattern.
+    baseline_fill_mae   = mae(np.full(len(y_val), train_label_mean[0]), y_val[:, 0])
+    baseline_noshow_mae = mae(np.full(len(y_val), train_label_mean[1]), y_val[:, 1])
     
     far_mask = val_days_adnvance >= FAR_FUTURE_THRESHOLD_DAYS
     n_far = int(far_mask.sum())
@@ -325,6 +330,10 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
     print(f" Fill Rate    MAE: {fill_mae:.4f}   RMSE: {fill_rmse:.4f}")
     print(f" No-Show Rate MAE: {noshow_mae:.4f}   RMSE: {noshow_rmse:.4f}")
     print()
+    print("== Baseline: always predict the training average ===============")
+    print(f" Fill Rate    MAE: {baseline_fill_mae:.4f}   (LSTM {'beats' if fill_mae < baseline_fill_mae else 'does NOT beat'} baseline)")
+    print(f" No-Show Rate MAE: {baseline_noshow_mae:.4f}   (LSTM {'beats' if noshow_mae < baseline_noshow_mae else 'does NOT beat'} baseline)")
+    print()
     print(f"== Far-future subset (daysInAdvance >= {FAR_FUTURE_THRESHOLD_DAYS}, n={n_far}) ====")
     if n_far > 0:
         print(f" Fill Rate    MAE: {far_fill_mae:.4f}   RMSE: {far_fill_rmse:.4f}")
@@ -336,6 +345,8 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
     metrics = {
         "fill_mae": round(fill_mae, 4), "fill_rmse": round(fill_rmse, 4),
         "noshow_mae": round(noshow_mae, 4), "noshow_rmse": round(noshow_rmse, 4),
+        "baseline_fill_mae": round(baseline_fill_mae, 4),
+        "baseline_noshow_mae": round(baseline_noshow_mae, 4),
         "far_future_n": n_far,
         "far_future_fill_mae": round(far_fill_mae, 4) if n_far > 0 else None,
         "far_future_fill_rmse": round(far_fill_rmse, 4) if n_far > 0 else None,
@@ -365,8 +376,8 @@ def evaluate(model: keras.Model, X_val: np.ndarray, y_val: np.ndarray, val_days_
 
         ax1.plot(history.history['loss'],     label='train loss')
         ax1.plot(history.history['val_loss'], label='val loss')
-        ax1.set_title('MSE Loss over Epochs')
-        ax1.set_xlabel('Epoch'); ax1.set_ylabel('MSE')
+        ax1.set_title('Huber Loss over Epochs')
+        ax1.set_xlabel('Epoch'); ax1.set_ylabel('Huber loss')
         ax1.legend(); ax1.grid(True)
 
         ax2.plot(history.history['mae'],     label='train MAE')
@@ -463,7 +474,7 @@ def main() -> None:
     print(f"\nBest epoch : {best_epoch}  |  best val_loss : {best_val_loss:.6f}\n")
 
     # == Evaluate ======================================================================
-    metrics = evaluate(model, X_val_seq, y_val_seq, val_target_days, history)
+    metrics = evaluate(model, X_val_seq, y_val_seq, val_target_days, y_train_raw.mean(axis=0), history)
 
     # == Convert to TFLite ============================================================
     convert_to_tflite(model, output_dir)
