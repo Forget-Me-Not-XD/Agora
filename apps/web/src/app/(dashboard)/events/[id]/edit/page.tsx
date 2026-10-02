@@ -6,6 +6,7 @@ import { getUsersByIds } from '@/lib/api/users';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
 import EventForm from '@/components/EventForm';
+import { defaultReviewCategories } from '@/lib/review-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,7 @@ export default async function EditEventPage({ params }: { params: { id: string }
             <EventForm
                 mode="edit"
                 eventId={event.id}
+                ratingCount={event.ratingCount}
                 initialValues={{
                     title: event.title,
                     description: event.description,
@@ -89,6 +91,11 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     ticketPrice: event.ticketPrice !== null ? String(event.ticketPrice) : '',
                     ticketsAvailable: event.ticketsAvailable !== null ? String(event.ticketsAvailable) : '',
                     allowsPlusOne: event.allowsPlusOne,
+                    // Ou geleenthede van voor resensie-kategorieë het 'n leë lys, en dan kan die vorm nie
+                    // stoor nie. Gee hulle die standaard-kategorieë, die backend gee hulle dan self id's.
+                    reviewCategories: event.reviewCategories.length > 0
+                        ? event.reviewCategories
+                        : defaultReviewCategories(),
                 }}
             />
         </div>

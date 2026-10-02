@@ -1,6 +1,7 @@
 // ========== Imports: ==========
 import { getToken } from '../session';
 import type { AttendanceRole } from '../attendance';
+import type { ReviewCategory, ReviewCategoryInput } from '../review-categories';
 import { httpErrorMessage } from './http-error';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
@@ -32,6 +33,9 @@ export interface Event {
     ticketPrice:              number | null;
     ticketsAvailable:         number | null;
     allowsPlusOne:            boolean;
+    reviewCategories:         ReviewCategory[];
+    ratingAvg:                number | null;
+    ratingCount:              number;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -57,6 +61,7 @@ export interface CreateEventPayload {
     ticketPrice?:              number;
     ticketsAvailable?:         number;
     allowsPlusOne?:            boolean;
+    reviewCategories?:         ReviewCategoryInput[];
 }
 
 export interface Venue {
