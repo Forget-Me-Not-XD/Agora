@@ -155,6 +155,29 @@ export class EventsService {
             .exec();
     }
 
+    async findDueForReviewRequests(endedBefore: Date, endedAfter: Date): Promise<EventDocument[]> {
+        const startedBefore = new Date(endedBefore.getTime() - DEFAULT_EVENT_DURATION_MS);
+        const startedAfter = new Date(endedAfter.getTime() - DEFAULT_EVENT_DURATION_MS);
+
+        return this.eventModel
+            .find({
+                reviewRequestsSentAt: null,
+                $or: [
+                    { endDate: { $lt: endedBefore, $gte: endedAfter } },
+                    { endDate: { $in: [null, undefined] }, date: { $lt: startedBefore, $gte: startedAfter } },
+                ],
+            })
+            .exec();
+    }
+
+    async claimReviewRequests(id: string, now: Date): Promise <EventDocument | null> {
+        return this.eventModel.findOneAndUpdate(
+            { _id: id, reviewRequestsSentAt: null },
+            { $set: { reviewRequestsSentAt: now } },
+            { new: true },
+        ).exec();
+    }
+
     async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {
         if (!isValidObjectId(id)) {
             throw new NotFoundException(`Event ${id} not found`);

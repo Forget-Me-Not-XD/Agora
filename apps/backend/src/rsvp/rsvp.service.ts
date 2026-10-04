@@ -210,6 +210,12 @@ export class RsvpService {
         .exec();
     }
 
+    async findCheckedInAttendees(eventId: string): Promise<RsvpDocument[]> {
+        return this.rsvpModel
+        .find({ event: eventId, checkedIn: true, user: { $exists: true, $ne: null } })
+        .exec();
+    }
+
     async cancelRsvp(rsvpId: string, requesterId: string, requesterRole: Role): Promise<void> {
         if (!isValidObjectId(rsvpId)) {
             throw new NotFoundException(`RSVP ${rsvpId} nie gevind nie`);

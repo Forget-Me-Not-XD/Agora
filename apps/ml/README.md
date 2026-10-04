@@ -35,7 +35,7 @@
 10. [Fase 1 — Kenmerkingenieurswese en Verliesfunksie: Resultate](#10-fase-1--kenmerkingenieurswese-en-verliesfunksie-resultate)
 11. [Fase 3 — Dag-van-die-Maand Kenmerk: Resultate](#11-fase-3--dag-van-die-maand-kenmerk-resultate)
 12. [Fase 4 — Data-gedrewe Verduidelikings (Occlusion-analise)](#12-fase-4--data-gedrewe-verduidelikings-occlusion-analise)
-13. [Kleiner Datastel — Hertreining en Vergelyking](#13-kleiner-datastel--hertreining-en-vergelyking)
+13. [Kleiner Datastel — Heropleiding en Vergelyking](#13-kleiner-datastel--heropleiding-en-vergelyking)
 
 ---
 
@@ -844,7 +844,7 @@ verhandelingspunt — 6 vorentoegange in plaas van tot 32.
 
 ---
 
-## 13. Kleiner Datastel — Hertreining en Vergelyking
+## 13. Kleiner Datastel — Heropleiding en Vergelyking
 
 ### 13.1 Wat beteken MAE? (in gewone taal)
 
@@ -876,7 +876,7 @@ LSTM met ~60% minder data steeds betroubaar is.
 
 ### 13.3 Watter geleenthede tel as opleidingsdata
 
-Die eerste hertreining het heeltemal misluk (vulkoers-MAE 0.3574, beste epoch 1
+Die eerste heropleiding het heeltemal misluk (vulkoers-MAE 0.3574, beste epoch 1
 — die model het vir elke geleentheid ~0.76 voorspel). Die oorsaak was die data,
 nie die model nie: `GET /analytics/training-data` het **elke** verlede
 geleentheid teruggegee, insluitend 1 000 geleenthede van `seed-demo-data.ts`.
@@ -901,7 +901,7 @@ soort data sien as waarop dit opgelei is. Die etikette (`fillRate`,
 `noShowRate`) word nou direk van die geleentheid se eie `confirmedAttendees` en
 `checkedInCount` gelees — een databasisnavraag in plaas van een per geleentheid.
 
-### 13.4 Hoe die hertreining gedoen is
+### 13.4 Hoe die heropleiding gedoen is
 
 ```bash
 cd apps/backend
