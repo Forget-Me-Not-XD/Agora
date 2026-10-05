@@ -1,7 +1,10 @@
+// ========== Imports: ==========
 import { getToken } from '../session';
 import { httpErrorMessage } from './http-error';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+
+export type NotificationType = 'FOTOGRAAF' | 'RESENSIE_VERSOEK';
 
 export interface NotificationEvent {
     _id:   string;
@@ -13,6 +16,7 @@ export interface NotificationItem {
     message:   string;
     read:      boolean;
     event:     NotificationEvent | null;
+    type:      NotificationType;
     createdAt: string;
 }
 
@@ -36,7 +40,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     return res.json() as Promise<T>;
 }
 
-// GET /api/v1/notifications/my — nuutste eerste (backend sorteer reeds)
 export async function getMyNotifications(): Promise<NotificationItem[]> {
     return apiFetch<NotificationItem[]>('/api/v1/notifications/my');
 }

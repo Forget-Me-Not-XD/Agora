@@ -7,6 +7,7 @@ import { useCurrentUser } from './UserContext';
 import { logoutAction } from '@/lib/actions/auth.actions';
 import { usePredictionsStore } from '@/lib/stores/predictions.store';
 import ProfileModal from './ProfileModal';
+import NotificationBell from './NotificationBell';
 
 export default function Header() {
     const { theme, setTheme } = useTheme();
@@ -30,6 +31,7 @@ export default function Header() {
     return (
         <header className="h-16 flex items-center justify-end px-6 bg-[var(--color-surface)] border-b border-[var(--color-border)] shrink-0">
             <div className="flex items-center gap-2">
+                <NotificationBell />
                 <button
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     className="p-2 rounded-lg text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)] transition-colors"
