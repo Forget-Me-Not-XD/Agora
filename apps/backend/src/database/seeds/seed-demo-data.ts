@@ -471,7 +471,7 @@ async function seed(): Promise<void> {
         title: string;
         description: string;
         date: Date;
-        endDate?: Date;
+        endDate: Date;
         location: string;
         maxCapacity: number;
         budget: number;
@@ -523,7 +523,7 @@ async function seed(): Promise<void> {
             title: `${titleBase} ${date.getFullYear()}`,
             description: 'Universiteitsgeleentheid geskep vir demonstrasie- en toetsdoeleindes met volledige voorbeelddata.',
             date,
-            endDate: Math.random() < 0.5 ? new Date(date.getTime() + randInt(1, 4) * 3_600_000) : undefined,
+            endDate: new Date(date.getTime() + randInt(1, 4) * 3_600_000),
             location: pick(LOCATIONS),
             maxCapacity: capacity,
             budget: Math.round(capacity * randInt(80, 250)),

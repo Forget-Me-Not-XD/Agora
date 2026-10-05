@@ -18,7 +18,7 @@ export const REVIEW_LIMITS = {
     minScore: 0,
     maxScore: 5,
     maxCommentLength: 1000,
-    windowDays: 14,
+    windowDays: 7,
 } as const;
 
 export const REVIEW_REQUESTS = {

@@ -9,6 +9,10 @@ export const COOKIE_REFRESH_GUARD = 'akademia_refresh_guard';
 // Sessie-cookie sonder persoonlike data. Dit wys net dat iemand hier aangemeld was, sodat die
 // middleware "jou sessie het verstryk" kan wys eerder as om stilweg na /login te stuur.
 export const COOKIE_SESSION_HINT  = 'akademia_had_session';
+// Die bladsy wat iemand uitgeteken probeer oopmaak het (bv. 'n e-pos-skakel), sodat ons ná
+// aanmelding daarheen kan terugstuur. 'n Cookie eerder as ?from=, want SSO gaan deur die backend
+// en Google/Microsoft en sou 'n query parameter verloor.
+export const COOKIE_RETURN_TO     = 'akademia_return_to';
 
 /**
  * Hoe lank die middleware en /api/auth/clear na 'n refresh-poging wag voordat hulle weer
@@ -16,6 +20,9 @@ export const COOKIE_SESSION_HINT  = 'akademia_had_session';
  * besige backend 'n blaaskans.
  */
 export const REFRESH_GUARD_SECONDS = 10;
+
+/** Lank genoeg om aan te meld, kort genoeg dat 'n vergete pad nie later iemand verras nie. */
+const RETURN_TO_SECONDS = 60 * 10;
 
 /**
  * Die access cookie verval soveel sekondes voor die JWT self. Die middleware sien dan reeds
@@ -146,6 +153,12 @@ export function clearAuthCookies(cookieStore: CookieWriter): void {
   cookieStore.delete(COOKIE_REMEMBER_NAME);
   cookieStore.delete(COOKIE_REFRESH_GUARD);
   cookieStore.delete(COOKIE_SESSION_HINT);
+  cookieStore.delete(COOKIE_RETURN_TO);
+}
+
+/** Onthou waarheen die gebruiker wou gaan. Die pad word eers by gebruik nagegaan (sien postLoginRedirect). */
+export function setReturnTo(cookieStore: CookieWriter, path: string): void {
+  cookieStore.set(COOKIE_RETURN_TO, path, { ...baseOptions(), maxAge: RETURN_TO_SECONDS });
 }
 
 /** Stel die guard cookie ná 'n refresh-poging (sien REFRESH_GUARD_SECONDS). */
