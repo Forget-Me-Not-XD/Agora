@@ -12,12 +12,29 @@ import {
   COOKIE_NAME,
   COOKIE_USER_NAME,
   COOKIE_REFRESH_NAME,
+  COOKIE_RETURN_TO,
   DEFAULT_ACCESS_EXPIRY,
   remainingSessionSeconds,
 } from '@/lib/auth-cookies';
 import { clientIpHeaders } from '@/lib/client-ip';
+import { postLoginRedirect } from '@/lib/safe-redirect';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
+
+/**
+ * Waarheen ons ná aanmelding stuur: die bladsy wat die middleware onthou het, of /dashboard.
+ *
+ * Moet die wagwoord eers verander word, laat ons die cookie staan. Die middleware stuur dan na
+ * /change-password, en changePasswordAction gebruik dit daarna.
+ */
+function afterLoginPath(mustChangePassword = false): string {
+  if (mustChangePassword) return '/dashboard';
+
+  const cookieStore = cookies();
+  const from = cookieStore.get(COOKIE_RETURN_TO)?.value;
+  cookieStore.delete(COOKIE_RETURN_TO);
+  return postLoginRedirect(from);
+}
 
 /**
  * Login server action.
@@ -25,13 +42,14 @@ const API_URL = process.env.API_URL ?? 'http://localhost:3000';
  * Roep NestJS POST /api/v1/auth/login, dan word die access token
  * gestel as 'n HttpOnly cookie — die browser sien nooit die raw JWT.
  *
- * Returns null as suksesvol (redirect na /dashboard server-side),
+ * Returns null as suksesvol (redirect server-side, sien afterLoginPath),
  * of 'n error string wat in die form gewys word.
  */
 export async function loginAction(
   payload: LoginPayload & { rememberMe?: boolean },
 ): Promise<string | null> {
   const { rememberMe = false, ...rest } = payload;
+  let data: TokenPair;
 
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/login`, {
@@ -49,14 +67,14 @@ export async function loginAction(
       return typeof msg === 'string' ? msg : (msg.join?.(', ') ?? 'Aanmelding het misluk.');
     }
 
-    const data: TokenPair = await res.json();
+    data = await res.json();
     setAuthCookies(cookies(), data, rememberMe);
   } catch {
     return 'Kan nie aan die bediener koppel nie. Probeer later.';
   }
 
   // Redirect net nadat die cookie gestel is en buite die try/catch is
-  redirect('/dashboard');
+  redirect(afterLoginPath(data.user?.mustChangePassword));
 }
 
 /**
@@ -65,7 +83,7 @@ export async function loginAction(
  * Roep NestJS POST /api/v1/auth/register, dan stel die cookies net soos
  * loginAction — registration auto-logs die gebruiker in.
  *
- * Returns null as suksesvol (redirect na /dashboard server-side),
+ * Returns null as suksesvol (redirect server-side, sien afterLoginPath),
  * of 'n error string wat in die form gewys word.
  */
 export async function registerAction(payload: {
@@ -97,7 +115,7 @@ export async function registerAction(payload: {
     return 'Kan nie aan die bediener koppel nie. Probeer later.';
   }
 
-  redirect('/dashboard');
+  redirect(afterLoginPath());
 }
 
 /**
@@ -151,7 +169,7 @@ export async function completeSsoLoginAction(
 
   // SSO het nie 'n onthou-my opsie nie, so ons onthou hulle altyd
   setAuthCookies(cookies(), tokenPair, true);
-  redirect('/dashboard');
+  redirect(afterLoginPath(user.mustChangePassword));
 }
 
 /**
@@ -160,7 +178,7 @@ export async function completeSsoLoginAction(
  * Werk daarna die akademia_user cookie se mustChangePassword veld op na false, sodat die 
  * middleware die gebruiker onmiddelik na /dashboard toelaat sonder om weer aan te meld.
  * 
- * Returns null as sukselvol (redirect na /dashboard server-side),
+ * Returns null as sukselvol (redirect server-side, sien afterLoginPath),
  * of 'n error string wat in die form gewys word
  */
 export async function changePasswordAction(
@@ -187,7 +205,7 @@ export async function changePasswordAction(
     }
   }
 
-  redirect('/dashboard');
+  redirect(afterLoginPath());
 }
 
 /**

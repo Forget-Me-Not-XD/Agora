@@ -6,6 +6,7 @@ import {
     COOKIE_REFRESH_NAME,
     COOKIE_REFRESH_GUARD,
     COOKIE_SESSION_HINT,
+    setReturnTo,
 } from '@/lib/auth-cookies';
 import { isRscRequest, reloadAsDocument } from '@/lib/rsc-request';
 
@@ -25,6 +26,16 @@ function matchesPath(pathname: string, paths: string[]): boolean {
  */
 function redirectTo(request: NextRequest, url: URL, status?: number): NextResponse {
     return isRscRequest(request) ? reloadAsDocument() : NextResponse.redirect(url, status);
+}
+
+/**
+ * Onthou die bladsy as iemand uitgeteken 'n skakel oopmaak, sodat die aanmelding hulle daarheen
+ * terugstuur. Net vir 'n gewone bladsylaai: 'n RSC-versoek laai netnou weer as 'n bladsy en kom
+ * dan hier verby.
+ */
+function rememberReturnTo(request: NextRequest, response: NextResponse): void {
+    if (request.method !== 'GET' || isRscRequest(request)) return;
+    setReturnTo(response.cookies, request.nextUrl.pathname + request.nextUrl.search);
 }
 
 export function middleware(request: NextRequest) {
@@ -78,7 +89,9 @@ export function middleware(request: NextRequest) {
         const hadSession = Boolean(request.cookies.get(COOKIE_SESSION_HINT));
 
         if (!hadSession) {
-            return redirectTo(request, url);
+            const response = redirectTo(request, url);
+            rememberReturnTo(request, response);
+            return response;
         }
 
         // Moenie by 'n RSC-versoek die cookies skoonmaak nie. Die bladsylaai wat volg, het die
@@ -92,6 +105,7 @@ export function middleware(request: NextRequest) {
         // Maak die ou cookies skoon sodat die boodskap net een keer wys
         const response = NextResponse.redirect(url);
         clearAuthCookies(response.cookies);
+        rememberReturnTo(request, response);
         return response;
     }
 
