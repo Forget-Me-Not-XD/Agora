@@ -4,11 +4,12 @@ import type { MockUser } from './mock-data';
 
 /**
  * Server-only helper. Reads the JWT cookie and returns a MockUser.
- * Redirects to /login if there is no valid session.
+ * Redirects to /api/auth/clear if there is no valid session, which refreshes or clears the
+ * auth cookies before /login, so the middleware cannot bounce back to the dashboard.
  */
 export function getCurrentUser(): MockUser {
     const session = getSession();
-    if (!session) redirect('/login');
+    if (!session) redirect('/api/auth/clear');
 
     return {
         id: session.id ?? 'unknown',
