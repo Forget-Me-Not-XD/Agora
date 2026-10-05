@@ -35,7 +35,7 @@ export class EventsService {
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
         const start = new Date(dto.date);
-        const end   = dto.endDate ? new Date(dto.endDate) : undefined;
+        const end   = new Date(dto.endDate);
         this.assertEndAfterStart(start, end);
         this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
         this.assertVenueCapacity(dto.location, dto.maxCapacity);

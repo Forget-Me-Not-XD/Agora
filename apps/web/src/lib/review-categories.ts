@@ -15,6 +15,9 @@ export const REVIEW_CATEGORY_LIMITS = {
     maxNameLength: 40,
 } as const;
 
+// REVIEW_LIMITS.maxCommentLength in die backend
+export const REVIEW_MAX_COMMENT_LENGTH = 1000;
+
 export interface ReviewCategory {
     id:   string;
     name: string;

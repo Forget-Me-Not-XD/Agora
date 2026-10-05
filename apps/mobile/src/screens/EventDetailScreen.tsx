@@ -623,6 +623,24 @@ useEffect(() => {
       return;
     }
 
+    if (!endHour.trim() || !endMinute.trim()) {
+      setError('Vul asseblief die eindtyd in.');
+      return;
+    }
+
+    const eh = parseInt(endHour, 10);
+    const em = parseInt(endMinute, 10);
+    if (isNaN(eh) || eh < 0 || eh > 23 || isNaN(em) || em < 0 || em > 59) {
+      setError('Eindtyd is ongeldig.');
+      return;
+    }
+
+    // Die geleentheid is op een dag, so die eindtyd moet net later as die begintyd wees
+    if (eh * 60 + em <= sh * 60 + sm) {
+      setError('Eindtyd moet na die begintyd wees.');
+      return;
+    }
+
     const cap = parseInt(maxCapacity, 10);
     if (isNaN(cap) || cap <= 0) {
       setError('Kapasiteit moet \'n positiewe getal wees.');
@@ -678,22 +696,14 @@ useEffect(() => {
       const startDate = new Date(date);
       startDate.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
 
-      let endDate: string | undefined;
-      if (endHour.trim() && endMinute.trim()) {
-        const eh = parseInt(endHour, 10);
-        const em = parseInt(endMinute, 10);
-        if (!isNaN(eh) && !isNaN(em)) {
-          const d = new Date(date);
-          d.setHours(eh, em, 0, 0);
-          endDate = d.toISOString();
-        }
-      }
+      const endDate = new Date(date);
+      endDate.setHours(eh, em, 0, 0);
 
       await createEvent({
         title: title.trim(),
         description: description.trim(),
         date: startDate.toISOString(),
-        endDate,
+        endDate: endDate.toISOString(),
         location: location.trim(),
         address: placeDetails.address,
         placeId: placeDetails.placeId,
@@ -814,7 +824,7 @@ useEffect(() => {
             />
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Eindtyd (opsioneel)</Text>
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Eindtyd *</Text>
           <View style={styles.timeRow}>
             <TextInput
               style={[styles.textInput, styles.timeInput]}

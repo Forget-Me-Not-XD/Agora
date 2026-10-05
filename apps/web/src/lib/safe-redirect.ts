@@ -27,3 +27,15 @@ export function safeRedirectPath(from: string | null, fallback = '/dashboard'): 
   const path = sameOriginPath(from);
   return path !== null && sameOriginPath(path) === path ? path : fallback;
 }
+
+// Hierdie bladsye is deel van aanmelding self, so om ná aanmelding daarheen te gaan sou net 'n lus maak
+const NOT_AFTER_LOGIN = ['/login', '/register', '/server-busy', '/change-password', '/api'];
+
+/** Waarheen ons ná aanmelding stuur: die onthoude pad as dit veilig is, anders /dashboard. */
+export function postLoginRedirect(from: string | null | undefined): string {
+  const path     = safeRedirectPath(from ?? null);
+  const pathname = path.split(/[?#]/)[0];
+  const blocked  = NOT_AFTER_LOGIN.some((p) => pathname === p || pathname.startsWith(p + '/'));
+
+  return blocked ? '/dashboard' : path;
+}

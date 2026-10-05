@@ -36,7 +36,7 @@ export interface CreateEventPayload {
   title: string;
   description: string;
   date: string;
-  endDate?: string;
+  endDate: string;
   location: string;
   address: string;
   placeId?: string;

@@ -39,9 +39,9 @@ export class CreateEventDto {
     @IsDateString()
     date!: string;
 
-    @IsOptional()
-    @IsDateString()
-    endDate?: string;
+    // Ou geleenthede het dalk nie een nie, maar elke nuwe geleentheid moet 'n eindtyd hê
+    @IsDateString({}, { message: 'Gee \'n geldige eind-datum' })
+    endDate!: string;
 
     @IsString()
     @IsNotEmpty()

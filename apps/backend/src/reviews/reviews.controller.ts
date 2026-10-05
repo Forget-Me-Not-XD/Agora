@@ -10,6 +10,8 @@ import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { ReviewResponseDto } from './dto/review-response.dto';
 import { PendingReviewDto } from './dto/pending-review.dto';
+import { ReviewEligibilityDto } from './dto/review-eligibility.dto';
+import { MyReviewStateDto } from './dto/my-review-state.dto';
 import { ReviewSummaryDto } from './dto/review-summary.dto';
 
 @Controller('reviews')
@@ -30,6 +32,19 @@ export class ReviewsController {
     @Get('pending')
     findPending(@CurrentUser() user: JwtPayload): Promise<PendingReviewDto[]> {
         return this.reviewsService.findPending(user.sub);
+    }
+
+    @Get('mine')
+    getMine(@CurrentUser() user: JwtPayload): Promise<MyReviewStateDto> {
+        return this.reviewsService.getMyReviewState(user.sub);
+    }
+
+    @Get('eligibility/:eventId')
+    getEligibility(
+        @Param('eventId') eventId: string,
+        @CurrentUser() user: JwtPayload,
+    ): Promise<ReviewEligibilityDto> {
+        return this.reviewsService.getEligibility(eventId, user.sub);
     }
 
     @Get('event/:eventId')

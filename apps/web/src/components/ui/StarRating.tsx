@@ -17,6 +17,8 @@ interface StarRatingProps {
     onChange?: (value: number) => void;
     size?: number;
     label?: string;
+    // Wat 'n skermleser by 0 sê. Waar 0 'n regte telling is, gee die ouer dit self.
+    zeroLabel?: string;
     className?: string;
 }
 
@@ -48,7 +50,7 @@ function StarIcon({ fill, size, preview }: { fill: number; size: number; preview
     );
 }
 
-export function StarRating({ value, onChange, size = 20, label = 'Gradering', className = '' }: StarRatingProps) {
+export function StarRating({ value, onChange, size = 20, label = 'Gradering', zeroLabel = 'Geen gradering', className = '' }: StarRatingProps) {
     const [hovered, setHovered] = useState<number | null>(null);
 
     if (!onChange) {
@@ -103,7 +105,7 @@ export function StarRating({ value, onChange, size = 20, label = 'Gradering', cl
             aria-valuemin={0}
             aria-valuemax={MAX}
             aria-valuenow={rating}
-            aria-valuetext={rating === 0 ? 'Geen gradering' : `${rating} uit ${MAX} sterre`}
+            aria-valuetext={rating === 0 ? zeroLabel : `${rating} uit ${MAX} sterre`}
             onKeyDown={handleKeyDown}
             onPointerLeave={() => setHovered(null)}
             className={`inline-flex items-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${className}`}

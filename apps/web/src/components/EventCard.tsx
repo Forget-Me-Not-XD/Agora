@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Calendar, MapPin, Users, Clock } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, CheckCircle2, Star } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import {
     TYPE_LABELS,
@@ -21,9 +21,10 @@ interface EventCardProps {
     event: Event;
     alreadyRsvpd?: boolean;
     isNew?: boolean;
+    reviewState?: 'reviewable' | 'reviewed' | 'closed' | 'upcoming';
 }
 
-export default function EventCard({ event, alreadyRsvpd = false, isNew = false }: EventCardProps) {
+export default function EventCard({ event, alreadyRsvpd = false, isNew = false, reviewState }: EventCardProps) {
     const status  = deriveStatus(event);
     const fillPct = fillPercentage(event);
     const isFull       = fillPct >= 100;
@@ -95,7 +96,33 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false }
                 </div>
             </Link>
 
-            <div className="p-5 pt-3">
+            <div className="p-5 pt-3 space-y-2">
+                {/* Net 'n aanduiding: die resensie self word op die detailbladsy gegee */}
+                {reviewState === 'reviewable' && (
+                    <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-[var(--color-primary)]">
+                        <Star size={13} />
+                        Jy kan nog &apos;n resensie gee
+                    </p>
+                )}
+                {reviewState === 'reviewed' && (
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
+                        <CheckCircle2 size={13} className="text-emerald-500" />
+                        Reeds beoordeel
+                    </p>
+                )}
+                {reviewState === 'closed' && (
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
+                        <Clock size={13} />
+                        Resensie-periode is verby
+                    </p>
+                )}
+                {reviewState === 'upcoming' && (
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
+                        <Clock size={13} />
+                        Resensie-periode kom nog
+                    </p>
+                )}
+
                 {alreadyRsvpd ? (
                     <AlreadyRsvpdTag eventId={event.id} />
                 ) : event.sellsTickets ? (

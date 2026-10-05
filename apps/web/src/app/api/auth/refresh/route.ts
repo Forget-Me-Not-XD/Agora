@@ -8,6 +8,7 @@ import {
   clearAuthCookies,
   setAuthCookies,
   setRefreshGuard,
+  setReturnTo,
   COOKIE_REFRESH_NAME,
   COOKIE_REMEMBER_NAME,
 } from '@/lib/auth-cookies';
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   const refreshToken = request.cookies.get(COOKIE_REFRESH_NAME)?.value;
 
   if (!refreshToken) {
-    return expireSession(request);
+    return expireSession(request, target);
   }
 
   const result = await refreshTokenPair(refreshToken);
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (result.status === 'invalid') {
-    return expireSession(request);
+    return expireSession(request, target);
   }
 
   if (result.status === 'unavailable') {
@@ -62,13 +63,15 @@ export async function GET(request: NextRequest) {
 /**
  * Die sessie is dood (of daar was nooit 'n refresh cookie nie): verwyder die cookies en stuur
  * na /login. Ons stel die guard ook, net ingeval die cookies nie verwyder word nie en ons in 'n
- * redirect-lus tussen /login en hierdie roete beland.
+ * redirect-lus tussen /login en hierdie roete beland. Die bladsy waarheen hulle wou gaan, word
+ * onthou vir ná die aanmelding.
  */
-function expireSession(request: NextRequest): NextResponse {
+function expireSession(request: NextRequest, target: string): NextResponse {
   const loginUrl = new URL('/login?error=session_expired', request.url);
   const response = noStore(NextResponse.redirect(loginUrl));
   clearAuthCookies(response.cookies);
   setRefreshGuard(response.cookies);
+  setReturnTo(response.cookies, target);
   return response;
 }
 
