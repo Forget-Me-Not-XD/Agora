@@ -28,7 +28,9 @@ export function safeRedirectPath(from: string | null, fallback = '/dashboard'): 
   return path !== null && sameOriginPath(path) === path ? path : fallback;
 }
 
-// Hierdie bladsye is deel van aanmelding self, so om ná aanmelding daarheen te gaan sou net 'n lus maak
+// Die aanmeld- en wagwoordbladsye en /server-busy hoort by die aanmeldvloei self, so as ons
+// ná aanmelding daarheen stuur, beland ons in 'n lus. /api is nooit 'n bladsy nie, en die
+// refresh-roete se ?from= kan enigiets bevat, so 'n API-roete word ook nooit 'n bestemming nie.
 const NOT_AFTER_LOGIN = ['/login', '/register', '/server-busy', '/change-password', '/api'];
 
 /** Waarheen ons ná aanmelding stuur: die onthoude pad as dit veilig is, anders /dashboard. */

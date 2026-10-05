@@ -11,7 +11,8 @@ interface ReviewModalProps {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-// Die dashboard rol in <main>, nie in die body nie, so ons sluit die naaste ouer wat rol
+// Die dashboard rol in <main>, nie in die body nie. Ons soek dus die naaste ouer wat rol en
+// keer dat dit agter die modal rol.
 function findScrollParent(element: HTMLElement): HTMLElement {
     for (let node = element.parentElement; node; node = node.parentElement) {
         const { overflowY } = getComputedStyle(node);

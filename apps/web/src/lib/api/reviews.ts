@@ -94,6 +94,7 @@ export async function getMyReviewState(): Promise<MyReviewState> {
 }
 
 // POST /api/v1/reviews: 403 nie ingeskandeer nie, 409 reeds beoordeel, 400 buite die venster
+// of ongeldige tellings
 export async function createReview(payload: CreateReviewPayload): Promise<ReviewResponse> {
     const token = getToken();
 

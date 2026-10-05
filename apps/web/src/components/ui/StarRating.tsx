@@ -17,7 +17,7 @@ interface StarRatingProps {
     onChange?: (value: number) => void;
     size?: number;
     label?: string;
-    // Wat 'n skermleser by 0 sê. Waar 0 'n regte telling is, gee die ouer dit self.
+    // What a screen reader says at 0. Where 0 is a real score, the parent passes its own.
     zeroLabel?: string;
     className?: string;
 }

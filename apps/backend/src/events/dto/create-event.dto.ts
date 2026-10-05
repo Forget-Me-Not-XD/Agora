@@ -40,7 +40,7 @@ export class CreateEventDto {
     date!: string;
 
     // Ou geleenthede het dalk nie een nie, maar elke nuwe geleentheid moet 'n eindtyd hê
-    @IsDateString({}, { message: 'Gee \'n geldige eind-datum' })
+    @IsDateString({}, { message: 'Gee \'n geldige eindtyd' })
     endDate!: string;
 
     @IsString()
