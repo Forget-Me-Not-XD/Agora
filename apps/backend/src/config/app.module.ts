@@ -4,6 +4,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { JwtService } from '@nestjs/jwt';
 
 import configuration from './configuration';
@@ -57,6 +58,8 @@ import { createThrottlerOptions } from '../common/throttler/throttler.config';
                 config.get<string>('redisUrl'),
             ),
     }),
+
+    ScheduleModule.forRoot(),
 
     // ========== Domain modules ==========
     HealthModule,

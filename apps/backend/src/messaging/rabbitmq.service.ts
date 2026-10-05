@@ -71,6 +71,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     await channel.assertQueue(QUEUES.NOTIFICATION_SMS,   baseQueueOptions);
     await channel.assertQueue(QUEUES.NOTIFICATION_PUSH,  baseQueueOptions);
     await channel.assertQueue(QUEUES.PHOTOGRAPHER_ASSIGNED, baseQueueOptions);
+    await channel.assertQueue(QUEUES.REVIEW_REQUESTED,      baseQueueOptions);
     await channel.assertQueue(QUEUES.AUDIT_LOG, {
       ...baseQueueOptions,
       arguments: {
@@ -88,8 +89,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
     await channel.bindQueue(QUEUES.NOTIFICATION_EMAIL,     EXCHANGES.AUTH,  ROUTING_KEYS.USER_REGISTERED);
     await channel.bindQueue(QUEUES.PHOTOGRAPHER_ASSIGNED,  EXCHANGES.EVENT, 'event.photographer.*');
+    await channel.bindQueue(QUEUES.REVIEW_REQUESTED,       EXCHANGES.EVENT, ROUTING_KEYS.REVIEW_REQUESTED);
 
-    this.logger.debug('Topology asserted: 4 exchanges + 1 DLX, 5 queues + 1 DLQ, 8 bindings');
+    this.logger.debug('Topology asserted: 4 exchanges + 1 DLX, 6 queues + 1 DLQ, 9 bindings');
   }
 
   async publish<T>(exchange: string, routingKey: string, payload: T): Promise<boolean> {
