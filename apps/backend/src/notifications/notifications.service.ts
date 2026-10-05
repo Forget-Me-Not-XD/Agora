@@ -42,7 +42,7 @@ export class NotificationsService {
     async findMyNotifications(userId: string): Promise<NotificationDocument[]> {
         return this.notificationModel
         .find({ userId })
-        .sort ({ createdAt: -1 })
+        .sort ({ read: 1, createdAt: -1 })
         .populate( 'event' )
         .exec();
     }
