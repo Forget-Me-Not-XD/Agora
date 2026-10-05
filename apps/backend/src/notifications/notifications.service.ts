@@ -2,7 +2,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { isValidObjectId, Model, Types } from "mongoose";
-import { Notification, NotificationDocument } from './schemas/notification.schema';
+import { Notification, NotificationDocument, NotificationType } from './schemas/notification.schema';
+import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
 import { PhotographerAssignedEvent } from "../messaging/events.constants";
 
@@ -22,6 +23,17 @@ export class NotificationsService {
             userId: new Types.ObjectId(payload.photographerId),
             event: new Types.ObjectId(payload.eventId),
             message,
+        });
+
+        return notification.save();
+    }
+
+    async createReviewRequest(userId: Types.ObjectId, event: EventDocument): Promise <NotificationDocument> {
+        const notification = new this.notificationModel({
+            userId,
+            event: event._id,
+            type: NotificationType.RESENSIE_VERSOEK,
+            message: `Hoe was ${event.title}? Los gerus 'n resensie.`,
         });
 
         return notification.save();

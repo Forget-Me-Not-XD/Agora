@@ -20,3 +20,8 @@ export const REVIEW_LIMITS = {
     maxCommentLength: 1000,
     windowDays: 14,
 } as const;
+
+export const REVIEW_REQUESTS = {
+    delayMs: 60 * 60 * 1000,
+    startDate: new Date('2026-10-04T00:00:00+02:00'),
+} as const;
