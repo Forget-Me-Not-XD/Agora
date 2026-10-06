@@ -86,11 +86,74 @@ export class UsersService {
     return UserResponseDto.fromDocument(updated);
   }
 
-  async changePassword( userId: string, passwordHash: string, passwordHistory: string[]): Promise <void> {
+  async changePassword(
+    userId: string,
+    passwordHash: string,
+    passwordHistory: string[],
+    sessionsValidAfter: Date,
+  ): Promise <void> {
     await this.userModel.updateOne(
       { _id: userId },
-      { $set: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date(), passwordHistory } },
+      {
+        $set: {
+          passwordHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+          passwordHistory,
+          sessionsValidAfter,
+          // A reset link requested before this change must not be able to overwrite it
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+        },
+      },
     ).exec();
+  }
+
+  async setPasswordResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: userId },
+      { $set: { passwordResetTokenHash: tokenHash, passwordResetExpiresAt: expiresAt } },
+    ).exec();
+  }
+
+  async findByValidResetToken(tokenHash: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { $gt: new Date() },
+    }).exec();
+  }
+
+  async completePasswordReset(
+    userId: string,
+    tokenHash: string,
+    passwordHash: string,
+    passwordHistory: string[],
+    sessionsValidAfter: Date,
+  ): Promise<boolean> {
+    const result = await this.userModel.updateOne(
+      // Check expiry and isActive again here: the bcrypt work since findByValidResetToken takes
+      // about a second, and in that time the token can expire or an admin can deactivate the account
+      {
+        _id: userId,
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+        isActive: true,
+      },
+      {
+        $set: {
+          passwordHash,
+          passwordHistory,
+          passwordChangedAt: new Date(),
+          mustChangePassword: false,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          sessionsValidAfter,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+        },
+      },
+    ).exec();
+    return result.modifiedCount === 1;
   }
 
   async markPasswordExpired( userId: string ): Promise <void> {
@@ -172,7 +235,19 @@ export class UsersService {
 
     const result = await this.userModel.updateOne(
       { _id: userId },
-      { $set: { passwordHash, mustChangePassword: true, passwordChangedAt: new Date(), passwordHistory: [] } },
+      {
+        $set: {
+          passwordHash,
+          mustChangePassword: true,
+          passwordChangedAt: new Date(),
+          passwordHistory: [],
+          // Sign out every existing session, so only someone with the temporary password gets in
+          sessionsValidAfter: new Date(Math.floor(Date.now() / 1000) * 1000),
+          // A reset link requested before this change must not be able to overwrite it
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+        },
+      },
     ).exec();
     if (result.matchedCount === 0) throw new NotFoundException(`User ${userId} not found`);
 

@@ -9,7 +9,7 @@ import { ReviewRequestsScheduler } from './review-requests.scheduler';
 import { NotificationsConsumer } from './notifications.consumer';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
-import { MailService } from './mail.service';
+import { MailModule } from './mail.module';
 
 @Module({
     imports: [
@@ -17,8 +17,9 @@ import { MailService } from './mail.service';
         EventsModule,
         RsvpModule,
         UsersModule,
+        MailModule,
     ],
-    providers: [NotificationsConsumer, NotificationsService, ReviewRequestsScheduler, MailService],
+    providers: [NotificationsConsumer, NotificationsService, ReviewRequestsScheduler],
     controllers: [NotificationsController],
     exports: [],
 })

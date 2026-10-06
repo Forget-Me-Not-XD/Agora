@@ -5,8 +5,10 @@ import {
     ForbiddenException,
     NotFoundException,
     ServiceUnavailableException,
+    BadRequestException,
     Logger,
   } from '@nestjs/common';
+  import { createHash, randomBytes } from 'crypto';
   import { ConfigService } from '@nestjs/config';
   import ms, { type StringValue } from 'ms';
   import { JwtService } from '@nestjs/jwt';
@@ -34,6 +36,9 @@ import {
     UserFailedLoginEvent,
   } from '../messaging/events.constants';
   import { ChangePasswordDto } from './dto/change-password.dto';
+  import { ResetPasswordDto } from './dto/reset-password.dto';
+  import { MailService } from '../notifications/mail.service';
+  import { passwordChangedEmail, passwordResetEmail, ssoPasswordResetEmail } from '../notifications/templates/password-reset.template';
   
   @Injectable()
   export class AuthService {
@@ -42,12 +47,16 @@ import {
     private readonly SELF_REGISTERABLE_ROLES = [Role.GAS, Role.STUDENT];
     private readonly PASSWORD_EXPIRY_DAYS = 90;
     private readonly PASSWORD_HISTORY_SIZE = 3;
+    private readonly PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
+    // Every request replaces the previous token, so an older email stops working once a newer one is sent
+    private readonly INVALID_RESET_TOKEN_MESSAGE = 'Hierdie herstelskakel is ongeldig, het verval, is reeds gebruik of is deur \'n nuwer skakel vervang. Gebruik die skakel in die nuutste e-pos, of versoek \'n nuwe een.';
   
     constructor(
       private readonly usersService: UsersService,
       private readonly jwtService: JwtService,
       private readonly config: ConfigService,
       private readonly rabbitmq: RabbitMQService,
+      private readonly mailService: MailService,
     ) {
       // Check the expiry settings once at startup. A typo in .env then stops the app with a
       // clear error instead of quietly giving every session the wrong lifetime.
@@ -219,7 +228,7 @@ import {
      * this defends against a stolen access token being used to lock the
      * real owner out by silently changing their password.
      */
-    async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    async changePassword(userId: string, dto: ChangePasswordDto): Promise<TokenPairDto> {
       const user= await this.usersService.findById(userId);
 
       if (!user.passwordHash) {
@@ -237,11 +246,83 @@ import {
       const newPasswordHash = await bcrypt.hash(dto.newPassword, salt);
       const updatedHistory = [user.passwordHash, ...user.passwordHistory].slice(0, this.PASSWORD_HISTORY_SIZE);
 
-      await this.usersService.changePassword(userId, newPasswordHash, updatedHistory);
+      // Signs out every other session, so someone who changes their password because they think
+      // the account was compromised also locks the attacker out. This device gets a new pair below.
+      await this.usersService.changePassword(userId, newPasswordHash, updatedHistory, this.sessionCutoff());
 
       this.logger.log(`-- Password changed: ${user.email}`);
+      const updated = await this.usersService.findById(userId);
+      return this.issueTokenPair(updated, { remember: dto.rememberMe ?? true });
     }
-  
+
+    /**
+     * Starts a password reset and returns straight away. All the work (lookup, token write and
+     * email) runs in the background, so the response time is the same whether the address
+     * exists, belongs to an SSO account or has a password.
+     */
+    forgotPassword(email: string): void {
+      void this.processForgotPassword(email).catch((err: Error) =>
+        this.logger.error(`-- Password reset request failed: ${err.message}`),
+      );
+    }
+
+    private async processForgotPassword(email: string): Promise<void> {
+      const user = await this.usersService.findByEmail(email.toLowerCase());
+      if (!user || !user.isActive) return;
+
+      if (!user.passwordHash) {
+        const sent = await this.mailService.send(user.email, ssoPasswordResetEmail(user.name));
+        this.logResetRequest(sent, `SSO account: ${user.email}`);
+        return;
+      }
+
+      const token = randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + this.PASSWORD_RESET_TTL_MS);
+      await this.usersService.setPasswordResetToken(user._id.toString(), this.hashResetToken(token), expiresAt);
+
+      // The token goes in the fragment, so the browser never sends it to a server: not ours, not
+      // the web's middleware (and its return-to cookie), and not in any access log.
+      const resetUrl = `${this.config.get<string>('frontendUrl')}/reset-password#token=${encodeURIComponent(token)}`;
+      const sent = await this.mailService.send(user.email, passwordResetEmail(user.name, resetUrl));
+      this.logResetRequest(sent, user.email);
+    }
+
+    private logResetRequest(sent: boolean, who: string): void {
+      if (sent) {
+        this.logger.log(`-- Password reset requested: ${who}`);
+      } else {
+        this.logger.warn(`-- Password reset requested but the email was not sent: ${who}`);
+      }
+    }
+
+    async resetPassword(dto: ResetPasswordDto): Promise<void> {
+      const tokenHash = this.hashResetToken(dto.token);
+      const user = await this.usersService.findByValidResetToken(tokenHash);
+
+      if (!user || !user.isActive || !user.passwordHash) {
+        throw new BadRequestException(this.INVALID_RESET_TOKEN_MESSAGE);
+      }
+
+      await this.assertPasswordNotReused(dto.newPassword, user.passwordHash, user.passwordHistory);
+
+      const salt = await bcrypt.genSalt(this.BCRYPT_ROUNDS);
+      const newPasswordHash = await bcrypt.hash(dto.newPassword, salt);
+      const updatedHistory = [user.passwordHash, ...user.passwordHistory].slice(0, this.PASSWORD_HISTORY_SIZE);
+      const completed = await this.usersService.completePasswordReset(
+        user._id.toString(),
+        tokenHash,
+        newPasswordHash,
+        updatedHistory,
+        this.sessionCutoff(),
+      );
+      if (!completed) {
+        throw new BadRequestException(this.INVALID_RESET_TOKEN_MESSAGE);
+      }
+
+      void this.mailService.send(user.email, passwordChangedEmail(user.name));
+      this.logger.log(`-- Password reset via email link: ${user.email}`);
+    }
+
     /**
      * Exchange a valid refresh token for a fresh token pair.
      *
@@ -287,6 +368,10 @@ import {
 
       if (user.lockedUntil && user.lockedUntil > new Date()) {
         throw new ForbiddenException(`Account locked. Try again after ${user.lockedUntil.toISOString()}`);
+      }
+
+      if (user.sessionsValidAfter && payload.authAt * 1000 < user.sessionsValidAfter.getTime()) {
+        throw new UnauthorizedException('Session ended because the password was changed. Please sign in again.');
       }
 
       // The password can expire mid-session, so check it here as well, the same way login does.
@@ -390,6 +475,19 @@ import {
       await this.rabbitmq.publish(EXCHANGES.AUTH, ROUTING_KEYS.USER_FAILED_LOGIN, event);
     }
 
+    /**
+     * The moment from which sessions count again after a password reset or change. Rounded down
+     * to whole seconds because JWT iat and authAt are in seconds, so a token issued in the same
+     * second (the new pair from changePassword) still passes.
+     */
+    private sessionCutoff(): Date {
+      return new Date(Math.floor(Date.now() / 1000) * 1000);
+    }
+
+    private hashResetToken(token: string): string {
+      return createHash('sha256').update(token).digest('hex');
+    }
+
     private isPasswordExpired(passwordChangedAt: Date): boolean {
       const expiryMs = this.PASSWORD_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
       const ageMs = Date.now() - passwordChangedAt.getTime();
@@ -401,7 +499,7 @@ import {
       for (const hash of hashesToCheck) {
         const reused = await bcrypt.compare(canidate, hash);
         if (reused) {
-          throw new ForbiddenException(`New password must be different from your current password and your last ${this.PASSWORD_HISTORY_SIZE} passwords.`);
+          throw new ForbiddenException(`Die nuwe wagwoord moet verskil van jou huidige wagwoord en jou laaste ${this.PASSWORD_HISTORY_SIZE} wagwoorde.`);
         }
       }
     }

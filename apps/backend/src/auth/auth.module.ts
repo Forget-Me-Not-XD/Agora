@@ -13,10 +13,12 @@ import { GoogleMobileStrategy } from './strategies/google-mobile.strategy';
 import { MicrosoftMobileStrategy } from './strategies/microsoft-mobile.strategy';
 import { SsoExceptionFilter } from './filters/sso-exception.filter';
 import { UsersModule } from '../users/users.module';
+import { MailModule } from '../notifications/mail.module';
 
 @Module({
   imports: [
     UsersModule,
+    MailModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
