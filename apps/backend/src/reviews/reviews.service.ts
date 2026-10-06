@@ -9,6 +9,8 @@ import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { RatingInputDto } from './dto/rating-input.dto';
 import { PendingReviewDto } from './dto/pending-review.dto';
+import { ReviewableEventDto, ReviewEligibilityDto } from './dto/review-eligibility.dto';
+import { MyReviewStateDto } from './dto/my-review-state.dto';
 import { CategorySummaryDto, ReviewCommentDto, ReviewSummaryDto } from './dto/review-summary.dto';
 import { Role } from '../common/enums/role.enums';
 import { REVIEW_LIMITS } from '../common/constants/review-categories';
@@ -26,11 +28,8 @@ export class ReviewsService {
     async create(dto: CreateReviewDto, userId: string): Promise<ReviewDocument> {
         const event = await this.findEventOrThrow(dto.eventId);
 
-        const attended = await this.rsvpModel
-            .exists({ event: event._id, user: userId, checkedIn: true })
-            .exec();
-        if (!attended) {
-            throw new ForbiddenException('Slegs bywoners wat by die geleentheid ingeteken het, kan dit beoordeel');
+        if (!(await this.hasAttended(event._id, userId))) {
+            throw new ForbiddenException('Slegs bywoners wat by die geleentheid ingeskandeer is, kan dit beoordeel');
         }
 
         this.assertReviewWindowOpen(event);
@@ -41,29 +40,55 @@ export class ReviewsService {
         return review;
     }
 
+    async getEligibility(eventId: string, userId: string): Promise<ReviewEligibilityDto> {
+        const event = await this.findEventOrThrow(eventId);
+
+        // Wie nie by die geleentheid was nie, kry niks daarvan te sien nie
+        if (!(await this.hasAttended(event._id, userId))) {
+            return { status: 'NOT_ATTENDED', event: null };
+        }
+
+        const details = ReviewableEventDto.fromEvent(event, this.getReviewWindow(event).closesAt);
+
+        const reviewed = await this.reviewModel.exists({ event: event._id, user: userId }).exec();
+        if (reviewed) return { status: 'ALREADY_REVIEWED', event: details };
+        if (event.reviewCategories.length === 0) return { status: 'NO_CATEGORIES', event: details };
+
+        return { status: this.getWindowState(event, Date.now()), event: details };
+    }
+
     async findPending(userId: string): Promise<PendingReviewDto[]> {
-        const [attendedEventIds, reviewedEventIds] = await Promise.all([
-            this.rsvpModel.distinct('event', { user: userId, checkedIn: true }).exec(),
-            this.reviewModel.distinct('event', { user: userId }).exec(),
-        ]);
-
-        const now = new Date();
-        const earliestEnd = new Date(now.getTime() - REVIEW_WINDOW_MS);
-
-        const events = await this.eventModel
-            .find({
-                _id: { $in: attendedEventIds, $nin: reviewedEventIds },
-                'reviewCategories.0': { $exists: true },
-                $or: [
-                    { endDate: { $gte: earliestEnd, $lte: now } },
-                    { endDate: null, date: { $gte: earliestEnd, $lte: now } },
-                ],
-            })
-            .exec();
+        const { attendedEventIds, reviewedEventIds } = await this.findUserEventIds(userId);
+        const events = await this.findUnreviewedEvents(attendedEventIds, reviewedEventIds);
+        const now = Date.now();
 
         return events
+            .filter((event) => this.getWindowState(event, now) === 'OPEN')
             .map((event) => PendingReviewDto.fromEvent(event, this.getReviewWindow(event).closesAt))
             .sort((a, b) => a.closesAt.getTime() - b.closesAt.getTime());
+    }
+
+    async getMyReviewState(userId: string): Promise<MyReviewStateDto> {
+        const { attendedEventIds, reviewedEventIds } = await this.findUserEventIds(userId);
+        const events = await this.findUnreviewedEvents(attendedEventIds, reviewedEventIds, 'date endDate');
+        const now = Date.now();
+
+        const state: MyReviewStateDto = {
+            reviewable: [],
+            reviewed:   reviewedEventIds.map((id) => id.toString()),
+            closed:     [],
+            upcoming:   [],
+        };
+
+        for (const event of events) {
+            const id = event._id.toString();
+            const windowState = this.getWindowState(event, now);
+            if (windowState === 'OPEN') state.reviewable.push(id);
+            else if (windowState === 'CLOSED') state.closed.push(id);
+            else state.upcoming.push(id);
+        }
+
+        return state;
     }
 
     async getEventSummary(eventId: string, requesterId: string, requesterRole: Role): Promise<ReviewSummaryDto> {
@@ -109,20 +134,52 @@ export class ReviewsService {
         return event;
     }
 
+    private async findUserEventIds(userId: string): Promise<{ attendedEventIds: Types.ObjectId[]; reviewedEventIds: Types.ObjectId[] }> {
+        const [attendedEventIds, reviewedEventIds] = await Promise.all([
+            this.rsvpModel.distinct('event', { user: userId, checkedIn: true }).exec(),
+            this.reviewModel.distinct('event', { user: userId }).exec(),
+        ]);
+        return { attendedEventIds, reviewedEventIds };
+    }
+
+    // Bygewoonde geleenthede met kategorieë wat die gebruiker nog nie beoordeel het nie. Of die
+    // venster oop is, besluit getWindowState, sodat die reël net op een plek staan.
+    private findUnreviewedEvents(
+        attendedEventIds: Types.ObjectId[],
+        reviewedEventIds: Types.ObjectId[],
+        fields?: string,
+    ): Promise<EventDocument[]> {
+        return this.eventModel
+            .find({ _id: { $in: attendedEventIds, $nin: reviewedEventIds }, 'reviewCategories.0': { $exists: true } })
+            .select(fields ?? {})
+            .exec();
+    }
+
+    private async hasAttended(eventId: Types.ObjectId, userId: string): Promise<boolean> {
+        const rsvp = await this.rsvpModel.exists({ event: eventId, user: userId, checkedIn: true }).exec();
+        return rsvp !== null;
+    }
+
     private getReviewWindow(event: EventDocument): { opensAt: Date; closesAt: Date } {
         const opensAt = event.endDate ?? event.date;
         return { opensAt, closesAt: new Date(opensAt.getTime() + REVIEW_WINDOW_MS) };
     }
 
-    private assertReviewWindowOpen(event: EventDocument): void {
+    private getWindowState(event: EventDocument, now: number): 'NOT_ENDED' | 'OPEN' | 'CLOSED' {
         const { opensAt, closesAt } = this.getReviewWindow(event);
-        const now = Date.now();
+        if (now < opensAt.getTime()) return 'NOT_ENDED';
+        if (now > closesAt.getTime()) return 'CLOSED';
+        return 'OPEN';
+    }
 
-        if (now < opensAt.getTime()) {
+    private assertReviewWindowOpen(event: EventDocument): void {
+        const windowState = this.getWindowState(event, Date.now());
+
+        if (windowState === 'NOT_ENDED') {
             throw new BadRequestException('Jy kan eers \'n resensie gee nadat die geleentheid geëindig het');
         }
 
-        if (now > closesAt.getTime()) {
+        if (windowState === 'CLOSED') {
             throw new BadRequestException(`Die resensie-venster het ${REVIEW_LIMITS.windowDays} dae na die geleentheid gesluit`);
         }
     }
@@ -157,18 +214,31 @@ export class ReviewsService {
     }
 
     private async recalculateEventRating(eventId: Types.ObjectId): Promise<void> {
-        const [count, averages] = await Promise.all([
-            this.reviewModel.countDocuments({ event: eventId }).exec(),
-            this.reviewModel.aggregate<{ avg: number }>([
-                { $match: { event: eventId } },
-                { $unwind: '$ratings' },
-                { $group: { _id: null, avg: { $avg: '$ratings.score' } } },
-            ]),
+        // Een aggregasie, sodat die telling en die gemiddeld van dieselfde resensies kom
+        const [totals] = await this.reviewModel.aggregate<{ count: number; scoreSum: number; scoreCount: number }>([
+            { $match: { event: eventId } },
+            {
+                $group: {
+                    _id:        null,
+                    count:      { $sum: 1 },
+                    scoreSum:   { $sum: { $sum: '$ratings.score' } },
+                    scoreCount: { $sum: { $size: '$ratings' } },
+                },
+            },
         ]);
+        if (!totals) return;
 
-        const ratingAvg = averages.length > 0 ? this.round(averages[0].avg) : null;
+        const ratingAvg = totals.scoreCount > 0 ? this.round(totals.scoreSum / totals.scoreCount) : null;
 
-        await this.eventModel.updateOne({ _id: eventId }, { ratingAvg, ratingCount: count }).exec();
+        // Resensies word net bygevoeg (en net saam met die geleentheid uitgevee), so 'n hoër telling
+        // is altyd die nuwer stand. Kom twee gelyktydige resensies hier in die verkeerde volgorde
+        // aan, keer die voorwaarde dat die ouer een die nuwer een oorskryf.
+        await this.eventModel
+            .updateOne(
+                { _id: eventId, ratingCount: { $not: { $gte: totals.count } } },
+                { ratingAvg, ratingCount: totals.count },
+            )
+            .exec();
     }
 
     private summariseCategory(category: ReviewCategory, reviews: ReviewDocument[]): CategorySummaryDto {

@@ -50,8 +50,15 @@ cp .env.example .env
 | `BACKEND_PORT` | Poort waarop die backend luister | `3000` |
 | `NODE_ENV` | Omgewingsmodus | `development` |
 | `EXPO_PUBLIC_API_URL` | Backend URL vir die mobiele toepassing | `http://10.0.2.2:3000` |
+| `SMTP_HOST` | SMTP-bediener vir uitgaande e-pos (leeg = e-posse afgeskakel) | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP-poort (`587` = STARTTLS, `465` = TLS) | `587` |
+| `SMTP_USER` | SMTP-gebruikersnaam | `no-reply@use-agora.com` |
+| `SMTP_PASS` | SMTP-wagwoord of app-wagwoord | `replace_with_smtp_password` |
+| `SMTP_FROM` | Afsender wat in e-posse wys | `Agora <no-reply@use-agora.com>` |
 
 > Genereer 'n veilige `JWT_SECRET` met: `openssl rand -hex 32`
+
+> In produksie is die `SMTP_*`-waardes nie in git nie. Hulle is in die `span4-backend-secrets` Kubernetes-secret, wat [`deploy/backend.yaml`](deploy/backend.yaml) via `envFrom` in die backend-pods laai.
 
 ---
 

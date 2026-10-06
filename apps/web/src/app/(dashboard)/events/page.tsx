@@ -13,6 +13,7 @@ import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
 import { getPaymentStatusAction } from '@/lib/actions/payments.actions';
+import { getMyReviewStateAction } from '@/lib/actions/review.actions';
 import { usePollWhileActive } from '@/lib/user-activity';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
@@ -54,6 +55,10 @@ export default function EventsPage() {
     const [loading, setLoading]     = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [rsvpdEventIds, setRsvpdEventIds] = useState<Set<string>>(new Set());
+    const [reviewableEventIds, setReviewableEventIds] = useState<Set<string>>(new Set());
+    const [reviewedEventIds, setReviewedEventIds]     = useState<Set<string>>(new Set());
+    const [closedReviewEventIds, setClosedReviewEventIds] = useState<Set<string>>(new Set());
+    const [upcomingReviewEventIds, setUpcomingReviewEventIds] = useState<Set<string>>(new Set());
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
@@ -142,6 +147,24 @@ export default function EventsPage() {
         }
     }, []);
 
+    // Die eerste laai en die poll kan oorvleuel, so net die jongste versoek se antwoord tel
+    const reviewStateRequestId = useRef(0);
+
+    const loadReviewState = useCallback(async () => {
+        const requestId = ++reviewStateRequestId.current;
+
+        try {
+            const { state } = await getMyReviewStateAction();
+            if (!state || requestId !== reviewStateRequestId.current) return;
+            setReviewableEventIds(new Set(state.reviewable));
+            setReviewedEventIds(new Set(state.reviewed));
+            setClosedReviewEventIds(new Set(state.closed));
+            setUpcomingReviewEventIds(new Set(state.upcoming));
+        } catch {
+            // Soos die RSVP's: die kaarte werk steeds sonder die resensie-aanduiding
+        }
+    }, []);
+
     // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
     // /payments/return en /cancel). PayFast se eie ITN skep die kaartjie
     // heeltemal server-tot-server, onafhanklik van wanneer die blaaier hierheen
@@ -210,12 +233,17 @@ export default function EventsPage() {
         loadRsvps();
     }, [loadRsvps]);
 
-    // Haal elke 60 s die geleenthede en RSVP-status weer op, maar net terwyl die gebruiker
-    // die bladsy gebruik. Die hook gebruik altyd die jongste datumfilter, sonder dat 'n
-    // filterklik die opname herbegin.
+    useEffect(() => {
+        loadReviewState();
+    }, [loadReviewState]);
+
+    // Haal elke 60 s die geleenthede, RSVP-status en resensies weer op, maar net terwyl die
+    // gebruiker die bladsy gebruik. Die hook gebruik altyd die jongste datumfilter, sonder dat
+    // 'n filterklik die opname herbegin.
     usePollWhileActive(() => {
         loadEvents(false);
         loadRsvps();
+        loadReviewState();
     }, 60000);
 
     const filtered = events
@@ -226,10 +254,11 @@ export default function EventsPage() {
             // 'Alle Status' beteken hier alle nie-verby geleenthede, 'n verby
             // geleentheid wys slegs as die 'Verby'-status spesifiek gekies is.
             // Uitsondering: het die gebruiker self 'n datumreeks gekies, dan is die
-            // verby geleenthede binne daardie reeks juis wat hy gevra het.
+            // verby geleenthede binne daardie reeks juis wat hy gevra het. 'n Verby
+            // geleentheid wat die gebruiker nog kan beoordeel, wys ook.
             const matchesStatus =
                 statusFilter === 'all'
-                    ? rangeActive || deriveStatus(event) !== 'past'
+                    ? rangeActive || deriveStatus(event) !== 'past' || reviewableEventIds.has(event.id)
                     : deriveStatus(event) === statusFilter;
             const matchesType = typeFilter === 'all' || event.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
@@ -406,6 +435,13 @@ export default function EventsPage() {
                             event={event}
                             alreadyRsvpd={rsvpdEventIds.has(event.id)}
                             isNew={event.id === newEventId}
+                            reviewState={
+                                reviewableEventIds.has(event.id) ? 'reviewable'
+                                : reviewedEventIds.has(event.id) ? 'reviewed'
+                                : closedReviewEventIds.has(event.id) ? 'closed'
+                                : upcomingReviewEventIds.has(event.id) ? 'upcoming'
+                                : undefined
+                            }
                         />
                     ))}
                 </div>

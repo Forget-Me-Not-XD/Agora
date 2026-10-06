@@ -4,6 +4,11 @@ import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type NotificationDocument = HydratedDocument<Notification>;
 
+export enum NotificationType {
+    FOTOGRAAF = 'FOTOGRAAF',
+    RESENSIE_VERSOEK = 'RESENSIE_VERSOEK',
+}
+
 @Schema({ timestamps: true, collection: 'notifications' })
 export class Notification {
     @Prop({ required: true, type: SchemaTypes.ObjectId, ref: 'User', index: true })
@@ -17,6 +22,9 @@ export class Notification {
 
     @Prop({ default: false })
     read !: boolean;
+
+    @Prop({ type: String, enum: Object.values(NotificationType), default: NotificationType.FOTOGRAAF })
+    type !: NotificationType;
 
     createdAt ?: Date;
     updatedAt ?: Date;

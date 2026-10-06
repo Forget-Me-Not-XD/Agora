@@ -35,7 +35,7 @@ export class EventsService {
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
         const start = new Date(dto.date);
-        const end   = dto.endDate ? new Date(dto.endDate) : undefined;
+        const end   = new Date(dto.endDate);
         this.assertEndAfterStart(start, end);
         this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
         this.assertVenueCapacity(dto.location, dto.maxCapacity);
@@ -153,6 +153,29 @@ export class EventsService {
             })
             .sort({ date: 1 })
             .exec();
+    }
+
+    async findDueForReviewRequests(endedBefore: Date, endedAfter: Date): Promise<EventDocument[]> {
+        const startedBefore = new Date(endedBefore.getTime() - DEFAULT_EVENT_DURATION_MS);
+        const startedAfter = new Date(endedAfter.getTime() - DEFAULT_EVENT_DURATION_MS);
+
+        return this.eventModel
+            .find({
+                reviewRequestsSentAt: null,
+                $or: [
+                    { endDate: { $lt: endedBefore, $gte: endedAfter } },
+                    { endDate: { $in: [null, undefined] }, date: { $lt: startedBefore, $gte: startedAfter } },
+                ],
+            })
+            .exec();
+    }
+
+    async claimReviewRequests(id: string, now: Date): Promise <EventDocument | null> {
+        return this.eventModel.findOneAndUpdate(
+            { _id: id, reviewRequestsSentAt: null },
+            { $set: { reviewRequestsSentAt: now } },
+            { new: true },
+        ).exec();
     }
 
     async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {

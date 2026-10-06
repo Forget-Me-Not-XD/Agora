@@ -5,6 +5,7 @@ import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
 import { getUsersByIds } from '@/lib/api/users';
 import { getMyRsvps } from '@/lib/api/rsvp';
+import { getReviewEligibility } from '@/lib/api/reviews';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
 import { formatDateLong as formatDate } from '@/lib/format-date';
@@ -12,6 +13,7 @@ import PhotographerSection from '@/components/PhotographerSection';
 import { Pill } from '@/components/ui/Pill';
 import PaymentModal from '@/components/PaymentModal';
 import AlreadyRsvpdTag from '@/components/AlreadyRsvpdTag';
+import ReviewEventCard from '@/components/ReviewEventCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +27,10 @@ export default async function EventDetailPage({ params }: { params: { id: string
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
 
-    const myRsvps = await getMyRsvps().catch(() => []);
+    const [myRsvps, reviewStatus] = await Promise.all([
+        getMyRsvps().catch(() => []),
+        getReviewEligibility(event.id).then((r) => r.status).catch(() => null),
+    ]);
     const alreadyRsvpd = myRsvps.some((r) => r.status !== 'GEKANSELLEER' && r.event?._id === event.id);
 
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
@@ -111,6 +116,8 @@ export default async function EventDetailPage({ params }: { params: { id: string
                     </div>
                 </div>
             )}
+
+            <ReviewEventCard eventId={event.id} status={reviewStatus} />
 
             {/* Finansiële afdeling — bestuurders van die geleentheid, en die toegekende Finansies-gebruiker */}
             {canViewFinance && (
