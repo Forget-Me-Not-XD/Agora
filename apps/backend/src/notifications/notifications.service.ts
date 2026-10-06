@@ -42,8 +42,9 @@ export class NotificationsService {
     async findMyNotifications(userId: string): Promise<NotificationDocument[]> {
         return this.notificationModel
         .find({ userId })
-        .sort ({ createdAt: -1 })
-        .populate( 'event' )
+        .sort ({ read: 1, createdAt: -1 })
+        // Die kliënte gebruik net die event se _id en titel, so ons stuur nie die hele dokument elke poll nie
+        .populate('event', 'title')
         .exec();
     }
 

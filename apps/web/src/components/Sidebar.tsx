@@ -13,6 +13,7 @@ import {
     Users,
     ChevronDown,
     Ticket,
+    Bell,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useCurrentUser } from './UserContext';
@@ -46,6 +47,7 @@ export default function Sidebar() {
     const flatItems: NavItem[] = [
         { href: '/events', label: 'Geleenthede', icon: Calendar },
         { href: '/rsvp', label: "My RSVP's", icon: Ticket },
+        { href: '/notifications', label: 'Kennisgewings', icon: Bell },
         ...(canCreateEvents(role)
             ? [{ href: '/events/create', label: 'Skep Geleentheid', icon: PlusCircle }]
             : []),

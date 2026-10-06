@@ -31,3 +31,6 @@ export class Notification {
 }
 
 export const NotificationSchema = SchemaFactory.createForClass(Notification);
+
+// Dek findMyNotifications se query: filter op userId, sorteer ongelees eerste en dan nuutste eerste
+NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
