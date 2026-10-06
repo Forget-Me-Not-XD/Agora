@@ -1,37 +1,32 @@
 'use client';
 
 // ========== Imports: ==========
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Bell, BellRing } from 'lucide-react';
 import { usePollWhileActive } from '@/lib/user-activity';
-import { listNotificationsAction, markNotificationReadAction } from '@/lib/actions/notification.actions';
+import { formatDateShort } from '@/lib/format-date';
+import { selectUnreadCount, useNotificationsStore, useOpenNotification } from '@/lib/stores/notifications.store';
 import type { NotificationItem } from '@/lib/api/notifications';
 
 const POLL_INTERVAL = 60000;
 
-export default function NotificationBell() {
-    const [items, setItems] = useState<NotificationItem[]>([]);
-    const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const wrapRef = useRef<HTMLDivElement>(null);
-    const router = useRouter();
+// Die popover wys net die nuutste paar; "Sien alles" gaan na die volle bladsy
+const POPOVER_LIMIT = 8;
 
-    const load = useCallback(async () => {
-        const result = await listNotificationsAction();
-        if (result.notifications) {
-            setItems(result.notifications);
-            setError(null);
-        } else if (result.error) {
-            setError(result.error);
-        }
-        setLoading(false);
-    }, []);
+export default function NotificationBell() {
+    const items       = useNotificationsStore((s) => s.items);
+    const loaded      = useNotificationsStore((s) => s.loaded);
+    const error       = useNotificationsStore((s) => s.error);
+    const load        = useNotificationsStore((s) => s.load);
+    const unreadCount = useNotificationsStore(selectUnreadCount);
+    const openNotification = useOpenNotification();
+
+    const [open, setOpen] = useState(false);
+    const wrapRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     // Hou die ongelees-telling vars, net terwyl die gebruiker werklik aktief is
@@ -49,23 +44,13 @@ export default function NotificationBell() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [open]);
 
-    const unreadCount = items.filter((n) => !n.read).length;
-
     async function handleItemClick(item: NotificationItem) {
-        if (!item.read) {
-            setItems((prev) => prev.map((n) => (n._id === item._id ? { ...n, read: true } : n)));
-            const result = await markNotificationReadAction(item._id);
-            if (result.error) {
-                setItems((prev) => prev.map((n) => (n._id === item._id ? { ...n, read: false } : n)));
-                setError(result.error);
-                return;
-            }
-        }
-        setOpen(false);
-        if (item.event) {
-            router.push(`/events/${item.event._id}`);
+        if (await openNotification(item)) {
+            setOpen(false);
         }
     }
+
+    const visibleItems = items.slice(0, POPOVER_LIMIT);
 
     return (
         <div className="relative" ref={wrapRef}>
@@ -85,7 +70,11 @@ export default function NotificationBell() {
             </button>
 
             {open && (
-                <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-xl z-50">
+                <div
+                    role="dialog"
+                    aria-label="Kennisgewings"
+                    className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-xl z-50"
+                >
                     <div className="p-3 border-b border-[var(--color-border)]">
                         <p className="text-sm font-semibold text-[var(--color-text)]">Kennisgewings</p>
                     </div>
@@ -94,13 +83,13 @@ export default function NotificationBell() {
                         <p className="text-xs text-[var(--color-red)] px-3 pt-2">{error}</p>
                     )}
 
-                    {loading ? (
-                        <p className="text-sm text-[var(--color-text-subtle)] text-center py-8">Laai...</p>
+                    {!loaded ? (
+                        !error && <p className="text-sm text-[var(--color-text-subtle)] text-center py-8">Laai...</p>
                     ) : items.length === 0 ? (
                         <p className="text-sm text-[var(--color-text-subtle)] text-center py-8">Geen kennisgewings nie</p>
                     ) : (
                         <div className="divide-y divide-[var(--color-border)]">
-                            {items.map((item) => (
+                            {visibleItems.map((item) => (
                                 <button
                                     key={item._id}
                                     onClick={() => void handleItemClick(item)}
@@ -115,7 +104,7 @@ export default function NotificationBell() {
                                             {item.message}
                                         </p>
                                         <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                                            {new Date(item.createdAt).toLocaleDateString('af-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            {formatDateShort(item.createdAt)}
                                         </p>
                                     </div>
                                 </button>
@@ -139,4 +128,3 @@ export default function NotificationBell() {
         </div>
     );
 }
-

@@ -43,7 +43,8 @@ export class NotificationsService {
         return this.notificationModel
         .find({ userId })
         .sort ({ read: 1, createdAt: -1 })
-        .populate( 'event' )
+        // Die kliënte gebruik net die event se _id en titel, so ons stuur nie die hele dokument elke poll nie
+        .populate('event', 'title')
         .exec();
     }
 

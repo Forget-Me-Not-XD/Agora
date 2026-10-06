@@ -1,36 +1,38 @@
 'use client';
 
 // ========== Imports: ==========
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Bell, BellRing } from 'lucide-react';
 import type { NotificationItem } from '@/lib/api/notifications';
-import { markNotificationReadAction } from '@/lib/actions/notification.actions';
 import { formatDateLong } from '@/lib/format-date';
+import { useNotificationsStore, useOpenNotification } from '@/lib/stores/notifications.store';
 
-export default function NotificationsList({ initial }: { initial: NotificationItem[] }) {
-    const [items, setItems] = useState(initial);
-    const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
+/**
+ * Die bediener se lys tot die store gelaai is, daarna die store. So wys die eerste render
+ * reeds data, en verander die lys saam wanneer die klokkie poll of iets as gelees merk.
+ */
+function useNotificationItems(initial: NotificationItem[]): NotificationItem[] {
+    const items   = useNotificationsStore((s) => s.items);
+    const loaded  = useNotificationsStore((s) => s.loaded);
+    const hydrate = useNotificationsStore((s) => s.hydrate);
 
     useEffect(() => {
-        setItems(initial);
-    }, [initial]);
+        hydrate(initial);
+    }, [initial, hydrate]);
 
-    async function handleClick(item: NotificationItem) {
-        if (!item.read) {
-            setItems((prev) => prev.map((n) => (n._id === item._id ? { ...n, read: true } : n)));
-            const result = await markNotificationReadAction(item._id);
-            if (result.error) {
-                setItems((prev) => prev.map((n) => (n._id === item._id ? { ...n, read: false } : n)));
-                setError(result.error);
-                return;
-            }
-        }
-        if (item.event) {
-            router.push(`/events/${item.event._id}`);
-        }
-    }
+    return loaded ? items : initial;
+}
+
+export function NotificationsUnreadSummary({ initial }: { initial: NotificationItem[] }) {
+    const unreadCount = useNotificationItems(initial).filter((n) => !n.read).length;
+
+    return <>{unreadCount > 0 ? `${unreadCount} ongelees` : 'Alles gelees'}</>;
+}
+
+export default function NotificationsList({ initial }: { initial: NotificationItem[] }) {
+    const items = useNotificationItems(initial);
+    const error = useNotificationsStore((s) => s.error);
+    const openNotification = useOpenNotification();
 
     if (items.length === 0) {
         return (
@@ -48,7 +50,7 @@ export default function NotificationsList({ initial }: { initial: NotificationIt
             {items.map((item) => (
                 <button
                     key={item._id}
-                    onClick={() => void handleClick(item)}
+                    onClick={() => void openNotification(item)}
                     className={[
                         'w-full text-left flex items-start gap-3 bg-[var(--color-surface)] border rounded-2xl p-4 transition-colors hover:border-[var(--color-primary)]',
                         item.read ? 'border-[var(--color-border)]' : 'border-[var(--color-primary)]',
