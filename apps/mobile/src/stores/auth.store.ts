@@ -154,13 +154,11 @@ register: async (payload) => {
 changePassword: async (currentPassword, newPassword) => {
   set({ isLoading: true, error: null });
   try {
-    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
-    const { user } = get();
-    if (user) {
-      set({ user: { ...user, mustChangePassword: false }, isLoading: false });
-    } else {
-      set({ isLoading: false });
-    }
+    // The backend ends every session when the password changes, this one included, and hands
+    // back a fresh pair. Without storing it the app would be signed out at the next refresh.
+    const result = await apiClient.post<TokenPair>('/auth/change-password', { currentPassword, newPassword });
+    await apiClient.setTokens(result.accessToken, result.refreshToken);
+    set({ user: result.user, isLoading: false });
   } catch (err) {
     set({ error: getErrorMessage(err, 'Password change failed'), isLoading: false });
     throw err;

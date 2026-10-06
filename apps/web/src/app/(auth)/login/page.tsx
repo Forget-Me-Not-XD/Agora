@@ -18,10 +18,10 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe]           = useState(false);
   const [error, setError]                     = useState<string | null>(null);
   const [isPending, startTransition]          = useTransition();
-  const [forgotInfo, setForgotInfo]           = useState(false);
   const [noAccountOpen, setNoAccountOpen]     = useState(false);
   const [noAccountEmail, setNoAccountEmail]   = useState<string | null>(null);
   const [deletedNotice, setDeletedNotice]     = useState(false);
+  const [resetNotice, setResetNotice]         = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -49,6 +49,12 @@ export default function LoginPage() {
 
     if (params.get('deleted') === 'true') {
       setDeletedNotice(true);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
+    if (params.get('reset') === 'true') {
+      setResetNotice(true);
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
@@ -136,8 +142,8 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Wagwoord vergeet info */}
-        {forgotInfo && (
+        {/* Wagwoord herstel bevestiging */}
+        {resetNotice && (
           <div
             className="mb-4 px-4 py-3 rounded-[12px] border text-[16px] font-semibold"
             style={{
@@ -146,7 +152,7 @@ export default function LoginPage() {
               color:       'var(--color-text)',
             }}
           >
-            Kontak die Agora stelseladministrateur om jou wagwoord te herstel.
+            Jou wagwoord is herstel. Meld aan met jou nuwe wagwoord.
           </div>
         )}
 
@@ -239,14 +245,13 @@ export default function LoginPage() {
                 Onthou my
               </span>
             </label>
-            <button
-              type="button"
+            <a
+              href="/forgot-password"
               className="text-[16px] font-bold transition"
               style={{ color: 'var(--color-primary)' }}
-              onClick={() => setForgotInfo(true)}
             >
               Wagwoord vergeet?
-            </button>
+            </a>
           </div>
 
           {/* Meld Aan */}

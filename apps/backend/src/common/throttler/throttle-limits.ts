@@ -40,9 +40,16 @@ export const THROTTLE_LIMITS = {
     // thing slowing down someone guessing it with a stolen access token
     changePassword: { limit: 5, ttl: minutes(1) },
 
-    forgotPasswordPerEmail: { limit: 3,  ttl: minutes(15) },
-    forgotPasswordPerIp:    { limit: 20, ttl: minutes(15) },
-    resetPassword:          { limit: 10, ttl: minutes(15) },
+    // Per email and IP together, so someone else can't use up a user's requests and lock them
+    // out of asking for a link. The per-IP limit stops one machine spraying many addresses.
+    forgotPasswordPerEmailIp: { limit: 3,  ttl: minutes(15) },
+    forgotPasswordPerIp:      { limit: 20, ttl: minutes(15) },
+
+    // Reset tokens are 256 random bits, so guessing them is hopeless and the limits are mostly
+    // about load. Counted per token first, so a whole study centre behind one IP doesn't share
+    // one small bucket; the per-IP limit is the backstop for made-up tokens.
+    resetPasswordPerToken: { limit: 10, ttl: minutes(15) },
+    resetPasswordPerIp:    { limit: 60, ttl: minutes(15) },
 
     // Every call costs us a request to Geoapify, and the address field searches 400ms after
     // each keystroke pause, so one address can take a handful of them

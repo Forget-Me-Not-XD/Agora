@@ -15,7 +15,13 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
 
   async headers() {
-    return [{ source: '/(.*)', headers: securityHeaders }];
+    return [
+      { source: '/(.*)', headers: securityHeaders },
+      // Die herstelbladsy stuur glad nie 'n Referer nie, ook nie na ons eie bediener nie.
+      // Die token is reeds in die fragment (wat nooit in 'n Referer kom nie); dit is 'n tweede slot.
+      // Die laaste ooreenstemmende reël wen, so dit vervang die algemene Referrer-Policy hierbo.
+      { source: '/reset-password', headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }] },
+    ];
   },
 
   async rewrites() {

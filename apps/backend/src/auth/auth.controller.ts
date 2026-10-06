@@ -26,7 +26,13 @@ import { SkipPasswordCheck } from '../common/decorators/skip-password-check.deco
 import { ClientIp } from '../common/decorators/client-ip.decorator';
 import { THROTTLE_LIMITS } from '../common/throttler/throttle-limits';
 import { ThrottleExtra } from '../common/throttler/throttle.decorators';
-import { emailTracker, ipTracker, refreshTokenTracker } from '../common/throttler/throttler-trackers';
+import {
+  emailIpTracker,
+  emailTracker,
+  ipTracker,
+  refreshTokenTracker,
+  resetTokenTracker,
+} from '../common/throttler/throttler-trackers';
 
 @Controller('auth')
 export class AuthController {
@@ -99,12 +105,12 @@ export class AuthController {
   async changePassword(
     @Body() dto: ChangePasswordDto,
     @CurrentUser() user: JwtPayload,
-  ): Promise<{ ok: boolean }> {
-    await this.authService.changePassword(user.sub, dto);
-    return { ok: true};
+  ): Promise<TokenPairDto> {
+    // Changing the password ends every session, this one included, so hand back a fresh pair
+    return this.authService.changePassword(user.sub, dto);
   }
 
-  @Throttle({ default: { ...THROTTLE_LIMITS.forgotPasswordPerEmail, getTracker: emailTracker } })
+  @Throttle({ default: { ...THROTTLE_LIMITS.forgotPasswordPerEmailIp, getTracker: emailIpTracker } })
   @ThrottleExtra({ ...THROTTLE_LIMITS.forgotPasswordPerIp, getTracker: ipTracker })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -113,7 +119,8 @@ export class AuthController {
     return { ok: true };
   }
 
-  @Throttle({ default: { ...THROTTLE_LIMITS.resetPassword, getTracker: ipTracker } })
+  @Throttle({ default: { ...THROTTLE_LIMITS.resetPasswordPerToken, getTracker: resetTokenTracker } })
+  @ThrottleExtra({ ...THROTTLE_LIMITS.resetPasswordPerIp, getTracker: ipTracker })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ ok: boolean }> {

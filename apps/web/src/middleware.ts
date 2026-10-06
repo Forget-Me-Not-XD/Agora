@@ -12,7 +12,10 @@ import { isRscRequest, reloadAsDocument } from '@/lib/rsc-request';
 
 const AUTH_ONLY_PATHS = ['/login', '/register'];
 const SERVER_BUSY_PATH = '/server-busy';
-const ALWAYS_PUBLIC_PATHS = ['/popia', SERVER_BUSY_PATH];
+// Die wagwoordherstel-bladsye werk of iemand aangemeld is of nie. Die herstel-token is in die
+// URL-fragment, so dit kom nooit hier verby nie, maar as dit wel 'n gewone pad was, sou
+// rememberReturnTo dit in 'n cookie gestoor het.
+const ALWAYS_PUBLIC_PATHS = ['/popia', SERVER_BUSY_PATH, '/forgot-password', '/reset-password'];
 const PASSWORD_CHANGE_PATH = '/change-password';
 const REFRESH_PATH = '/api/auth/refresh';
 

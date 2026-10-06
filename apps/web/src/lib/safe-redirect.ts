@@ -31,7 +31,9 @@ export function safeRedirectPath(from: string | null, fallback = '/dashboard'): 
 // Die aanmeld- en wagwoordbladsye en /server-busy hoort by die aanmeldvloei self, so as ons
 // ná aanmelding daarheen stuur, beland ons in 'n lus. /api is nooit 'n bladsy nie, en die
 // refresh-roete se ?from= kan enigiets bevat, so 'n API-roete word ook nooit 'n bestemming nie.
-const NOT_AFTER_LOGIN = ['/login', '/register', '/server-busy', '/change-password', '/api'];
+const NOT_AFTER_LOGIN = [
+  '/login', '/register', '/server-busy', '/change-password', '/forgot-password', '/reset-password', '/api',
+];
 
 /** Waarheen ons ná aanmelding stuur: die onthoude pad as dit veilig is, anders /dashboard. */
 export function postLoginRedirect(from: string | null | undefined): string {

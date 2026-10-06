@@ -86,7 +86,12 @@ export class UsersService {
     return UserResponseDto.fromDocument(updated);
   }
 
-  async changePassword( userId: string, passwordHash: string, passwordHistory: string[]): Promise <void> {
+  async changePassword(
+    userId: string,
+    passwordHash: string,
+    passwordHistory: string[],
+    sessionsValidAfter: Date,
+  ): Promise <void> {
     await this.userModel.updateOne(
       { _id: userId },
       {
@@ -95,6 +100,7 @@ export class UsersService {
           mustChangePassword: false,
           passwordChangedAt: new Date(),
           passwordHistory,
+          sessionsValidAfter,
           // A reset link requested before this change must not be able to overwrite it
           passwordResetTokenHash: null,
           passwordResetExpiresAt: null,
@@ -125,7 +131,14 @@ export class UsersService {
     sessionsValidAfter: Date,
   ): Promise<boolean> {
     const result = await this.userModel.updateOne(
-      { _id: userId, passwordResetTokenHash: tokenHash },
+      // Check expiry and isActive again here: the bcrypt work since findByValidResetToken takes
+      // about a second, and in that time the token can expire or an admin can deactivate the account
+      {
+        _id: userId,
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpiresAt: { $gt: new Date() },
+        isActive: true,
+      },
       {
         $set: {
           passwordHash,
@@ -228,6 +241,8 @@ export class UsersService {
           mustChangePassword: true,
           passwordChangedAt: new Date(),
           passwordHistory: [],
+          // Sign out every existing session, so only someone with the temporary password gets in
+          sessionsValidAfter: new Date(Math.floor(Date.now() / 1000) * 1000),
           // A reset link requested before this change must not be able to overwrite it
           passwordResetTokenHash: null,
           passwordResetExpiresAt: null,

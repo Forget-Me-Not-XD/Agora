@@ -69,6 +69,27 @@ export function emailTracker(req: TrackableRequest): string {
 }
 
 /**
+ * Per email address and IP together, for forgot-password. Only per email would let anyone use up
+ * a user's requests and lock them out of asking for a reset link.
+ */
+export function emailIpTracker(req: TrackableRequest): string {
+    const email = req.body?.email;
+    return typeof email === 'string' && email.trim()
+        ? `email-ip:${email.trim().toLowerCase()}|${getClientIp(req)}`
+        : ipTracker(req);
+}
+
+/**
+ * Per reset token, for /auth/reset-password. Hashed for the same reason as refreshTokenTracker.
+ */
+export function resetTokenTracker(req: TrackableRequest): string {
+    const token = req.body?.token;
+    return typeof token === 'string' && token
+        ? `reset:${createHash('sha256').update(token).digest('base64url')}`
+        : ipTracker(req);
+}
+
+/**
  * Per refresh token, for /auth/refresh. The token is hashed so the raw value never ends up in
  * the throttler's storage. createHash throws on a non-string, which would turn a bad request into
  * a 500, hence the IP fallback.

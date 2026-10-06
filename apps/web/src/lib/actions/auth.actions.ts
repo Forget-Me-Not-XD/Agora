@@ -7,14 +7,11 @@ import { deleteAccount } from '@/lib/api/users';
 import type { TokenPair, LoginPayload, UserResponse } from '@/lib/types';
 import {
   setAuthCookies,
-  setUserCookie,
   clearAuthCookies,
   COOKIE_NAME,
-  COOKIE_USER_NAME,
-  COOKIE_REFRESH_NAME,
+  COOKIE_REMEMBER_NAME,
   COOKIE_RETURN_TO,
   DEFAULT_ACCESS_EXPIRY,
-  remainingSessionSeconds,
 } from '@/lib/auth-cookies';
 import { clientIpHeaders } from '@/lib/client-ip';
 import { postLoginRedirect } from '@/lib/safe-redirect';
@@ -175,8 +172,8 @@ export async function completeSsoLoginAction(
 /**
  * Change-password server action.
  * Roep NestJS POST /api/v1/auth/change-password met die ingetekende gebruiker se token.
- * Werk daarna die akademia_user cookie se mustChangePassword veld op na false, sodat die 
- * middleware die gebruiker onmiddelik na /dashboard toelaat sonder om weer aan te meld.
+ * Die backend meld daarmee alle sessies uit en gee 'n nuwe token-paar, wat ons stel sodat die
+ * gebruiker op hierdie toestel aangemeld bly en die middleware hulle na /dashboard toelaat.
  * 
  * Returns null as sukselvol (redirect server-side, sien afterLoginPath),
  * of 'n error string wat in die form gewys word
@@ -186,26 +183,81 @@ export async function changePasswordAction(
 ): Promise <string | null> {
   const cookieStore = cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
+  // Behou die gebruiker se onthou-my keuse vir die nuwe sessie
+  const rememberMe = Boolean(cookieStore.get(COOKIE_REMEMBER_NAME)?.value);
 
   try {
-    await changePassword(payload, token);
+    // Die backend meld alle sessies uit, hierdie een ook, en gee 'n nuwe paar terug. Stel dit
+    // soos by aanmelding; die nuwe akademia_user cookie het reeds mustChangePassword = false.
+    const data = await changePassword({ ...payload, rememberMe }, token);
+    setAuthCookies(cookieStore, data, rememberMe);
   } catch(err) {
     return err instanceof Error ? err.message : 'Wagwoordverandering het misluk.';
   }
 
-  const userCookie = cookieStore.get(COOKIE_USER_NAME)?.value;
-  if (userCookie) {
-    try {
-      const user = JSON.parse(userCookie) as UserResponse;
-      // Hou so lank as wat die sessie nog oor het, soos met aanmelding
-      const maxAge = remainingSessionSeconds(cookieStore.get(COOKIE_REFRESH_NAME)?.value, token);
-      setUserCookie(cookieStore, { ...user, mustChangePassword: false }, maxAge);
-    } catch {
-      // Malformed cookie - nothing to patch, next full login will fix the corrupted cookie
+  redirect(afterLoginPath());
+}
+
+/**
+ * Forgot-password server action.
+ * Roep NestJS POST /api/v1/auth/forgot-password. Die backend antwoord altyd dieselfde, of die
+ * e-posadres bestaan of nie, so ons kan net "kyk in jou e-pos" wys.
+ *
+ * Returns null as suksesvol, of 'n error string wat in die form gewys word.
+ */
+export async function forgotPasswordAction(email: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
+      method:  'POST',
+      // Die backend throttle per e-pos en IP, so dit moet die gebruiker se IP wees, nie die web-pod se een nie
+      headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
+      body:    JSON.stringify({ email }),
+      cache:   'no-store',
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const msg  = body?.message ?? 'Kon nie die versoek stuur nie.';
+      return typeof msg === 'string' ? msg : (msg.join?.(', ') ?? 'Kon nie die versoek stuur nie.');
     }
+  } catch {
+    return 'Kan nie aan die bediener koppel nie. Probeer later.';
   }
 
-  redirect(afterLoginPath());
+  return null;
+}
+
+/**
+ * Reset-password server action.
+ * Roep NestJS POST /api/v1/auth/reset-password met die token uit die e-posskakel. Die backend
+ * meld daarmee alle sessies uit, so ons stuur na /login eerder as om iemand aan te meld.
+ *
+ * Returns 'n error string wat in die form gewys word; met sukses redirect dit na /login.
+ */
+export async function resetPasswordAction(payload: {
+  token:       string;
+  newPassword: string;
+}): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/reset-password`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
+      body:    JSON.stringify(payload),
+      cache:   'no-store',
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const msg  = body?.message ?? 'Wagwoordherstel het misluk.';
+      return typeof msg === 'string' ? msg : (msg.join?.(', ') ?? 'Wagwoordherstel het misluk.');
+    }
+  } catch {
+    return 'Kan nie aan die bediener koppel nie. Probeer later.';
+  }
+
+  // Maak enige ou sessie se cookies skoon; die backend het dit in elk geval reeds beëindig
+  clearAuthCookies(cookies());
+  redirect('/login?reset=true');
 }
 
 /**
