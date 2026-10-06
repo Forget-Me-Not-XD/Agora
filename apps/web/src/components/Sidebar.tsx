@@ -45,7 +45,6 @@ export default function Sidebar() {
     ];
 
     const flatItems: NavItem[] = [
-        { href: '/notifications', label: 'Kennisgewings', icon: Bell },
         { href: '/events', label: 'Geleenthede', icon: Calendar },
         { href: '/rsvp', label: "My RSVP's", icon: Ticket },
         ...(canCreateEvents(role)
