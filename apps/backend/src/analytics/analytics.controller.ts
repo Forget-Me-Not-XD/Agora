@@ -13,6 +13,8 @@ import { Throttle } from '@nestjs/throttler';
 import { Trend } from './dto/trend.dto';
 import { THROTTLE_LIMITS } from '../common/throttler/throttle-limits';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
+import { KeyFindingsService } from './key-findings.service';
+import { KeyFinding } from './dto/key-finding.dto';
 
 interface EventsSummaryResponse {
     eventsPerMonth: EventsPerMonth[];
@@ -30,6 +32,7 @@ export class AnalyticsController {
     constructor(
         private readonly lstmService: LstmService,
         private readonly analyticsService: AnalyticsService,
+        private readonly keyFindingsService: KeyFindingsService,
     ) {}
 
     @Get('training-data')
@@ -171,6 +174,13 @@ export class AnalyticsController {
     @Roles(Role.ADMIN, Role.DOSENT)
     async getModelStatus(): Promise<ModelStatus> {
         return this.lstmService.getModelStatus();
+    }
+
+    @Get('key-findings')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
+    async getKeyFindings(@CurrentUser() user: JwtPayload): Promise<KeyFinding[]> {
+        return this.keyFindingsService.getKeyFindings(user);
     }
 
     @Get('predict/:eventId')
