@@ -40,6 +40,10 @@ export const THROTTLE_LIMITS = {
     // thing slowing down someone guessing it with a stolen access token
     changePassword: { limit: 5, ttl: minutes(1) },
 
+    forgotPasswordPerEmail: { limit: 3,  ttl: minutes(15) },
+    forgotPasswordPerIp:    { limit: 20, ttl: minutes(15) },
+    resetPassword:          { limit: 10, ttl: minutes(15) },
+
     // Every call costs us a request to Geoapify, and the address field searches 400ms after
     // each keystroke pause, so one address can take a handful of them
     places: { limit: 30, ttl: minutes(1) },

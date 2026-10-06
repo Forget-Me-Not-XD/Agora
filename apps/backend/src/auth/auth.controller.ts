@@ -20,6 +20,8 @@ import { Throttle } from '@nestjs/throttler';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SkipPasswordCheck } from '../common/decorators/skip-password-check.decorator';
 import { ClientIp } from '../common/decorators/client-ip.decorator';
 import { THROTTLE_LIMITS } from '../common/throttler/throttle-limits';
@@ -100,6 +102,23 @@ export class AuthController {
   ): Promise<{ ok: boolean }> {
     await this.authService.changePassword(user.sub, dto);
     return { ok: true};
+  }
+
+  @Throttle({ default: { ...THROTTLE_LIMITS.forgotPasswordPerEmail, getTracker: emailTracker } })
+  @ThrottleExtra({ ...THROTTLE_LIMITS.forgotPasswordPerIp, getTracker: ipTracker })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() dto: ForgotPasswordDto): { ok: boolean } {
+    this.authService.forgotPassword(dto.email);
+    return { ok: true };
+  }
+
+  @Throttle({ default: { ...THROTTLE_LIMITS.resetPassword, getTracker: ipTracker } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ ok: boolean }> {
+    await this.authService.resetPassword(dto);
+    return { ok: true };
   }
 
   @Get('google')
