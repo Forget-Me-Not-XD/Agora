@@ -10,6 +10,8 @@ import { AnalyticsService } from './analytics.service';
 import { RecommendationService } from './recommendation.service';
 import { AnalyticsController } from './analytics.controller';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { Review, ReviewSchema } from '../reviews/schemas/review.schema';
+import { KeyFindingsService } from './key-findings.service';
 
 
 // Importing MongooseModule.forFeature here gives the LstmService direct access to the Rsvp model:
@@ -22,9 +24,10 @@ import { User, UserSchema } from '../users/schemas/user.schema';
             { name: User.name, schema: UserSchema },
             { name: Rsvp.name, schema: RsvpSchema},
             { name: Payment.name, schema: PaymentSchema },
+            { name: Review.name, schema: ReviewSchema },
         ]),
     ],
-    providers: [LstmService, AnalyticsService, RecommendationService],
+    providers: [LstmService, AnalyticsService, RecommendationService, KeyFindingsService],
     controllers: [AnalyticsController],
     exports: [LstmService],
 })
