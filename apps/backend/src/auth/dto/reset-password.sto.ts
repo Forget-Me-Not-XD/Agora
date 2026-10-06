@@ -1,11 +1,12 @@
-// ========== Imports: ==========
+// ========== Import: ==========
 import { IsString, MinLength, MaxLength, Matches } from "class-validator";
 import { PASSWORD_PATTERN, PASSWORD_PATTERN_MESSAGE } from "./password-rules";
 
-export class ChangePasswordDto {
+export class ResetPasswordDto {
     @IsString()
     @MinLength(1)
-    currentPassword!: string;
+    @MaxLength(128)
+    token!: string;
 
     @IsString()
     @MinLength(8)
