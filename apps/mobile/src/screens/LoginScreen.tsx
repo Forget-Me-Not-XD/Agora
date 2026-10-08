@@ -198,7 +198,9 @@ export function LoginScreen({ navigation }: Props) {
 
             <TouchableOpacity
               style={styles.forgotBtn}
-              onPress={() => Alert.alert('Wagwoord', 'Kontak die Agora stelseladministrateur om jou wagwoord te herstel.')}
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+              disabled={isLoading}
+              accessibilityRole="button"
             >
               <Text style={styles.forgotText}>Wagwoord vergeet?</Text>
             </TouchableOpacity>

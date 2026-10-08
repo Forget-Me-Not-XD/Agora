@@ -1,4 +1,4 @@
-// ========== Imorts: ==========
+// ========== Imports: ==========
 import { apiClient, UserResponse } from './client'
 
 export interface CreateUserPayload {
@@ -12,4 +12,8 @@ export interface CreateUserPayload {
 
 export async function adminCreateUser(payload: CreateUserPayload): Promise <UserResponse> {
     return apiClient.post<UserResponse, CreateUserPayload>('/auth/admin/register', payload);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+    await apiClient.post<{ ok: boolean }, { email: string }>('/auth/forgot-password', { email });
 }

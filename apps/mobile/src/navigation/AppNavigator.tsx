@@ -11,6 +11,7 @@ import { startAppPrefetch } from '../lib/prefetch';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
@@ -27,6 +28,7 @@ import { MainTabs } from './MainTabs';
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  ForgotPassword: { email?: string } | undefined;
   ChangePassword: undefined;
   AppLoading: undefined;
   Onboarding: undefined;
@@ -152,6 +154,7 @@ export function AppNavigator() {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Popia" component={PopiaScreen} />
         </>
       )}

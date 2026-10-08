@@ -18,10 +18,12 @@ export default function ResetPasswordPage() {
 
     // Die token is in die fragment (#token=...), wat die blaaier nooit na 'n bediener stuur nie.
     // Lees dit een keer en haal dit dan uit die adresbalk, sodat dit nie in die geskiedenis bly nie.
+    // React Strict Mode loop hierdie effect in ontwikkeling twee keer; die tweede keer is die
+    // fragment reeds weg, so 'n token wat ons klaar gelees het, word nie met null oorskryf nie.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.hash.slice(1));
-        setToken(params.get('token') || null);
-        window.history.replaceState(null, '', window.location.pathname);
+        const fromHash = new URLSearchParams(window.location.hash.slice(1)).get('token');
+        if (fromHash) window.history.replaceState(null, '', window.location.pathname);
+        setToken((current) => fromHash || current || null);
     }, []);
 
     const passwordRules = useMemo(() => ({
