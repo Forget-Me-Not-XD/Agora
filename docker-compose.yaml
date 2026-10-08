@@ -67,6 +67,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # ────────────────────────────────────────
+  # Mailpit — vang alle e-posse tydens ontwikkeling
+  # Inkassie: http://localhost:8025 · SMTP: localhost:1025
+  # Slegs plaaslik; produksie stuur via 'n regte SMTP-diens
+  # ────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit
+    container_name: akademia-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"     # SMTP — localhost only
+      - "127.0.0.1:8025:8025"     # Web-inkassie — localhost only
+    networks:
+      - akademia-net
+
 volumes:
   mongo_data:
   rabbitmq_data:
