@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Star, X } from 'lucide-react';
 
@@ -21,11 +21,35 @@ function findScrollParent(element: HTMLElement): HTMLElement {
     return document.body;
 }
 
+// Die vorm sê hierdeur wanneer die resensie gestuur word. Op die volle bladsy is daar geen modal
+// nie, en dan is dit null.
+const ReviewModalBusyContext = createContext<((busy: boolean) => void) | null>(null);
+
+export function useSetReviewModalBusy() {
+    return useContext(ReviewModalBusyContext);
+}
+
 // Die modal is 'n onderskepte roete, so toemaak is net terug na die bladsy daaronder
 export default function ReviewModal({ title, children }: ReviewModalProps) {
     const router = useRouter();
     const overlayRef = useRef<HTMLDivElement>(null);
     const dialogRef  = useRef<HTMLDivElement>(null);
+
+    // Die ref is vir close, sodat die Escape-luisteraar nie oor en oor geregistreer word nie.
+    // Die state is net vir die X-knoppie se voorkoms.
+    const busyRef = useRef(false);
+    const [busy, setBusyState] = useState(false);
+
+    const setBusy = useCallback((value: boolean) => {
+        busyRef.current = value;
+        setBusyState(value);
+    }, []);
+
+    // Terwyl die resensie gestuur word, bly die modal oop, anders weet die gebruiker nie of dit
+    // gestoor is nie
+    const close = useCallback(() => {
+        if (!busyRef.current) router.back();
+    }, [router]);
 
     useEffect(() => {
         const overlay = overlayRef.current;
@@ -41,7 +65,7 @@ export default function ReviewModal({ title, children }: ReviewModalProps) {
 
         function handleKeyDown(e: KeyboardEvent) {
             if (e.key === 'Escape') {
-                router.back();
+                close();
                 return;
             }
             if (e.key !== 'Tab' || !dialog) return;
@@ -70,13 +94,13 @@ export default function ReviewModal({ title, children }: ReviewModalProps) {
             scrollParent.style.overflow = previousOverflow;
             previouslyFocused?.focus();
         };
-    }, [router]);
+    }, [close]);
 
     return (
         <div
             ref={overlayRef}
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => router.back()}
+            onClick={close}
         >
             <div
                 ref={dialogRef}
@@ -95,16 +119,19 @@ export default function ReviewModal({ title, children }: ReviewModalProps) {
                         <h3 id="review-modal-title" className="text-sm font-bold text-[var(--color-text)] truncate">{title}</h3>
                     </div>
                     <button
-                        onClick={() => router.back()}
+                        onClick={close}
+                        disabled={busy}
                         aria-label="Maak toe"
-                        className="p-1.5 rounded-lg text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] transition-colors"
+                        className="p-1.5 rounded-lg text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <X size={15} />
                     </button>
                 </div>
 
                 <div className="px-5 py-4 max-h-[75vh] overflow-y-auto">
-                    {children}
+                    <ReviewModalBusyContext.Provider value={setBusy}>
+                        {children}
+                    </ReviewModalBusyContext.Provider>
                 </div>
             </div>
         </div>

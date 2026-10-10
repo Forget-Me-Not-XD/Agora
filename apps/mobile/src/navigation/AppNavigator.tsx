@@ -18,6 +18,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
 import { RsvpManagementScreen } from '../screens/RsvpManagementScreen';
+import { ReviewScreen } from '../screens/ReviewScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { AdminUsersScreen } from '../screens/AdminUsersScreen';
 import { InsightsScreen } from '../screens/InsightsScreen';
@@ -38,6 +39,7 @@ export type RootStackParamList = {
   EventDetail: { eventId: string };
   QrScanner: { eventId: string };
   RsvpManagement: { eventId: string };
+  Review: { eventId: string };
   AdminCreateUser: undefined;
   AdminUsers: undefined;
   Insights: undefined;
@@ -144,6 +146,13 @@ export function AppNavigator() {
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="QrScanner" component={QrScannerScreen} />
             <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
+            {/* Deursigtig sodat die geleentheid agter die resensievel sigbaar bly. Die vel animeer
+                self, daarom animeer die navigasie nie. */}
+            <Stack.Screen
+              name="Review"
+              component={ReviewScreen}
+              options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
+            />
             <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
             <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
             <Stack.Screen name="Insights" component={InsightsScreen} />
