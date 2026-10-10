@@ -69,8 +69,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      {/* Nodig vir KeyboardAwareScrollView. Die app is reeds edge-to-edge, en die provider
-          respekteer dit, so skerms wat nog RN se eie KeyboardAvoidingView gebruik werk soos voorheen. */}
+      {/* Nodig vir keyboard-controller se KeyboardAwareScrollView en KeyboardAvoidingView. Die app
+          is reeds edge-to-edge, en die provider respekteer dit, so skerms wat nog RN se eie
+          KeyboardAvoidingView gebruik werk soos voorheen. */}
       <KeyboardProvider>
         <InactivityProvider>
           <ResponseProvider>

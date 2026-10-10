@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -25,12 +25,14 @@ import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
 import { getDraftPrediction } from '../api/analytics';
+import { getReviewEligibility, type ReviewEligibilityStatus } from '../api/reviews';
 import type { AlternativePrediction, PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PredictionAdvice } from '../components/PredictionAdvice';
 import { ReviewCategoryEditor } from '../components/ReviewCategoryEditor';
+import { ReviewEventCard } from '../components/ReviewEventCard';
 import {
   createDraft,
   defaultReviewCategories,
@@ -55,6 +57,7 @@ export function EventDetailScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDark = useIsDark();
+  const isFocused = useIsFocused();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
   const [wantsPlusOne, setWantsPlusOne] = useState(false);
@@ -82,6 +85,8 @@ export function EventDetailScreen() {
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [predictionLoading, setPredictionLoading] = useState(true);
   const [predictionUnavailable, setPredictionUnavailable] = useState(false);
+
+  const [reviewStatus, setReviewStatus] = useState<ReviewEligibilityStatus | null>(null);
 
   useEffect(() => {
     if (isCreating) return;
@@ -127,6 +132,19 @@ export function EventDetailScreen() {
       .finally(() => { if (!cancelled) setPredictionLoading(false); });
     return () => { cancelled = true; };
   }, [isCreating, event, ensurePrediction]);
+
+  // Haal die status elke keer as die skerm fokus kry, ook wanneer die resensievel toegaan, sodat
+  // die kaart dan "Reeds beoordeel" wys. 'n Fout wys eenvoudig geen kaart nie, soos op die web.
+  useFocusEffect(
+    useCallback(() => {
+      if (isCreating) return;
+      let active = true;
+      getReviewEligibility(route.params.eventId)
+        .then((r) => { if (active) setReviewStatus(r.status); })
+        .catch(() => { if (active) setReviewStatus(null); });
+      return () => { active = false; };
+    }, [isCreating, route.params.eventId]),
+  );
 
   if (isCreating) {
     return (
@@ -222,7 +240,10 @@ export function EventDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    // Die resensievel is deursigtig, so hierdie skerm bly daaronder sigbaar. Terwyl die vel oop is,
+    // versteek ons dit vir TalkBack, anders kan dit agter die vel by hierdie knoppies uitkom. Op iOS
+    // doen die vel se accessibilityViewIsModal dit reeds.
+    <SafeAreaView style={styles.safe} importantForAccessibility={isFocused ? 'auto' : 'no-hide-descendants'}>
       {/* ── Back + header ── */}
       <ScreenHeader
         title="Funksie Detail"
@@ -462,6 +483,11 @@ export function EventDetailScreen() {
             </>
           )
         )}
+
+        <ReviewEventCard
+          status={reviewStatus}
+          onReview={() => navigation.navigate('Review', { eventId: event.id })}
+        />
 
       </ScrollView>
       </KeyboardAvoidingView>

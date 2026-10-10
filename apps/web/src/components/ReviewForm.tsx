@@ -10,6 +10,7 @@ import { REVIEW_BLOCKED_MESSAGE } from '@/lib/review-view';
 import { REVIEW_MAX_COMMENT_LENGTH } from '@/lib/review-categories';
 import { formatDateLong } from '@/lib/format-date';
 import { StarRating } from '@/components/ui/StarRating';
+import { useSetReviewModalBusy } from '@/components/ReviewModal';
 import successAnim from '@/assets/Success.json';
 import warningAnim from '@/assets/Warning_Status.json';
 import errorAnim   from '@/assets/Tomato_Error.json';
@@ -75,6 +76,9 @@ interface RatingFormProps {
 }
 
 function RatingForm({ event, onCancel, onSubmitted, onError }: RatingFormProps) {
+    // Net in die modal. Op die volle bladsy is dit null.
+    const setModalBusy = useSetReviewModalBusy();
+
     // null is "nog nie gekies nie", want 0 is 'n geldige telling
     const [scores, setScores] = useState<Record<string, number | null>>(
         () => Object.fromEntries(event.reviewCategories.map((category) => [category.id, null])),
@@ -92,6 +96,8 @@ function RatingForm({ event, onCancel, onSubmitted, onError }: RatingFormProps) 
         if (!allRated) return;
 
         setLoading(true);
+        // Sê dit vir die modal voor die versoek begin, sodat dit nie intussen kan toegaan nie
+        setModalBusy?.(true);
         try {
             const result = await submitReviewAction(
                 event.id,
@@ -106,6 +112,7 @@ function RatingForm({ event, onCancel, onSubmitted, onError }: RatingFormProps) 
             onError('Kon nie jou resensie stuur nie. Probeer weer.', false);
         } finally {
             setLoading(false);
+            setModalBusy?.(false);
         }
     }
 
@@ -148,7 +155,8 @@ function RatingForm({ event, onCancel, onSubmitted, onError }: RatingFormProps) 
             <div className="flex gap-2">
                 <button
                     onClick={onCancel}
-                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors"
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-border)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     Kanselleer
                 </button>

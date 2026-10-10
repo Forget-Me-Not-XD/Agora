@@ -16,6 +16,8 @@ type StarRatingProps = {
     onChange?: (value: number) => void;
     size?: number;
     label?: string;
+    // What a screen reader says at 0. Forms where 0 is a real score pass their own text.
+    zeroLabel?: string;
 };
 
 function clamp(value: number): number {
@@ -46,7 +48,7 @@ function StarIcon({ fill, size, filledColor, emptyColor }: { fill: number; size:
     );
 }
 
-export function StarRating({ value, onChange, size = 24, label = 'Gradering' }: StarRatingProps) {
+export function StarRating({ value, onChange, size = 24, label = 'Gradering', zeroLabel = 'Geen gradering' }: StarRatingProps) {
     const colors = useThemeColors();
     const starColors = useMemo(
         () => ({ filledColor: colors.warning, emptyColor: colors.textSubtle }),
@@ -88,7 +90,7 @@ export function StarRating({ value, onChange, size = 24, label = 'Gradering' }: 
                 min: 0,
                 max: MAX,
                 now: rating,
-                text: rating === 0 ? 'Geen gradering' : `${rating} uit ${MAX} sterre`,
+                text: rating === 0 ? zeroLabel : `${rating} uit ${MAX} sterre`,
             }}
             accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
             onAccessibilityAction={handleAccessibilityAction}
