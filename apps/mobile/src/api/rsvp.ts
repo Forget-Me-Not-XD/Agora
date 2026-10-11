@@ -79,16 +79,18 @@ export async function getRsvpQrDataUri(rsvpId: string): Promise<string> {
     return apiClient.getImageDataUri(`/rsvp/${rsvpId}/qr`);
 }
 
-// POST /rsvp/scan -- personeel skandeer 'n gas se QR-kode om in te check
-// 404 - ongeldige lading, 409 - gas reeds ingecheck, rol-beperk tot ADMIN/DOSENT
+// POST /rsvp/scan -- personeel skandeer 'n gas se QR-kode om in te check, rol-beperk tot ADMIN/DOSENT.
+// 404 - ongeldige lading; 400 - kaartjie vir 'n ander geleentheid; 409 - reeds ingecheck,
+// gekanselleer of die geleentheid is klaar (die backend se boodskap sê watter een)
 export interface ScanResult {
     guestName: string;
     eventTitle: string;
     eventDate: string;
 }
 
-export async function scanQr(qrPayload: string): Promise<ScanResult> {
-    return apiClient.post<ScanResult, { qrPayload: string }>('/rsvp/scan', { qrPayload });
+// eventId is die geleentheid waarvoor die skandeerder oop is
+export async function scanQr(qrPayload: string, eventId: string): Promise<ScanResult> {
+    return apiClient.post<ScanResult, { qrPayload: string; eventId: string }>('/rsvp/scan', { qrPayload, eventId });
 }
 
 // GET /rsvp/event/:eventId -- ADMIN/DOSENT-only, elke RSVP vir 'n gegewe geleentheid.

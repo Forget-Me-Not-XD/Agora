@@ -17,7 +17,7 @@ import {
   formatFullDate,
   formatEventTime,
 } from '../lib/event-status';
-import { canViewBudget, canManageCheckIns, canViewInsights } from '../lib/rbac';
+import { canManageEvent, canViewBudget, canViewInsights } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
@@ -33,6 +33,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PredictionAdvice } from '../components/PredictionAdvice';
 import { ReviewCategoryEditor } from '../components/ReviewCategoryEditor';
 import { ReviewEventCard } from '../components/ReviewEventCard';
+import { EventReviewSummary } from '../components/EventReviewSummary';
 import {
   createDraft,
   defaultReviewCategories,
@@ -183,6 +184,9 @@ export function EventDetailScreen() {
   }
 
   const status = getEventStatus(event);
+  // Knoppies en besonderhede wys net vir wie die backend dit ook sal toelaat
+  const isManager = canManageEvent(role, user?.id, event.createdBy);
+  const showBudget = canViewBudget(role, user?.id, event);
   const fillPct = event.maxCapacity > 0 ? Math.min(Math.round((event.confirmedAttendees / event.maxCapacity) * 100), 100) : 0;
   const predictedPct = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
   const pillColor = getStatusPillColors(status, isDark);
@@ -343,24 +347,28 @@ export function EventDetailScreen() {
           <DetailRow label="Lokaal" value={event.location} colors={colors} />
           {event.address ? <DetailRow label="Adres" value={event.address} colors={colors} /> : null}
           <DetailRow label="Tipe" value={TYPE_LABELS[event.type]} colors={colors} />
-          <DetailRow label="Kapasiteit" value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`} colors={colors} />
+          <DetailRow
+            label="Kapasiteit"
+            value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`}
+            colors={colors}
+            isLast={!event.sellsTickets && !showBudget}
+          />
           {event.sellsTickets && (
             <DetailRow
               label="Kaartjieprys"
               value={`R${event.ticketPrice ?? 0}${event.ticketsAvailable !== null ? ` · ${event.ticketsAvailable} oor` : ''}`}
               colors={colors}
+              isLast={!showBudget}
             />
           )}
-          {canViewBudget(role) && (
+          {/* Soos op die web: wie die begroting nie mag sien nie, sien glad nie die ry nie */}
+          {showBudget && (
             <DetailRow
               label="Begroting"
               value={`R ${event.budget.toLocaleString('af-ZA')}`}
               colors={colors}
               isLast
             />
-          )}
-          {!canViewBudget(role) && (
-            <DetailRow label="Begroting" value="—" colors={colors} isLast />
           )}
         </View>
 
@@ -372,8 +380,8 @@ export function EventDetailScreen() {
           </View>
         ) : null}
 
-        {/* ── Action buttons ── */}
-        {canManageCheckIns(role) && (
+        {/* ── Action buttons ── net vir admin, of die dosent wat die geleentheid geskep het */}
+        {isManager && (
           <>
             <TouchableOpacity
               style={styles.primaryBtn}
@@ -488,6 +496,11 @@ export function EventDetailScreen() {
           status={reviewStatus}
           onReview={() => navigation.navigate('Review', { eventId: event.id })}
         />
+
+        {/* ── Resensie-opsomming ── net vir admin, of die dosent wat die geleentheid geskep het */}
+        {isManager && (
+          <EventReviewSummary key={event.id} eventId={event.id} />
+        )}
 
       </ScrollView>
       </KeyboardAvoidingView>

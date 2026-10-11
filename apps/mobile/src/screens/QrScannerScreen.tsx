@@ -26,7 +26,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
 import { useEventsStore } from '../stores/events.store';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { getErrorStatus } from '../lib/errors';
+import { getApiErrorMessage, getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'QrScanner'>;
 type Route = RouteProp<RootStackParamList, 'QrScanner'>;
@@ -95,7 +95,7 @@ export function QrScannerScreen() {
     setScanned(true);
     showLoading(true);
     try {
-      const res = await scanQr(data);
+      const res = await scanQr(data, route.params.eventId);
       showLoading(false);
       setLastScannedName(res.guestName);
       showSuccess(res, resetScanner);
@@ -104,8 +104,10 @@ export function QrScannerScreen() {
     } catch (err) {
       showLoading(false);
       const status = getErrorStatus(err);
-      if (status === 409) {
-        showWarning('Gas het reeds ingecheck', resetScanner);
+      // Die backend gebruik 409 vir drie dinge (reeds ingecheck, gekanselleer, geleentheid klaar) en
+      // 400 vir 'n kaartjie van 'n ander geleentheid. Sy boodskap sê presies watter een, so wys dit.
+      if (status === 409 || status === 400) {
+        showWarning(getApiErrorMessage(err, 'Hierdie kaartjie kan nie ingecheck word nie.'), resetScanner);
       } else if (status === 404) {
         showError('Ongeldige QR-kode', resetScanner);
       } else {

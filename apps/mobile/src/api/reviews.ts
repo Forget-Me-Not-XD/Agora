@@ -50,6 +50,37 @@ export function getReviewEligibility(eventId: string): Promise<ReviewEligibility
   return apiClient.get<ReviewEligibility>(`/reviews/eligibility/${encodeURIComponent(eventId)}`);
 }
 
+export interface CategorySummary {
+  id: string;
+  name: string;
+  // Net null as niemand die kategorie nog beoordeel het nie
+  avg: number | null;
+  // Hoeveel keer elke telling van 0 tot 5 gegee is
+  distribution: number[];
+}
+
+// Anoniem: die backend stuur nie saam wie dit geskryf het nie
+export interface ReviewComment {
+  comment: string;
+  createdAt: string;
+}
+
+// Die gemiddeldes kom rou van die backend af. Rond dit af met roundScore of formatScore.
+export interface ReviewSummary {
+  count: number;
+  overallAvg: number | null;
+  categories: CategorySummary[];
+  // Nuutste eerste
+  comments: ReviewComment[];
+  // Elke resensie se algehele telling, van laag na hoog
+  reviewScores: number[];
+}
+
+// GET /reviews/event/:eventId: net vir die skepper van die geleentheid of 'n admin
+export function getReviewSummary(eventId: string): Promise<ReviewSummary> {
+  return apiClient.get<ReviewSummary>(`/reviews/event/${encodeURIComponent(eventId)}`);
+}
+
 // POST /reviews: 403 nie ingeskandeer nie, 409 reeds beoordeel, 400 buite die venster
 // of ongeldige tellings
 export function createReview(payload: CreateReviewPayload): Promise<ReviewResponse> {
