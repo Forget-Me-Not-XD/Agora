@@ -94,6 +94,14 @@ export class Event {
     @Prop ({ default: 0 })
     ratingCount!: number;
 
+    // Word gestel net voordat die eerste resensie gestoor word. ratingCount kom eers ná die stoor,
+    // so dit alleen kan nie keer dat 'n gelyktydige kategorie-wysiging tussenin glip nie.
+    // Doelbewus sonder default: ouer geleenthede het nie die veld nie, en Mongoose sou dan by elke
+    // save() 'n false terugskryf en so 'n slot uitvee wat 'n resensie intussen gestel het.
+    // Ontbreek dit, is die kategorieë nog oop.
+    @Prop ({ type: Boolean })
+    reviewCategoriesLocked?: boolean;
+
     @Prop({ type: Date, default: null })
     reviewRequestsSentAt!: Date | null;
 

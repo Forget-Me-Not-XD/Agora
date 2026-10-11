@@ -353,9 +353,10 @@ export class EventsService {
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
+        let nextCategories: ReviewCategory[] | null = null;
         if (reviewCategories) {
             this.assertReviewCategoriesEditable(event, reviewCategories);
-            event.reviewCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
+            nextCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
         }
         if (address) {
             const place = await this.resolvePlace(address, lat, lon);
@@ -368,6 +369,11 @@ export class EventsService {
         this.assertEndAfterStart(event.date, event.endDate);
         this.assertTicketsWithinCapacity(event.sellsTickets, event.ticketsAvailable, event.maxCapacity);
         this.assertVenueCapacity(event.location, event.maxCapacity);
+
+        // Laaste, sodat die kategorieë nie verander as een van die kontroles hierbo nog sou misluk nie
+        if (nextCategories && !this.isSameReviewCategories(nextCategories, event.reviewCategories)) {
+            await this.replaceReviewCategories(event, nextCategories);
+        }
 
         return event.save();
     }
@@ -440,6 +446,34 @@ export class EventsService {
             usedIds.add(id);
             return { id, name: category.name };
         });
+    }
+
+    // Kom die kategorieë onveranderd saam met 'n ander wysiging, skryf ons hulle glad nie. Anders sou
+    // 'n titel-wysiging op 'n gesluite geleentheid misluk net omdat die kategorieë saamgestuur is.
+    private isSameReviewCategories(a: ReviewCategory[], b: ReviewCategory[]): boolean {
+        return a.length === b.length && a.every((category, i) => category.id === b[i].id && category.name === b[i].name);
+    }
+
+    // Skryf net as die kategorieë nog nie gesluit is nie, in een atomiese stap. Die eerste resensie
+    // sluit hulle (ReviewsService.lockReviewCategories), so as die twee saam inkom, wen een en
+    // die ander misluk, en 'n resensie kan nooit na kategorieë verwys wat nie meer bestaan nie.
+    private async replaceReviewCategories(event: EventDocument, categories: ReviewCategory[]): Promise<void> {
+        const result = await this.eventModel
+            .updateOne(
+                // ratingCount vang ouer geleenthede wat resensies gekry het voordat die slot bestaan het
+                { _id: event._id, reviewCategoriesLocked: { $ne: true }, ratingCount: { $not: { $gt: 0 } } },
+                { $set: { reviewCategories: categories } },
+            )
+            .exec();
+
+        if (result.matchedCount === 0) {
+            throw new BadRequestException('Resensie-kategorieë kan nie verander word nadat resensies ontvang is nie');
+        }
+
+        // Die antwoord moet die nuwe kategorieë wys, maar save() mag dit nie weer sonder die
+        // voorwaarde skryf nie: 'n ander wysiging en 'n resensie kon intussen ingekom het
+        event.reviewCategories = categories;
+        event.unmarkModified('reviewCategories');
     }
 
     private assertReviewCategoriesEditable(event: EventDocument, input: ReviewCategoryInputDto[]): void {

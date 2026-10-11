@@ -93,6 +93,45 @@ export async function getMyReviewState(): Promise<MyReviewState> {
     return res.json() as Promise<MyReviewState>;
 }
 
+export interface CategorySummary {
+    id:           string;
+    name:         string;
+    // Net null as niemand die kategorie nog beoordeel het nie
+    avg:          number | null;
+    // Hoeveel keer elke telling van 0 tot 5 gegee is
+    distribution: number[];
+}
+
+// Anoniem: die backend stuur nie saam wie dit geskryf het nie
+export interface ReviewComment {
+    comment:   string;
+    createdAt: string;
+}
+
+// Die gemiddeldes kom rou van die backend af. Rond dit af met roundScore of formatScore.
+export interface ReviewSummary {
+    count:        number;
+    overallAvg:   number | null;
+    categories:   CategorySummary[];
+    // Nuutste eerste
+    comments:     ReviewComment[];
+    // Elke resensie se algehele telling, van laag na hoog
+    reviewScores: number[];
+}
+
+// GET /api/v1/reviews/event/:eventId: net vir die skepper van die geleentheid of 'n admin
+export async function getReviewSummary(eventId: string): Promise<ReviewSummary> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/reviews/event/${encodeURIComponent(eventId)}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<ReviewSummary>;
+}
+
 // POST /api/v1/reviews: 403 nie ingeskandeer nie, 409 reeds beoordeel, 400 buite die venster
 // of ongeldige tellings
 export async function createReview(payload: CreateReviewPayload): Promise<ReviewResponse> {
