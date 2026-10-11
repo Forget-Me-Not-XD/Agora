@@ -17,4 +17,6 @@ export class ReviewSummaryDto {
     overallAvg!: number | null;
     categories!: CategorySummaryDto[];
     comments!: ReviewCommentDto[];
+    // Elke resensie se algehele telling (die gemiddeld van sy kategorieë), van laag na hoog
+    reviewScores!: number[];
 }

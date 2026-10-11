@@ -8,3 +8,14 @@ export const REVIEW_BLOCKED_MESSAGE: Record<Exclude<ReviewEligibilityStatus, 'OP
     CLOSED:           'Die resensie-venster vir hierdie geleentheid het gesluit.',
     NO_CATEGORIES:    'Hierdie geleentheid neem nie resensies nie.',
 };
+
+// Tellings word tot die naaste tiende afgerond, en 'n helfte gaan op (4,05 word 4,1). toFixed(1)
+// kan dit nie self doen nie: 4,05 is eintlik 4,0499... as 'n float en word dan 4,0.
+export function roundScore(score: number): number {
+    return Math.round(score * 10) / 10;
+}
+
+// Altyd een desimaal met 'n desimale komma, so 4 word "4,0"
+export function formatScore(score: number): string {
+    return roundScore(score).toFixed(1).replace('.', ',');
+}

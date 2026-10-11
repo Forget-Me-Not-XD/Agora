@@ -5,7 +5,7 @@ import { getEventById } from '@/lib/api/events';
 import { getPhotographersByIds } from '@/lib/api/photographer';
 import { getUsersByIds } from '@/lib/api/users';
 import { getMyRsvps } from '@/lib/api/rsvp';
-import { getReviewEligibility } from '@/lib/api/reviews';
+import { getReviewEligibility, getReviewSummary } from '@/lib/api/reviews';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getToken } from '@/lib/session';
 import { formatDateLong as formatDate } from '@/lib/format-date';
@@ -14,6 +14,7 @@ import { Pill } from '@/components/ui/Pill';
 import PaymentModal from '@/components/PaymentModal';
 import AlreadyRsvpdTag from '@/components/AlreadyRsvpdTag';
 import ReviewEventCard from '@/components/ReviewEventCard';
+import EventReviewSummary from '@/components/EventReviewSummary';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,17 +28,19 @@ export default async function EventDetailPage({ params }: { params: { id: string
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
 
-    const [myRsvps, reviewStatus] = await Promise.all([
-        getMyRsvps().catch(() => []),
-        getReviewEligibility(event.id).then((r) => r.status).catch(() => null),
-    ]);
-    const alreadyRsvpd = myRsvps.some((r) => r.status !== 'GEKANSELLEER' && r.event?._id === event.id);
-
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
     const canManageEvent = user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
     // die begroting is sigbaar vir bestuurders van die geleentheid, en vir die
     // gebruiker met die Finansies-tag wat spesifiek hieraan toegeken is
     const canViewFinance = canManageEvent || event.assignedTo === user.id;
+
+    const [myRsvps, reviewStatus, reviewSummary] = await Promise.all([
+        getMyRsvps().catch(() => []),
+        getReviewEligibility(event.id).then((r) => r.status).catch(() => null),
+        // die backend laat net bestuurders toe, so ander vra nie eers nie
+        canManageEvent ? getReviewSummary(event.id).catch(() => null) : null,
+    ]);
+    const alreadyRsvpd = myRsvps.some((r) => r.status !== 'GEKANSELLEER' && r.event?._id === event.id);
 
     // los die reeds-toegewysde fotograwe op hul ID's op
     const assigned =
@@ -118,6 +121,9 @@ export default async function EventDetailPage({ params }: { params: { id: string
             )}
 
             <ReviewEventCard eventId={event.id} status={reviewStatus} />
+
+            {/* Resensie-opsomming — net vir admin, of die dosent wat die geleentheid geskep het */}
+            {canManageEvent && <EventReviewSummary summary={reviewSummary} />}
 
             {/* Finansiële afdeling — bestuurders van die geleentheid, en die toegekende Finansies-gebruiker */}
             {canViewFinance && (

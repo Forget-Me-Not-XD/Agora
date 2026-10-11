@@ -34,6 +34,7 @@ export class ReviewsService {
 
         this.assertReviewWindowOpen(event);
         this.assertRatingsMatchCategories(dto.ratings, event.reviewCategories);
+        await this.lockReviewCategories(event);
 
         const review = await this.saveReview(event._id, userId, dto);
         await this.recalculateEventRating(event._id);
@@ -103,17 +104,31 @@ export class ReviewsService {
             .sort({ createdAt: -1 })
             .exec();
 
+        // Elke resensie beoordeel elke kategorie, en die eerste resensie sluit die kategorieë, so almal
+        // het ewe veel tellings. Dan is hierdie gemiddeld dieselfde as die gemiddeld van elke resensie
+        // se algehele telling (net so vir ratingAvg).
         const allScores = reviews.flatMap((review) => review.ratings.map((rating) => rating.score));
+
+        // Gesorteer, sodat die volgorde nie saam met die kommentaar (nuutste eerste) gelees kan word
+        // om 'n telling aan 'n kommentaar te koppel nie
+        const reviewScores = reviews
+            .flatMap((review) => {
+                const score = this.average(review.ratings.map((rating) => rating.score));
+                return score === null ? [] : [score];
+            })
+            .sort((a, b) => a - b);
 
         const comments: ReviewCommentDto[] = reviews.flatMap((review) =>
             review.comment ? [{ comment: review.comment, createdAt: review.createdAt! }] : [],
         );
 
+        // Die gemiddeldes gaan rou uit; die kliënt besluit self hoe om dit af te rond
         return {
             count:      reviews.length,
             overallAvg: this.average(allScores),
             categories: event.reviewCategories.map((category) => this.summariseCategory(category, reviews)),
             comments,
+            reviewScores,
         };
     }
 
@@ -197,6 +212,29 @@ export class ReviewsService {
         }
     }
 
+    // Sluit die kategorieë net as dit nog presies dié is waarteen die tellings pas gekontroleer is.
+    // Saam met EventsService.replaceReviewCategories keer dit dat 'n resensie en 'n
+    // kategorie-wysiging albei deurkom; daar staan hoe.
+    private async lockReviewCategories(event: EventDocument): Promise<void> {
+        const categories = event.reviewCategories;
+        const result = await this.eventModel
+            .updateOne(
+                {
+                    _id: event._id,
+                    reviewCategories: {
+                        $size: categories.length,
+                        $all:  categories.map((category) => ({ $elemMatch: { id: category.id, name: category.name } })),
+                    },
+                },
+                { $set: { reviewCategoriesLocked: true } },
+            )
+            .exec();
+
+        if (result.matchedCount === 0) {
+            throw new BadRequestException('Die resensie-kategorieë het pas verander. Maak die vorm weer oop en probeer weer.');
+        }
+    }
+
     private async saveReview(eventId: Types.ObjectId, userId: string, dto: CreateReviewDto): Promise<ReviewDocument> {
         try {
             return await this.reviewModel.create({
@@ -259,7 +297,7 @@ export class ReviewsService {
     private average(values: number[]): number | null {
         if (values.length === 0) return null;
         const total = values.reduce((sum, value) => sum + value, 0);
-        return this.round(total / values.length);
+        return total / values.length;
     }
 
     private round(value: number): number {
