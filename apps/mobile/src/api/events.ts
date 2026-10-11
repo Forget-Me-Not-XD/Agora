@@ -19,6 +19,7 @@ export interface EventResponse {
   createdBy: string;
   photographers: string[];
   photographerInstructions: string;
+  assignedTo: string | null;
   confirmedAttendees: number;
   checkedInCount: number;
   intendedAttendance: string;

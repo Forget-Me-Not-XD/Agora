@@ -38,7 +38,7 @@ export class RsvpController {
         @Body() dto: ScanRsvpDto,
         @CurrentUser() user: JwtPayload,
     ): Promise <ScanResponse> {
-        return this.rsvpService.scanRsvp(dto.qrPayload, user.sub, user.role);
+        return this.rsvpService.scanRsvp(dto.qrPayload, dto.eventId, user.sub, user.role);
     }
 
     @Post('walk-in')

@@ -1,5 +1,5 @@
 ﻿// ========== Imports: ==========
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
@@ -375,7 +375,7 @@ export class RsvpService {
         return toBuffer(rsvp.qrPayload);
     }
 
-    async scanRsvp(qrPayload: string, requesterId: string, requesterRole: Role): Promise <ScanResponse> {
+    async scanRsvp(qrPayload: string, eventId: string, requesterId: string, requesterRole: Role): Promise <ScanResponse> {
         const rsvp = await this.rsvpModel
         .findOne({ qrPayload })
         .populate<{ user: User }>('user')
@@ -383,6 +383,12 @@ export class RsvpService {
 
         if (!rsvp) {
             throw new NotFoundException('Ongeldige QR-kode');
+        }
+
+        // Voor die eienaarskap-kontrole, en sonder die ander geleentheid se naam: dit kan aan
+        // iemand anders behoort, en die skandeerder hoef net te weet dis nie vir hierdie een nie
+        if (rsvp.event.toString() !== eventId) {
+            throw new BadRequestException('Hierdie QR-kode is vir \'n ander geleentheid.');
         }
 
         const event = await this.eventsService.findById(rsvp.event.toString());
