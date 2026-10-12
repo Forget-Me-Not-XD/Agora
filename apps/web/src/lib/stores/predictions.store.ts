@@ -5,11 +5,12 @@ import type { PredictionResult } from '@/lib/api/analytics';
 
 /**
  * Kas vir voorspellings aan die kliëntkant. Werk soos apps/mobile/src/stores/predictions.store.ts,
- * met 'n ekstra lys vir die KI-Speeltuin se konsep-voorspellings.
+ * met 'n ekstra lys vir konsep-voorspellings in die beplanner (die KI-Voorspelling-paneel en die
+ * KI-Speeltuin).
  *
  * Een voorspelling vat die model omtrent 3,5 sekondes, en dit hang net van die datum en kapasiteit
  * af, nie van RSVP-syfers nie. Dieselfde geleentheid (of dieselfde datum en kapasiteit in die
- * Speeltuin) hoef dus nie elke keer weer bereken te word as die gebruiker rondklik of die bladsy
+ * beplanner) hoef dus nie elke keer weer bereken te word as die gebruiker rondklik of die bladsy
  * verfris nie.
  */
 const TTL_MS = 5 * 60_000;
@@ -44,7 +45,7 @@ interface PredictionsState {
 
     /** Voorspelling vir 'n bestaande geleentheid. */
     ensureLoaded: (event: EventKeyParts) => Promise<PredictionOutcome>;
-    /** Voorspelling vir 'n geleentheid wat nog nie bestaan nie (die Speeltuin). */
+    /** Voorspelling vir 'n datum en kapasiteit uit die beplanner se twee panele, los van 'n gestoorde geleentheid. */
     ensureDraftLoaded: (parts: DraftKeyParts) => Promise<PredictionOutcome>;
     reset: () => void;
 }

@@ -5,6 +5,7 @@
 
 # --- Python ---
 .venv/
+__pycache__/
 
 # --- Node / JS ---
 node_modules/

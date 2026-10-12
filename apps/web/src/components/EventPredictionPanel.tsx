@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import type { PredictionResult } from '@/lib/api/analytics';
-import { getDraftAttendancePredictionAction } from '@/lib/actions/analytics.actions';
+import { usePredictionsStore } from '@/lib/stores/predictions.store';
 import PredictionAdvice from '@/components/PredictionAdvice';
 
 interface EventPredictionPanelProps {
@@ -19,6 +19,10 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
     const [loading, setLoading]       = useState(false);
     const [unavailable, setUnavailable] = useState(false);
     const [error, setError]           = useState<string | null>(null);
+    // Deel die kas met die Speeltuin. Op die wysig-bladsy begin albei op dieselfde datum en
+    // kapasiteit, so die model word net een keer gevra. 'n Kombinasie wat die afgelope vyf
+    // minute al suksesvol voorspel is, kom sonder 'n nuwe oproep terug.
+    const ensureDraftPrediction = usePredictionsStore((s) => s.ensureDraftLoaded);
 
     useEffect(() => {
         const capacityNum = Number(capacity);
@@ -27,6 +31,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
             setPrediction(null);
             setUnavailable(false);
             setError(null);
+            setLoading(false);
             return;
         }
 
@@ -36,7 +41,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
             setUnavailable(false);
             setError(null);
 
-            getDraftAttendancePredictionAction({ date, maxCapacity: capacityNum })
+            ensureDraftPrediction({ date, maxCapacity: capacityNum })
                 .then((result) => {
                     if (cancelled) return;
                     if (result.prediction) {
@@ -56,7 +61,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [date, capacity]);
+    }, [date, capacity, ensureDraftPrediction]);
 
     if (!date || !Number(capacity)) {
         return (
@@ -113,11 +118,6 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
                         Gebruik Voorgestelde Begroting
                     </button>
 
-                    <PredictionAdvice
-                        prediction={prediction}
-                        onChooseAlternative={(alternative) => onApplyAlternative(alternative.date.slice(0, 10), alternative.capacity)}
-                    />
-
                     <div>
                         <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">
                             Waarom hierdie voorspelling?
@@ -131,6 +131,11 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget, on
                             ))}
                         </ul>
                     </div>
+
+                    <PredictionAdvice
+                        prediction={prediction}
+                        onChooseAlternative={(alternative) => onApplyAlternative(alternative.date.slice(0, 10), alternative.capacity)}
+                    />
                 </div>
             )}
         </div>

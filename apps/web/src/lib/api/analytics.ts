@@ -171,6 +171,20 @@ export async function getModelStatus(): Promise<ModelStatus> {
     return apiFetch<ModelStatus>('/api/v1/analytics/model-status');
 }
 
+// 'value' kom sonder eenheid (23 kan 'n persentasie, 'n aantal sitplekke of 'n bedrag
+// in rand wees), so KeyFindings formateer dit volgens 'key'.
+export interface KeyFinding {
+    key:      string;
+    title:    string;
+    value:    string | number;
+    sentence: string;
+    action:   string;
+}
+
+export async function getKeyFindings(): Promise<KeyFinding[]> {
+    return apiFetch<KeyFinding[]>('/api/v1/analytics/key-findings');
+}
+
 export type AlternativeKind = 'sameWeek' | 'laterWeek' | 'recommendedCapacity';
 
 export interface AlternativePrediction {
@@ -248,34 +262,4 @@ export interface PredictionAccuracyItem {
 export async function getPredictionAccuracy(eventIds: string[]): Promise<PredictionAccuracyItem[]> {
     if (eventIds.length === 0) return [];
     return apiFetch<PredictionAccuracyItem[]>(`/api/v1/analytics/prediction-accuracy?eventIds=${eventIds.map(encodeURIComponent).join(',')}`);
-}
-
-export interface PredictDraftPayload {
-    date:        string;
-    maxCapacity: number;
-}
-
-export async function getDraftAttendancePrediction(payload: PredictDraftPayload): Promise<PredictionResult> {
-    const token = getToken();
-
-    const res = await fetch(`${BASE_URL}/api/v1/analytics/predict-draft`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-    });
-
-    if (res.status === 503) {
-        throw new PredictionUnavailableError('Prediction service unavailable');
-    }
-
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        throw new Error(httpErrorMessage(res, body));
-    }
-
-    return res.json() as Promise<PredictionResult>;
 }
