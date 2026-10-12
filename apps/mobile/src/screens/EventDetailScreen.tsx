@@ -55,6 +55,7 @@ export function EventDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const user = useAuthStore((s) => s.user);
+  const role = user?.role ?? 'STUDENT';
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDark = useIsDark();
@@ -120,7 +121,9 @@ export function EventDetailScreen() {
     // wat werklik gebeur het nie, so vir 'n afgelope geleentheid herhaal dit net
     // dieselfde raaiskoot as voor die tyd, wat nooit met die regte confirmedAttendees
     // ooreenstem nie. Ons moet dit dus nie eers vra vir geleenthede wat verby is nie.
-    if (isCreating || !event || getEventStatus(event) === 'past') {
+    // KI-inligting is net vir dosente en admins, dieselfde rolle wat die KI-oortjie kry, so
+    // vir ander rolle vra ons dit glad nie.
+    if (isCreating || !event || !canViewInsights(role) || getEventStatus(event) === 'past') {
       setPredictionLoading(false);
       return;
     }
@@ -132,7 +135,7 @@ export function EventDetailScreen() {
       .catch(() => { if (!cancelled) setPredictionUnavailable(true); })
       .finally(() => { if (!cancelled) setPredictionLoading(false); });
     return () => { cancelled = true; };
-  }, [isCreating, event, ensurePrediction]);
+  }, [isCreating, event, role, ensurePrediction]);
 
   // Haal die status elke keer as die skerm fokus kry, ook wanneer die resensievel toegaan, sodat
   // die kaart dan "Reeds beoordeel" wys. 'n Fout wys eenvoudig geen kaart nie, soos op die web.
@@ -156,8 +159,6 @@ export function EventDetailScreen() {
       />
     );
   }
-
-  const role = user?.role ?? 'STUDENT';
 
   if (loading && !event) {
     return (
@@ -280,30 +281,35 @@ export function EventDetailScreen() {
         </View>
 
         {/* ── Stats row ── */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{event.checkedInCount}</Text>
-            <Text style={styles.statLabel}>Bygewoon</Text>
+        {/* Net vir dosente en admins: "Verwag" is die KI se voorspelling, en bywoning is vir die
+            organiseerders. Ander sien kapasiteit en besprekings in die tabel hieronder. */}
+        {canViewInsights(role) && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{event.checkedInCount}</Text>
+              <Text style={styles.statLabel}>Bygewoon</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.textSubtle }]}>
+                {prediction ? prediction.estimatedAttendees : '—'}
+              </Text>
+              <Text style={styles.statLabel}>Verwag</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.warning }]}>{event.maxCapacity}</Text>
+              <Text style={styles.statLabel}>Kapasiteit</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.textSubtle }]}>
-              {prediction ? prediction.estimatedAttendees : '—'}
-            </Text>
-            <Text style={styles.statLabel}>Verwag</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.warning }]}>{event.maxCapacity}</Text>
-            <Text style={styles.statLabel}>Kapasiteit</Text>
-          </View>
-        </View>
+        )}
 
         {/* ── AI prediction card ──
             Verby geleenthede het reeds 'n regte uitkoms (sien "Bygewoon" hierbo) --
             die model voorspel net vooruit en het geen benul van wat werklik gebeur
-             het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie. */}
-        {status !== 'past' && (
+            het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie.
+            Soos die KI-oortjie is die kaart net vir dosente en admins. */}
+        {status !== 'past' && canViewInsights(role) && (
           <View style={styles.aiCard}>
             {predictionLoading ? (
               <LoadingSpinner size={40} />
@@ -330,7 +336,18 @@ export function EventDetailScreen() {
                   <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
                 </View>
 
-                {canViewInsights(role) && <PredictionAdvice prediction={prediction} />}
+                {/* Soos in die skep-vorm: eers waarom die model dit verwag, dan die aanbevelings. */}
+                <View style={styles.aiReasoning}>
+                  <Text style={styles.reasoningHeading}>Waarom hierdie voorspelling?</Text>
+                  {prediction.reasoning.map((reason, i) => (
+                    <View key={i} style={styles.reasoningRow}>
+                      <Text style={styles.reasoningBullet}>•</Text>
+                      <Text style={styles.reasoningText}>{reason}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <PredictionAdvice prediction={prediction} />
               </>
             )}
           </View>
@@ -1276,6 +1293,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 999,
       backgroundColor: colors.primary,
     },
+    aiReasoning: { marginTop: 14 },
 
     detailsCard: {
       backgroundColor: colors.surface,
