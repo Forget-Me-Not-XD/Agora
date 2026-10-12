@@ -193,8 +193,12 @@ export class AnalyticsController {
         return this.analyticsService.predictAttendance(eventId);
     }
 
+    // Staff only, like the rest of the AI insights; assertInsightAccess then limits a DOSENT
+    // to their own events.
     @Get('prediction')
     @Throttle({ default: THROTTLE_LIMITS.prediction })
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN, Role.DOSENT)
     async getAttendancePrediction(
         @Query('eventId') eventId: string,
         @CurrentUser() user: JwtPayload,
