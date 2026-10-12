@@ -20,7 +20,10 @@ interface NotificationsState {
     load:     () => Promise<void>;
     /** Gebruik data wat die bediener reeds gelaai het, sodat ons nie weer hoef te vra nie. */
     hydrate:  (items: NotificationItem[]) => void;
-    /** Gee false terug as die API-versoek misluk het. */
+    /**
+     * Gee false terug as die API-versoek misluk het. Bestaan die kennisgewing nie meer nie, verdwyn
+     * dit net uit die lys, en dit tel nie as 'n mislukking nie.
+     */
     markRead: (id: string) => Promise<boolean>;
 }
 
@@ -49,6 +52,12 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
         set((s) => ({ items: s.items.map((n) => (n._id === id ? { ...n, read: true } : n)) }));
 
         const result = await markNotificationReadAction(id);
+        if (result.gone) {
+            // Intussen verwyder, byvoorbeeld 'n resensieversoek wat op 'n ander toestel beantwoord is.
+            // Dit is nie 'n fout nie: haal dit net uit die lys, en laat die klik voortgaan.
+            set((s) => ({ items: s.items.filter((n) => n._id !== id), error: null }));
+            return true;
+        }
         if (result.error) {
             set((s) => ({
                 items: s.items.map((n) => (n._id === id ? { ...n, read: false } : n)),
@@ -68,7 +77,8 @@ export function selectUnreadCount(state: NotificationsState): number {
 
 /**
  * Wat gebeur as iemand op 'n kennisgewing klik: merk dit as gelees en gaan na die geleentheid
- * toe. Is die geleentheid verwyder (event is null), word dit net as gelees gemerk.
+ * toe. 'n Resensieversoek maak eerder die resensie oop (as 'n modal bo-oor die huidige bladsy).
+ * Is die geleentheid verwyder (event is null), word dit net as gelees gemerk.
  * Gee false terug as die merk misluk het; dan bly ons op dieselfde plek.
  */
 export function useOpenNotification(): (item: NotificationItem) => Promise<boolean> {
@@ -80,7 +90,7 @@ export function useOpenNotification(): (item: NotificationItem) => Promise<boole
         if (!ok) return false;
 
         if (item.event) {
-            router.push(`/events/${item.event._id}`);
+            router.push(item.type === 'RESENSIE_VERSOEK' ? `/reviews/${item.event._id}` : `/events/${item.event._id}`);
         }
         return true;
     }, [markRead, router]);

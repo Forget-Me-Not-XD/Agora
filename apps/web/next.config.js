@@ -14,6 +14,15 @@ const nextConfig = {
   compress: true,
   productionBrowserSourceMaps: false,
 
+  // Next 14 hou 'n dinamiese bladsy tot 30 sekondes in die blaaier se kas. Dan wys die resensie-modal
+  // of die dashboard se Hangende Resensies nog iets wat intussen op 'n ander toestel beoordeel is.
+  // Met 0 vra elke navigasie die bladsy vars van die bediener af; Next 15 doen dit reeds by verstek.
+  // Die terug-knoppie gebruik steeds die kas. Die modal kan nogtans soms verouderd wees, daarom kyk
+  // ReviewForm self ook wanneer dit oopmaak.
+  experimental: {
+    staleTimes: { dynamic: 0 },
+  },
+
   async headers() {
     return [
       { source: '/(.*)', headers: securityHeaders },

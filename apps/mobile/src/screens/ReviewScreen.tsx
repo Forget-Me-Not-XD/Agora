@@ -28,6 +28,7 @@ import { REVIEW_MAX_COMMENT_LENGTH } from '../lib/review-categories';
 import { formatEventTime, formatFullDate } from '../lib/event-status';
 import { getApiErrorMessage, getErrorMessage, getErrorStatus } from '../lib/errors';
 import { safeGoBack } from '../lib/navigation';
+import { useNotificationsStore } from '../stores/notifications.store';
 import { StarRating } from '../components/StarRating';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useThemeColors, type ThemeColors } from '../theme/theme';
@@ -47,8 +48,9 @@ const CLOSE_MS = 220;
 const SUBMIT_FAILED = 'Kon nie jou resensie stuur nie. Probeer weer.';
 
 // ========== Vel ==========
-// Die skerm is 'n transparentModal, so die geleentheid bly agter die vel sigbaar. Die navigasie
-// animeer nie; die vel en die donker agtergrond doen dit self. Die vorm en die boodskappe is
+// Die skerm is 'n transparentModal, so die skerm waarvandaan dit oopgemaak is (die geleentheid, Tuis
+// of Kennisgewings) bly agter die vel sigbaar. Die navigasie animeer nie; die vel en die donker
+// agtergrond doen dit self. Die vorm en die boodskappe is
 // dieselfde as in die web se ReviewModal en ReviewForm.
 
 export function ReviewScreen() {
@@ -204,6 +206,7 @@ interface ReviewContentProps {
 }
 
 function ReviewContent({ eligibility, onClose, onSubmittingChange }: ReviewContentProps) {
+  const loadNotifications = useNotificationsStore((s) => s.load);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<{ message: string; expected: boolean } | null>(null);
 
@@ -229,7 +232,12 @@ function ReviewContent({ eligibility, onClose, onSubmittingChange }: ReviewConte
     <RatingForm
       event={eligibility.event}
       onCancel={onClose}
-      onSubmitted={() => setDone(true)}
+      onSubmitted={() => {
+        setDone(true);
+        // Die backend het pas die resensieversoek verwyder. Laai die kennisgewings weer sodat die
+        // klokkie se telling klop, ook as die vel van die geleentheid af oopgemaak is.
+        loadNotifications();
+      }}
       onError={(msg, expected) => setError({ message: msg, expected })}
       onSubmittingChange={onSubmittingChange}
     />

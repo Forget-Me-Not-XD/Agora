@@ -5,8 +5,9 @@ import ReviewForm from '@/components/ReviewForm';
 
 export const dynamic = 'force-dynamic';
 
-// Vang /reviews/[eventId] as dit binne die app oopgemaak word, sodat die vorm bo-oor die
-// geleentheid wys. 'n Refresh of e-pos-skakel kry steeds die volle bladsy.
+// Vang /reviews/[eventId] as dit binne die app oopgemaak word, sodat die vorm bo-oor die bladsy
+// wys waarvandaan dit oopgemaak is (die geleentheid, die dashboard of die kennisgewings). 'n Refresh
+// of e-pos-skakel kry steeds die volle bladsy.
 export default async function ReviewModalPage({ params }: { params: { eventId: string } }) {
     let eligibility: ReviewEligibility;
     try {

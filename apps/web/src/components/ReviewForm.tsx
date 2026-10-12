@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Clock } from 'lucide-react';
 import type { ReviewEligibility, ReviewableEvent } from '@/lib/api/reviews';
-import { submitReviewAction } from '@/lib/actions/review.actions';
+import { getReviewEligibilityAction, submitReviewAction } from '@/lib/actions/review.actions';
 import { REVIEW_BLOCKED_MESSAGE } from '@/lib/review-view';
 import { REVIEW_MAX_COMMENT_LENGTH } from '@/lib/review-categories';
 import { formatDateLong } from '@/lib/format-date';
 import { StarRating } from '@/components/ui/StarRating';
 import { useSetReviewModalBusy } from '@/components/ReviewModal';
+import { useNotificationsStore } from '@/lib/stores/notifications.store';
 import successAnim from '@/assets/Success.json';
 import warningAnim from '@/assets/Warning_Status.json';
 import errorAnim   from '@/assets/Tomato_Error.json';
@@ -24,8 +25,10 @@ interface ReviewFormProps {
     doneHref?:   string;
 }
 
-export default function ReviewForm({ eligibility, doneHref }: ReviewFormProps) {
+export default function ReviewForm({ eligibility: initialEligibility, doneHref }: ReviewFormProps) {
+    const eligibility = useCurrentEligibility(initialEligibility);
     const router = useRouter();
+    const loadNotifications = useNotificationsStore((s) => s.load);
     const [done, setDone] = useState(false);
     const [error, setError] = useState<{ message: string; expected: boolean } | null>(null);
 
@@ -60,10 +63,42 @@ export default function ReviewForm({ eligibility, doneHref }: ReviewFormProps) {
         <RatingForm
             event={eligibility.event}
             onCancel={close}
-            onSubmitted={() => setDone(true)}
+            onSubmitted={() => {
+                setDone(true);
+                // Die backend het pas die resensieversoek verwyder. Sonder hierdie herlaai bly die
+                // versoek tot die volgende poll in die klokkie staan.
+                void loadNotifications();
+            }}
             onError={(message, expected) => setError({ message, expected })}
         />
     );
+}
+
+// ========== Huidige status ==========
+
+// Next 14 hergebruik soms sy vorige kopie van die modal: dit vra die bladsy weer by die bediener,
+// maar die bediener stuur net wat volgens Next verander het. Is die resensie intussen op 'n ander
+// toestel gegee, lyk die vorm dan nog oop, en eers "Dien in" sê dat dit reeds beoordeel is. Daarom
+// vra die vorm self die huidige status wanneer dit oopmaak. Net 'n oop vorm word nagegaan, want net
+// dan kan die gebruiker iets probeer wat nie meer kan nie. Misluk die versoek, bly die status wat
+// die bladsy gegee het.
+function useCurrentEligibility(initial: ReviewEligibility): ReviewEligibility {
+    const [current, setCurrent] = useState<ReviewEligibility | null>(null);
+    const eventId = initial.status === 'OPEN' ? initial.event?.id : undefined;
+
+    useEffect(() => {
+        if (!eventId) return;
+
+        let active = true;
+        void getReviewEligibilityAction(eventId).then((result) => {
+            if (active && result.eligibility && result.eligibility.status !== 'OPEN') {
+                setCurrent(result.eligibility);
+            }
+        });
+        return () => { active = false; };
+    }, [eventId]);
+
+    return current ?? initial;
 }
 
 // ========== Vorm ==========

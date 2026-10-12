@@ -20,6 +20,14 @@ export interface NotificationItem {
     createdAt: string;
 }
 
+// Hou die statuskode by: 'n 404 beteken die kennisgewing bestaan nie meer nie, en die action hanteer
+// dit anders as 'n gewone fout
+export class NotificationApiError extends Error {
+    constructor(message: string, readonly status: number) {
+        super(message);
+    }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const token = getToken();
 
@@ -34,7 +42,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        throw new Error(httpErrorMessage(res, body));
+        throw new NotificationApiError(httpErrorMessage(res, body), res.status);
     }
 
     return res.json() as Promise<T>;

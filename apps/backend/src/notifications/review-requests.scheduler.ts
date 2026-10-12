@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventsService } from '../events/events.service';
 import { EventDocument } from '../events/schemas/event.schema';
 import { RsvpService } from '../rsvp/rsvp.service';
+import { ReviewsService } from '../reviews/reviews.service';
 import { RabbitMQService } from '../messaging/rabbitmq.service';
 import { EXCHANGES, ROUTING_KEYS, ReviewRequestedEvent } from '../messaging/events.constants';
 import { REVIEW_REQUESTS } from '../common/constants/review-categories';
@@ -16,6 +17,7 @@ export class ReviewRequestsScheduler {
     constructor(
         private readonly eventsService: EventsService,
         private readonly rsvpService: RsvpService,
+        private readonly reviewsService: ReviewsService,
         private readonly notificationsService: NotificationsService,
         private readonly rabbitmq: RabbitMQService,
     ) {}
@@ -40,11 +42,18 @@ export class ReviewRequestsScheduler {
     }
 
     private async sendForEvent(event: EventDocument): Promise<number> {
-        const rsvps = await this.rsvpService.findCheckedInAttendees(event._id.toString());
+        const [rsvps, reviewerIds] = await Promise.all([
+            this.rsvpService.findCheckedInAttendees(event._id.toString()),
+            this.reviewsService.findReviewerIds(event._id),
+        ]);
+
+        // Die venster gaan oop sodra die geleentheid eindig, maar die versoeke gaan eers 'n uur of
+        // wat later uit. Wie intussen reeds 'n resensie gegee het, kry nie meer 'n versoek of e-pos nie.
+        const reviewed = new Set(reviewerIds.map((id) => id.toString()));
         let sent = 0;
 
         for (const rsvp of rsvps) {
-            if (!rsvp.user) continue;
+            if (!rsvp.user || reviewed.has(rsvp.user.toString())) continue;
 
             try {
                 await this.notificationsService.createReviewRequest(rsvp.user, event);
@@ -69,6 +78,20 @@ export class ReviewRequestsScheduler {
             }
         }
 
+        if (sent > 0) await this.removeAnsweredRequests(event);
         return sent;
+    }
+
+    // Die lys van wie reeds beoordeel het, is net 'n momentopname van voor die lus. Gee iemand 'n
+    // resensie terwyl die lus nog loop, verwyder ReviewsService.create dalk niks nie, want hul versoek
+    // bestaan nog nie, en dan skep ons dit daarna steeds. Hierdie tweede kyk vang dit, want teen dié
+    // tyd bestaan elke versoek uit die lus al. Die e-pos is dan wel klaar gestuur.
+    private async removeAnsweredRequests(event: EventDocument): Promise<void> {
+        try {
+            const reviewerIds = await this.reviewsService.findReviewerIds(event._id);
+            await this.notificationsService.removeReviewRequests(event._id, reviewerIds);
+        } catch (err) {
+            this.logger.error(`Kon nie beantwoorde resensieversoeke vir geleentheid ${event._id} opruim nie: ${(err as Error).message}`);
+        }
     }
 }

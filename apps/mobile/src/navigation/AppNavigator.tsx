@@ -6,7 +6,6 @@ import { useAuthStore } from '../stores/auth.store';
 import { useNotificationsStore } from '../stores/notifications.store';
 import { useThemeColors, type ThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
-import { canViewNotifications } from '../lib/rbac';
 import { startAppPrefetch } from '../lib/prefetch';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -19,6 +18,7 @@ import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
 import { RsvpManagementScreen } from '../screens/RsvpManagementScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { AdminUsersScreen } from '../screens/AdminUsersScreen';
 import { InsightsScreen } from '../screens/InsightsScreen';
@@ -40,6 +40,7 @@ export type RootStackParamList = {
   QrScanner: { eventId: string };
   RsvpManagement: { eventId: string };
   Review: { eventId: string };
+  Notifications: undefined;
   AdminCreateUser: undefined;
   AdminUsers: undefined;
   Insights: undefined;
@@ -100,9 +101,7 @@ export function AppNavigator() {
 
     let active = true;
     const isStaff = user.role === 'ADMIN' || user.role === 'DOSENT';
-    const notifPromise = canViewNotifications(user.role)
-      ? useNotificationsStore.getState().load()
-      : Promise.resolve();
+    const notifPromise = useNotificationsStore.getState().load();
 
     const MAX_WAIT_MS = 6000;
     const timeout = new Promise<void>((resolve) => setTimeout(resolve, MAX_WAIT_MS));
@@ -146,13 +145,14 @@ export function AppNavigator() {
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="QrScanner" component={QrScannerScreen} />
             <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
-            {/* Deursigtig sodat die geleentheid agter die resensievel sigbaar bly. Die vel animeer
-                self, daarom animeer die navigasie nie. */}
+            {/* Deursigtig sodat die skerm daaronder (die geleentheid, Tuis of Kennisgewings) agter die
+                resensievel sigbaar bly. Die vel animeer self, daarom animeer die navigasie nie. */}
             <Stack.Screen
               name="Review"
               component={ReviewScreen}
               options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
             />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
             <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
             <Stack.Screen name="Insights" component={InsightsScreen} />

@@ -28,6 +28,7 @@ import {
   type RsvpStatus,
 } from '../api/rsvp';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { NotificationBell } from '../components/NotificationBell';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 import { useRsvpsStore } from '../stores/rsvps.store';
@@ -233,6 +234,7 @@ export function RsvpScreen() {
       <ScreenHeader
         title="My RSVPs"
         subtitle={`${rsvps.length} inskrywing${rsvps.length !== 1 ? 's' : ''}`}
+        right={<NotificationBell />}
       />
 
       {/* Soekveld */}

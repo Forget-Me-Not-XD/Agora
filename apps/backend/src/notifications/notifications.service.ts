@@ -39,6 +39,17 @@ export class NotificationsService {
         return notification.save();
     }
 
+    // Verwyder resensieversoeke wat reeds beantwoord is. ReviewsService.create verwyder 'n mens se eie
+    // versoek sodra die resensie gestoor is; hierdie een is vir die skeduleerder (sien
+    // ReviewRequestsScheduler.removeAnsweredRequests).
+    async removeReviewRequests(eventId: Types.ObjectId, userIds: Types.ObjectId[]): Promise<void> {
+        if (userIds.length === 0) return;
+
+        await this.notificationModel
+            .deleteMany({ event: eventId, userId: { $in: userIds }, type: NotificationType.RESENSIE_VERSOEK })
+            .exec();
+    }
+
     async findMyNotifications(userId: string): Promise<NotificationDocument[]> {
         return this.notificationModel
         .find({ userId })

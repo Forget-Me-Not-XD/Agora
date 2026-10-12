@@ -29,6 +29,7 @@ import {
 import { canCreateEvents } from '../lib/rbac';
 import { useEventsStore } from '../stores/events.store';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { NotificationBell } from '../components/NotificationBell';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { DateRangePicker } from '../components/DateRangePicker';
 import { toIsoRange } from '../lib/date-range';
@@ -156,15 +157,18 @@ export function EventsScreen() {
       <ScreenHeader
         title="Funksies"
         right={
-          canCreateEvents(role) ? (
-            <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => navigation.navigate('EventDetail', { eventId: 'new' })}
-              accessibilityLabel="Skep nuwe funksie"
-            >
-              <Feather name="plus" size={16} color={colors.surface} />
-            </TouchableOpacity>
-          ) : undefined
+          <>
+            <NotificationBell />
+            {canCreateEvents(role) && (
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={() => navigation.navigate('EventDetail', { eventId: 'new' })}
+                accessibilityLabel="Skep nuwe funksie"
+              >
+                <Feather name="plus" size={16} color={colors.surface} />
+              </TouchableOpacity>
+            )}
+          </>
         }
       />
 

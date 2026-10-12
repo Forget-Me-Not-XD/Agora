@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createReview, getMyReviewState, ReviewApiError } from '@/lib/api/reviews';
-import type { MyReviewState, ReviewRatingInput } from '@/lib/api/reviews';
+import { createReview, getMyReviewState, getReviewEligibility, ReviewApiError } from '@/lib/api/reviews';
+import type { MyReviewState, ReviewEligibility, ReviewRatingInput } from '@/lib/api/reviews';
 import { REVIEW_BLOCKED_MESSAGE } from '@/lib/review-view';
 
 export interface SubmitReviewResult {
@@ -28,9 +28,25 @@ export async function submitReviewAction(
         return { error: err instanceof Error ? err.message : 'Kon nie jou resensie stuur nie.' };
     }
 
-    // Die "Gee resensie"-knoppie op die geleentheid moet weg wees as die gebruiker terugkom
+    // Die "Gee resensie"-knoppie op die geleentheid, en die geleentheid op die dashboard se
+    // Hangende Resensies, moet weg wees as die gebruiker terugkom
     revalidatePath(`/events/${eventId}`);
+    revalidatePath('/dashboard');
     return {};
+}
+
+export interface ReviewEligibilityResult {
+    eligibility?: ReviewEligibility;
+    error?:       string;
+}
+
+// Vir ReviewForm se eie kyk wanneer dit oopmaak (sien useCurrentEligibility daar)
+export async function getReviewEligibilityAction(eventId: string): Promise<ReviewEligibilityResult> {
+    try {
+        return { eligibility: await getReviewEligibility(eventId) };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie die resensie laai nie.' };
+    }
 }
 
 export interface MyReviewStateResult {

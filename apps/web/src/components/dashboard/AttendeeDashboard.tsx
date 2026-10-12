@@ -5,7 +5,9 @@ import ChartCard from '@/components/charts/ChartCard';
 import RsvpStatusBreakdown from '@/components/charts/RsvpStatusBreakdown';
 import UpcomingEventsCarousel from './UpcomingEventsCarousel';
 import MyBookingsTable from './MyBookingsTable';
+import PendingReviewsCard from './PendingReviewsCard';
 import { getMyRsvps } from '@/lib/api/rsvp';
+import { getPendingReviews } from '@/lib/api/reviews';
 import type { RsvpStatus } from '@/lib/api/rsvp';
 import type { RsvpStatusCount } from '@/lib/api/analytics';
 import { getSession } from '@/lib/session';
@@ -13,7 +15,11 @@ import { getSession } from '@/lib/session';
 const STATUS_ORDER: RsvpStatus[] = ['BEVESTIG', 'HANGENDE', 'GEKANSELLEER'];
 
 export default async function AttendeeDashboard() {
-    const rsvps = await getMyRsvps().catch(() => []);
+    const [rsvps, pendingReviews] = await Promise.all([
+        getMyRsvps().catch(() => []),
+        // Die kaart is net 'n herinnering, so as dit nie wil laai nie, wys ons dit eerder nie
+        getPendingReviews().catch(() => []),
+    ]);
     const session = getSession();
     const attendeeName = session ? `${session.name} ${session.surname}` : '';
 
@@ -33,6 +39,8 @@ export default async function AttendeeDashboard() {
 
     return (
         <div className="space-y-6">
+            <PendingReviewsCard reviews={pendingReviews} />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <StatCard label="My Besprekings" value={rsvps.length} sub="in totaal" icon={Ticket} color="blue" />
                 <StatCard label="Bevestig" value={confirmed.length} sub="gereed om by te woon" icon={CheckCircle2} color="green" />

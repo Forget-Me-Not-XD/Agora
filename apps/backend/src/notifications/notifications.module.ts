@@ -5,6 +5,7 @@ import { Notification, NotificationSchema } from './schemas/notification.schema'
 import { EventsModule } from '../events/events.module';
 import { RsvpModule } from '../rsvp/rsvp.module';
 import { UsersModule } from '../users/users.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 import { ReviewRequestsScheduler } from './review-requests.scheduler';
 import { NotificationsConsumer } from './notifications.consumer';
 import { NotificationsService } from './notifications.service';
@@ -17,6 +18,7 @@ import { MailModule } from './mail.module';
         EventsModule,
         RsvpModule,
         UsersModule,
+        ReviewsModule,
         MailModule,
     ],
     providers: [NotificationsConsumer, NotificationsService, ReviewRequestsScheduler],
