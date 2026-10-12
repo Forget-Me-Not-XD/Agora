@@ -1,4 +1,4 @@
-const AF_MONTHS_LONG = [
+export const AF_MONTHS_LONG = [
     'Januarie', 'Februarie', 'Maart', 'April', 'Mei', 'Junie',
     'Julie', 'Augustus', 'September', 'Oktober', 'November', 'Desember',
 ];

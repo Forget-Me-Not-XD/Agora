@@ -8,7 +8,8 @@ import InfoModal from '@/components/InfoModal';
 import DateRangePicker from '@/components/DateRangePicker';
 import { toIsoRange } from '@/lib/date-range';
 import ExportCsvButton from '@/components/ExportCsvButton';
-import { canCreateEvents } from '@/lib/rbac';
+import { canCreateEvents, canManageEvent, getRoleLabel } from '@/lib/rbac';
+import { ATTENDANCE_OPTIONS } from '@/lib/attendance';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
@@ -21,32 +22,22 @@ import type { EventStatus } from '@/lib/event-view';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 
-const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
-    {
-        type: 'public',
-        label: 'Publiek',
-        color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-        description: 'Oop vir alle gebruikers ongeag hul rol. Geen uitnodiging nodig nie. Sigbaar vir GAS, studente, dosente en admins.',
-    },
-    {
-        type: 'internal_student',
-        label: 'Intern - Student',
-        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-        description: 'Slegs vir geregistreerde studente. Dosente en admins kan ook sien. GAS-lede moet spesifiek uitgenooi word.',
-    },
-    {
-        type: 'private',
-        label: 'Privaat',
-        color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-        description: 'Slegs vir spesifiek uitgenodigde gebruikers. Jy moet \'n direkte uitnodiging van die organiseerder ontvang het om dit te sien.',
-    },
-    {
-        type: 'department',
-        label: 'Departement',
-        color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-        description: 'Slegs vir dosente en administrateurs. Nie sigbaar vir studente of GAS-lede nie.',
-    },
+// Die tipe is net 'n kategorie (vir filters en insigte). Wie 'n geleentheid sien, hang af van sy
+// sigbaarheid (intendedAttendance), soos die backend se events.service dit afdwing.
+const EVENT_TYPE_INFO: { type: string; label: string; color: string }[] = [
+    { type: 'public',           label: 'Publiek',          color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' },
+    { type: 'internal_student', label: 'Intern - Student', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+    { type: 'private',          label: 'Privaat',          color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+    { type: 'department',       label: 'Departement',      color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
 ];
+
+const VISIBILITY_FOR_ROLE: Record<string, string> = {
+    ADMIN:        'Jy sien alle geleenthede.',
+    DOSENT:       'Jy sien alle geleenthede behalwe dié wat net vir admins is.',
+    STUDENT:      'Jy sien geleenthede vir "Almal" en vir "Studente en hoër".',
+    GAS:          'Jy sien geleenthede wat vir "Almal" oop is.',
+    PHOTOGRAPHER: 'Jy sien net geleenthede waarvoor jy as fotograaf toegewys is.',
+};
 
 export default function EventsPage() {
     const user = useCurrentUser();
@@ -309,11 +300,12 @@ export default function EventsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--color-text)]">Geleenthede</h1>
                     <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                        {loading ? 'Laai geleenthede…' : `${filtered.length} geleenthede sigbaar vir jou rol`}
+                        {loading ? 'Laai geleenthede…' : `${filtered.length} geleenthede wat jy kan sien`}
                     </p>
                 </div>
                 <div className="flex item-center gap-2">
-                    <ExportCsvButton type="rsvp-summary"/>
+                    {/* Die backend se uitvoer is net vir admins */}
+                    {user.role === 'ADMIN' && <ExportCsvButton type="rsvp-summary" />}
                 {canCreateEvents(user.role) && (
                     <Link
                         href="/events/create"
@@ -364,36 +356,34 @@ export default function EventsPage() {
                         <option value="department">Departement</option>
                     </select>
 
-                    <InfoModal title="Geleentheid Tipes">
+                    <InfoModal title="Wie sien watter geleenthede?">
                         <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
-                            Elke geleentheid het 'n tipe wat bepaal wie dit kan sien.
-                            Jou rol bepaal watter tipes vir jou sigbaar is.
+                            Wie &apos;n geleentheid kan sien, hang af van sy <strong className="text-[var(--color-text)]">sigbaarheid</strong>,
+                            wat die organiseerder kies wanneer hy dit skep:
                         </p>
-                        <div className="space-y-2">
-                            {EVENT_TYPE_INFO.map((item) => (
-                                <div
-                                    key={item.type}
-                                    className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${item.color}`}>
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                        {item.description}
-                                    </p>
-                                </div>
+                        <ul className="space-y-1.5">
+                            {ATTENDANCE_OPTIONS.map((o) => (
+                                <li key={o.value} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)]">
+                                    {o.label}
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-                            <p className="text-xs font-semibold text-[var(--color-text)] mb-1">Jou rol: {user.role}</p>
-                            <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                {user.role === 'ADMIN' && 'Jy kan alle geleenthede sien, ongeag tipe.'}
-                                {user.role === 'DOSENT' && 'Jy kan alle aanstaande geleenthede sien, plus geleenthede wat jy geskep het.'}
-                                {user.role === 'STUDENT' && 'Jy kan publieke, intern-student geleenthede, en geleenthede waarvoor jy uitgenooi is sien.'}
-                                {user.role === 'GAS' && 'Jy kan publieke geleenthede en geleenthede waarvoor jy spesifiek uitgenooi is sien.'}
+                            <p className="text-xs font-semibold text-[var(--color-text)] mb-1">Jou rol: {getRoleLabel(user.role)}</p>
+                            <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+                                {VISIBILITY_FOR_ROLE[user.role]} Is jy as Finansies aan &apos;n geleentheid toegeken, sien jy dit ook.
                             </p>
+                        </div>
+                        <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+                            Die <strong className="text-[var(--color-text)]">tipe</strong> is net &apos;n kategorie. Gebruik dit om die lys te filter;
+                            dit bepaal nie wie die geleentheid sien nie.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {EVENT_TYPE_INFO.map((item) => (
+                                <span key={item.type} className={`text-xs px-2 py-0.5 rounded-full font-semibold ${item.color}`}>
+                                    {item.label}
+                                </span>
+                            ))}
                         </div>
                     </InfoModal>
                 </div>
@@ -435,6 +425,7 @@ export default function EventsPage() {
                             event={event}
                             alreadyRsvpd={rsvpdEventIds.has(event.id)}
                             isNew={event.id === newEventId}
+                            manageable={canManageEvent(user, event)}
                             reviewState={
                                 reviewableEventIds.has(event.id) ? 'reviewable'
                                 : reviewedEventIds.has(event.id) ? 'reviewed'

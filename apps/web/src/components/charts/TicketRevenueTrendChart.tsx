@@ -34,12 +34,13 @@ export default function TicketRevenueTrendChart({ data, trend }: { data: SingleM
             <div className="flex flex-wrap items-center gap-4 mb-3">
                 <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-primary)' }} />
-                    Kaartjie-inkomste <span className="font-semibold text-[var(--color-text)]">{fmtRand(total)}</span>
+                    Totaal oor 12 maande <span className="font-semibold text-[var(--color-text)]">{fmtRand(total)}</span>
                 </span>
                 <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
                     ~{fmtRand(avgPerMonth)} per maand
                 </span>
-                <TrendIndicator trend={trend} label="vs. verlope week" />
+                {/* getRevenueTrend vergelyk hierdie maand met verlede maand */}
+                <TrendIndicator trend={trend} label="hierdie maand vs. verlede maand" />
             </div>
 
             <ResponsiveContainer width="100%" height={220}>

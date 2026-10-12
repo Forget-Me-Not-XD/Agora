@@ -1,7 +1,7 @@
 'use server';
 
-import { cancelRsvp, createRsvp, getMyRsvps, getRsvpQrDataUri } from '@/lib/api/rsvp';
-import type { MyRsvp, CreateRsvpPlusOne } from '@/lib/api/rsvp';
+import { cancelRsvp, checkInRsvp, createRsvp, getEventRsvps, getMyRsvps, getRsvpQrDataUri, registerWalkIn } from '@/lib/api/rsvp';
+import type { MyRsvp, CreateRsvpPlusOne, EventRsvp } from '@/lib/api/rsvp';
 
 export interface RsvpActionResult {
     qrDataUri?:         string;
@@ -28,7 +28,7 @@ export async function rsvpToEventAction(
             syncedToOutlook: rsvp.outlookCalendarEventId !== null,
         };
     } catch (err) {
-        return { error: err instanceof Error ? err.message : 'Inskrywing het misluk.' };
+        return { error: err instanceof Error ? err.message : 'RSVP het misluk.' };
     }
 }
 
@@ -65,5 +65,40 @@ export async function getMyRsvpsAction(dateFrom?: string, dateTo?: string): Prom
         return { rsvps };
     } catch (err) {
         return { error: err instanceof Error ? err.message : 'Kon nie jou RSVPs laai nie.' };
+    }
+}
+
+export interface EventRsvpActionResult {
+    rsvp?:  EventRsvp;
+    error?: string;
+}
+
+export async function checkInRsvpAction(rsvpId: string): Promise<EventRsvpActionResult> {
+    try {
+        return { rsvp: await checkInRsvp(rsvpId) };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie die persoon inteken nie.' };
+    }
+}
+
+export async function registerWalkInAction(eventId: string, guestName: string): Promise<EventRsvpActionResult> {
+    try {
+        return { rsvp: await registerWalkIn(eventId, guestName) };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie die loop-in byvoeg nie.' };
+    }
+}
+
+export interface EventRsvpsActionResult {
+    rsvps?: EventRsvp[];
+    error?: string;
+}
+
+// Vir die deelnemerslys se polling: QR-skanderings gebeur in die mobiele app, nie op hierdie bladsy nie
+export async function getEventRsvpsAction(eventId: string): Promise<EventRsvpsActionResult> {
+    try {
+        return { rsvps: await getEventRsvps(eventId) };
+    } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Kon nie die deelnemerslys laai nie.' };
     }
 }

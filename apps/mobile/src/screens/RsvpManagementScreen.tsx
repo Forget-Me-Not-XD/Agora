@@ -157,7 +157,7 @@ export function RsvpManagementScreen() {
                       {attendeeName(rsvp)}{rsvp.primaryRsvpId ? ' (+1-gas)' : ''}
                     </Text>
                     <Text style={styles.rowMeta}>
-                      {rsvp.user ? rsvp.user.email : rsvp.guestEmail ?? 'Walk-in (geen rekening nie)'}
+                      {rsvp.user ? rsvp.user.email : rsvp.guestEmail ?? 'Loop-in (geen rekening nie)'}
                     </Text>
                     {rsvp.plusOneName && (
                       <Text style={styles.rowMeta}>

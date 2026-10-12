@@ -5,6 +5,11 @@ export function canCreateEvents(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
 }
 
+// Admin bestuur alle geleenthede, 'n dosent net dié wat hy self geskep het (soos die backend se assertOwnership)
+export function canManageEvent(user: { id: string; role: UserRole }, event: { createdBy: string }): boolean {
+    return user.role === 'ADMIN' || (user.role === 'DOSENT' && event.createdBy === user.id);
+}
+
 export function canViewInsights(role: UserRole): boolean {
     return role === 'DOSENT' || role === 'ADMIN';
 }

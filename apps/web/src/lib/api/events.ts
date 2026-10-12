@@ -69,6 +69,7 @@ export interface Venue {
     label:       string;
     campus:      string;
     maxCapacity: number;
+    address:     string;   // die kampus se straatadres
 }
 
 export async function getVenues(): Promise<Venue[]> {

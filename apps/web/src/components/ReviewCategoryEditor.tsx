@@ -49,7 +49,7 @@ export default function ReviewCategoryEditor({ categories, onChange, errors, rat
     return (
         <div className="space-y-2">
             <div>
-                <label className="text-xs font-medium text-[var(--color-text-subtle)] block">
+                <label className="text-sm font-medium text-[var(--color-text)] block">
                     Resensie-kategorieë
                 </label>
                 <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
@@ -67,37 +67,40 @@ export default function ReviewCategoryEditor({ categories, onChange, errors, rat
                 </div>
             )}
 
-            {categories.map((category, index) => (
-                <div key={category.key}>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            placeholder="Kategorienaam..."
-                            aria-label={`Kategorie ${index + 1}`}
-                            value={category.name}
-                            onChange={(e) => handleRename(category.key, e.target.value)}
-                            maxLength={REVIEW_CATEGORY_LIMITS.maxNameLength}
-                            disabled={locked}
-                            className={inputClass(category.key)}
-                        />
-                        {!locked && (
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(category.key)}
-                                disabled={!canRemove}
-                                aria-label={`Verwyder ${category.name.trim() || `kategorie ${index + 1}`}`}
-                                title={canRemove ? 'Verwyder kategorie' : 'Daar moet ten minste een kategorie wees'}
-                                className="shrink-0 p-2.5 rounded-xl border border-[var(--color-border)] text-[var(--color-text-subtle)] hover:text-[var(--color-red)] hover:border-[var(--color-red)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--color-text-subtle)] disabled:hover:border-[var(--color-border)]"
-                            >
-                                <Trash2 size={16} />
-                            </button>
+            {/* Twee per ry, sodat vyf kategorieë nie die hele bladsy opvul nie */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {categories.map((category, index) => (
+                    <div key={category.key}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                placeholder="Kategorienaam..."
+                                aria-label={`Kategorie ${index + 1}`}
+                                value={category.name}
+                                onChange={(e) => handleRename(category.key, e.target.value)}
+                                maxLength={REVIEW_CATEGORY_LIMITS.maxNameLength}
+                                disabled={locked}
+                                className={inputClass(category.key)}
+                            />
+                            {!locked && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemove(category.key)}
+                                    disabled={!canRemove}
+                                    aria-label={`Verwyder ${category.name.trim() || `kategorie ${index + 1}`}`}
+                                    title={canRemove ? 'Verwyder kategorie' : 'Daar moet ten minste een kategorie wees'}
+                                    className="shrink-0 p-2.5 rounded-xl border border-[var(--color-border)] text-[var(--color-text-subtle)] hover:text-[var(--color-red)] hover:border-[var(--color-red)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--color-text-subtle)] disabled:hover:border-[var(--color-border)]"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                        </div>
+                        {errors.rows[category.key] && (
+                            <p className="text-xs text-[var(--color-red)] mt-1">{errors.rows[category.key]}</p>
                         )}
                     </div>
-                    {errors.rows[category.key] && (
-                        <p className="text-xs text-[var(--color-red)] mt-1">{errors.rows[category.key]}</p>
-                    )}
-                </div>
-            ))}
+                ))}
+            </div>
 
             {!locked && (
                 <button
