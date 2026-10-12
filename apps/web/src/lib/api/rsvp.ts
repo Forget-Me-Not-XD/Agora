@@ -138,3 +138,64 @@ export async function getRsvpQrDataUri(rsvpId: string): Promise<string> {
     const base64      = Buffer.from(arrayBuffer).toString('base64');
     return `data:image/png;base64,${base64}`;
 }
+
+// Soos die backend se RsvpResponseDto dit stuur (GET /rsvp/event/:id en die inteken-roetes). 'n
+// Plus-een en 'n walk-in het geen gebruiker nie, net 'n guestName.
+export interface EventRsvp {
+    id:            string;
+    event:         string;
+    user:          { id: string; name: string; surname: string; email: string; role: string } | null;
+    guestName:     string | null;
+    guestEmail:    string | null;
+    status:        RsvpStatus;
+    checkedIn:     boolean;
+    checkedInAt:   string | null;
+    paid:          boolean;
+    primaryRsvpId: string | null;
+    createdAt:     string;
+}
+
+// GET /api/v1/rsvp/event/:eventId — almal wat vir 'n geleentheid RSVP het (net admin of die skepper)
+export async function getEventRsvps(eventId: string): Promise<EventRsvp[]> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/rsvp/event/${eventId}`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<EventRsvp[]>;
+}
+
+// PATCH /api/v1/rsvp/:id/check-in — teken iemand by die deur in sonder om hul QR-kode te skandeer
+export async function checkInRsvp(rsvpId: string): Promise<EventRsvp> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/rsvp/${rsvpId}/check-in`, {
+        method:  'PATCH',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<EventRsvp>;
+}
+
+// POST /api/v1/rsvp/walk-in — iemand wat sonder 'n RSVP opdaag; word dadelik ingeteken
+export async function registerWalkIn(eventId: string, guestName: string): Promise<EventRsvp> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/rsvp/walk-in`, {
+        method:  'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body:  JSON.stringify({ eventId, guestName }),
+        cache: 'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<EventRsvp>;
+}

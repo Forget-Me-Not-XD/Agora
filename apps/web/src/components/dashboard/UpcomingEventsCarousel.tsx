@@ -40,8 +40,15 @@ export default function UpcomingEventsCarousel({ upcoming }: { upcoming: MyRsvp[
 
     if (upcoming.length === 0) {
         return (
-            <div className="lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-center justify-center">
-                <p className="text-sm text-[var(--color-text-subtle)]">Geen opkomende geleenthede bespreek nie.</p>
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-[var(--color-text-subtle)]">Jy het nog nie vir opkomende geleenthede RSVP nie.</p>
+                <Link
+                    href="/events"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                    Kyk watter geleenthede beskikbaar is
+                    <ArrowRight size={15} />
+                </Link>
             </div>
         );
     }
@@ -50,7 +57,7 @@ export default function UpcomingEventsCarousel({ upcoming }: { upcoming: MyRsvp[
     if (!current.event) return null;
 
     return (
-        <div className="relative overflow-hidden lg:col-span-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-primary)] transition-colors duration-200">
+        <div className="relative overflow-hidden bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 hover:border-[var(--color-primary)] transition-colors duration-200">
             <div
                 className="pointer-events-none absolute -top-20 -right-20 w-56 h-56 rounded-full opacity-[0.07] blur-3xl"
                 style={{ background: 'var(--color-primary)' }}

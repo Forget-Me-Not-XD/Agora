@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { DeltaBadge } from './ui/Badge';
 import { IconChip } from './ui/IconChip';
+import { ChartHelpButton, type ChartHelpContent } from './charts/ChartHelp';
 
 interface StatCardProps {
     label: string;
@@ -9,6 +10,7 @@ interface StatCardProps {
     icon: LucideIcon;
     deltaPct?: number | null;
     deltaLabel?: string;
+    help?: ChartHelpContent;
     color?: 'blue' | 'green' | 'orange' | 'red';
 }
 
@@ -19,6 +21,7 @@ export default function StatCard({
     icon: Icon,
     deltaPct,
     deltaLabel = 'vs. verlede maand',
+    help,
     color = 'blue',
 }: StatCardProps) {
     return (
@@ -27,14 +30,15 @@ export default function StatCard({
                 <IconChip tone={color} size="sm">
                     <Icon size={14} />
                 </IconChip>
-                <span className="text-xs text-[var(--color-text-subtle)]">{label}</span>
+                <span className="text-xs text-[var(--color-text-subtle)] flex-1 min-w-0">{label}</span>
+                {help && <ChartHelpButton help={help} />}
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className="text-2xl font-bold text-[var(--color-text)]">{value}</p>
                 {deltaPct !== undefined && (
                     <span className="flex items-center gap-1.5">
                         <DeltaBadge value={deltaPct} />
-                        <span className="text-[11px] text-[var(--color-text-subtle)]">{deltaLabel}</span>
+                        <span className="text-xs text-[var(--color-text-subtle)]">{deltaLabel}</span>
                     </span>
                 )}
             </div>
