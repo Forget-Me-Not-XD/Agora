@@ -326,7 +326,7 @@ export default function CalendarPage() {
                                 <div className="flex items-center gap-3 text-sm text-[var(--color-text-subtle)]">
                                     <Users size={15} className="shrink-0 text-[var(--color-primary)]" />
                                     <span>
-                                        {selectedEvent.confirmedAttendees} / {selectedEvent.maxCapacity} RSVPs
+                                        {selectedEvent.confirmedAttendees} / {selectedEvent.maxCapacity} geregistreer
                                     </span>
                                 </div>
                             </div>

@@ -2,8 +2,7 @@ import { Pill } from './Pill';
 
 export function DeltaBadge({ value }: { value: number | null }) {
     if (value === null) {
-        // Verlede maand was 0, so daar is niks om mee te vergelyk nie
-        return <Pill tone="neutral">geen vergelyking</Pill>;
+        return <Pill tone="neutral">--</Pill>;
     }
 
     const positive = value >= 0;

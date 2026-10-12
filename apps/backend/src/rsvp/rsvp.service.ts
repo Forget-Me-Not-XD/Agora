@@ -340,29 +340,13 @@ export class RsvpService {
             throw new ConflictException('Gas het reeds ingecheck');
         }
 
-        await this.markCheckedIn(rsvp);
+        rsvp.checkedIn = true;
+        rsvp.checkedInAt = new Date();
+        rsvp.status = RsvpStatus.BEVESTIG;
+        await rsvp.save();
         await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         return rsvp;
-    }
-
-    // Atomies "eis" die inteken: die web se "Teken in"-knoppie en die app se QR-skandeerder kan
-    // dieselfde persoon gelyktydig inteken. Albei slaag dan die checkedIn-kontrole hierbo, maar
-    // net een kry die dokument hier terug, so checkedInCount word net een keer verhoog.
-    private async markCheckedIn(rsvp: Pick<Rsvp, 'checkedIn' | 'checkedInAt' | 'status'> & { _id: Types.ObjectId }): Promise<void> {
-        const checkedInAt = new Date();
-        const claimed = await this.rsvpModel.findOneAndUpdate(
-            { _id: rsvp._id, checkedIn: { $ne: true }, status: { $ne: RsvpStatus.GEKANSELLEER } },
-            { $set: { checkedIn: true, checkedInAt, status: RsvpStatus.BEVESTIG } },
-        ).exec();
-        if (!claimed) {
-            throw new ConflictException('Gas het reeds ingecheck');
-        }
-
-        // Hou die gelaaide dokument (met sy gepopuleerde user) in lyn vir die respons
-        rsvp.checkedIn = true;
-        rsvp.checkedInAt = checkedInAt;
-        rsvp.status = RsvpStatus.BEVESTIG;
     }
 
     async getQrCode(rsvpId: string, requesterId: string, requesterRole: Role):Promise<Buffer>{
@@ -418,7 +402,10 @@ export class RsvpService {
             throw new ConflictException('Gas het reeds ingecheck');
         }
 
-        await this.markCheckedIn(rsvp);
+        rsvp.checkedIn = true;
+        rsvp.checkedInAt = new Date();
+        rsvp.status = RsvpStatus.BEVESTIG;
+        await rsvp.save();
         await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         // Walk-ins en +1-gaste het geen gekoppelde `user` nie -- val dan terug op

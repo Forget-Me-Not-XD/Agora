@@ -2,92 +2,52 @@
 import { Calendar, CalendarClock, Ticket, Gauge } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import ChartCard from '@/components/charts/ChartCard';
+import FillRateDonut from '@/components/charts/FillRateDonut';
 import TopEventsBarChart from '@/components/charts/TopEventsBarChart';
 import MyEventsTable from './MyEventsTable';
-import AttentionList from './AttentionList';
-import NextEventCard from './NextEventCard';
-import { LoadError } from '@/components/ui/LoadError';
-import { getEvents, type Event } from '@/lib/api/events';
-import { deriveStatus } from '@/lib/event-view';
+import { getEvents } from '@/lib/api/events';
 import type { RsvpPerEvent } from '@/lib/api/analytics';
-import { METRICS, attentionItems, fillRateBand, metricHelp, topEventsInsight } from '@/lib/metrics';
 
 export default async function DosentDashboard({ userId }: { userId: string }) {
-    const visible = await getEvents().catch(() => null);
-
-    // Alles op hierdie paneelbord kom uit hierdie een versoek. Sonder dit sou elke kaart nul wys
-    // en die aandag-lys "Alles lyk goed" sê, so wys eerder net die fout.
-    if (!visible) {
-        return (
-            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                <LoadError what="jou geleenthede" />
-            </div>
-        );
-    }
-
+    const visible = await getEvents().catch(() => []);
     const myEvents = visible.filter((e) => e.createdBy === userId);
 
-    const now = new Date();
-    const byStart = (a: Event, b: Event) => new Date(a.date).getTime() - new Date(b.date).getTime();
-    const upcoming = myEvents
-        .filter((e) => new Date(e.date).getTime() >= now.getTime())
-        .sort(byStart);
-    // Die volgende geleentheid is die eerste een wat nog nie verby is nie, ook een wat nou aan die
-    // gang is: dan het die dosent die deelnemers-kortpad die nodigste, om mense in te teken.
-    const nextEvent = myEvents
-        .filter((e) => deriveStatus(e) === 'ongoing' || deriveStatus(e) === 'upcoming')
-        .sort(byStart)[0] ?? null;
+    const now = Date.now();
+    const upcoming = myEvents.filter((e) => new Date(e.date).getTime() >= now);
     const totalRsvps = myEvents.reduce((s, e) => s + e.confirmedAttendees, 0);
-    const withCapacity = myEvents.filter((e) => e.maxCapacity > 0);
-    const avgFillRate = withCapacity.length > 0
-        ? Math.round((withCapacity.reduce((s, e) => s + e.confirmedAttendees / e.maxCapacity, 0) / withCapacity.length) * 100)
+    const avgFillRate = myEvents.length > 0
+        ? Math.round(
+            (myEvents.reduce((s, e) => s + (e.maxCapacity > 0 ? e.confirmedAttendees / e.maxCapacity : 0), 0) / myEvents.length) * 100,
+        )
         : 0;
 
     const topEvents: RsvpPerEvent[] = [...myEvents]
         .sort((a, b) => b.confirmedAttendees - a.confirmedAttendees)
         .slice(0, 5)
         .map((e) => ({ eventTitle: e.title, totalRsvps: e.confirmedAttendees }));
+    const topEventsTotal = topEvents.reduce((s, e) => s + e.totalRsvps, 0);
 
     const sortedByDateDesc = [...myEvents].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return (
         <div className="space-y-6">
-            <AttentionList items={attentionItems(myEvents, now)} />
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="My Geleenthede" value={myEvents.length} sub="deur jou geskep" icon={Calendar} color="blue" />
-                <StatCard label="Opkomend" value={upcoming.length} sub="nog nie plaasgevind nie" icon={CalendarClock} color="green" />
-                <StatCard
-                    label="RSVPs"
-                    value={totalRsvps}
-                    sub="oor al jou geleenthede"
-                    icon={Ticket}
-                    color="orange"
-                    help={{
-                        title: 'RSVPs',
-                        what: 'Hoeveel RSVPs jou geleenthede altesaam het. Gekanselleerde RSVPs tel nie.',
-                    }}
-                />
-                <StatCard
-                    label="Gemiddelde Vulkoers"
-                    value={withCapacity.length > 0 ? `${avgFillRate}%` : '--'}
-                    sub={withCapacity.length > 0 ? fillRateBand(avgFillRate).label : 'nog geen geleenthede nie'}
-                    icon={Gauge}
-                    color="red"
-                    help={metricHelp(METRICS.fillRate)}
-                />
+                <StatCard label="Opkomend" value={upcoming.length} sub="datum in die toekoms" icon={CalendarClock} color="green" />
+                <StatCard label="Totale RSVPs" value={totalRsvps} sub="oor jou geleenthede" icon={Ticket} color="orange" />
+                <StatCard label="Gemiddelde Vulkoers" value={`${avgFillRate}%`} sub="oor jou geleenthede" icon={Gauge} color="red" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-                <NextEventCard event={nextEvent} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+                <ChartCard title="Vulkoers-gesondheid" subtitle="Gemiddeld oor jou geleenthede">
+                    <FillRateDonut percent={avgFillRate} />
+                </ChartCard>
                 <ChartCard
-                    title="Jou gewildste geleenthede"
-                    subtitle="Jou 5 geleenthede met die meeste RSVPs"
-                    insight={topEventsInsight(topEvents)}
-                    help={{
-                        title: 'Jou gewildste geleenthede',
-                        what: 'Jou vyf geleenthede met die meeste RSVPs. Gebruik dit om te sien watter soort geleenthede jou gehoor trek.',
-                    }}
+                    title="Top Geleenthede"
+                    subtitle="Jou top 5 volgens RSVPs"
+                    value={topEventsTotal}
+                    valueLabel="RSVPs (top 5)"
+                    className="lg:col-span-2"
                 >
                     <TopEventsBarChart data={topEvents} />
                 </ChartCard>

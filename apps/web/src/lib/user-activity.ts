@@ -36,7 +36,7 @@ function startListening(): void {
 }
 
 /** Is die oortjie sigbaar en het die gebruiker onlangs iets gedoen? */
-export function isUserActive(): boolean {
+function isUserActive(): boolean {
   return document.visibilityState === 'visible' && Date.now() - lastActivity < ACTIVE_WINDOW_MS;
 }
 

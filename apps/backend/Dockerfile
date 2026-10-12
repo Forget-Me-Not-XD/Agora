@@ -43,11 +43,6 @@ RUN python3 -m venv ./venv \
 # satisfies both call sites with a single dependency install.
 ENV PATH="/app/apps/ml/venv/bin:${PATH}"
 
-# Dieselfde tydsone as die web-houer en die gebruikers. Die weeklikse analise en aanbevelings werk
-# met plaaslike kalenderdae (getDate, getDay), en 'n datum sonder tydsone word in SA-tyd gelees.
-# Node bring sy eie sone-data saam (ICU), so die slim beeld het nie tzdata nodig nie.
-ENV TZ=Africa/Johannesburg
-
 RUN groupadd -g 1001 nodejs && \
     useradd -u 1001 -g nodejs -s /bin/false nestjs && \
     chown -R nestjs:nodejs /app

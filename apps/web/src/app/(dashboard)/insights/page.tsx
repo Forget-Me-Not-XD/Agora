@@ -14,8 +14,6 @@ import KeyFindings from '@/components/KeyFindings';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 import PredictionAccuracyPanel from '@/components/PredictionAccuracyPanel';
 import AutoRefresh from '@/components/AutoRefresh';
-import { ChartHelpButton } from '@/components/charts/ChartHelp';
-import { METRICS, metricHelp, type HelpContent, eventWord } from '@/lib/metrics';
 
 function attendanceColors(rate: number): { tone: Tone; bar: string } {
     if (rate >= 80) return { tone: 'green', bar: 'bg-green-500' };
@@ -104,8 +102,7 @@ export default async function InsightsPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* Die backend se uitvoer is net vir admins */}
-                    {user.role === 'ADMIN' && <ExportCsvButton type="events-summary" />}
+                    <ExportCsvButton type="events-summary" />
                 </div>
                 <InfoModal title="Oor KI Insigte">
                     <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
@@ -159,19 +156,14 @@ export default async function InsightsPage() {
                     tone="blue"
                     label="Totaal Bygewoon"
                     value={String(totalAttended)}
-                    sub={`oor ${completedEvents.length} voltooide ${eventWord(completedEvents.length)}`}
-                    help={{
-                        title: 'Totaal Bygewoon',
-                        what: 'Hoeveel mense by afgelope geleenthede ingeteken het (hul QR-kode is geskandeer of hulle is op die geleentheid se bladsy ingeteken).',
-                    }}
+                    sub={`oor ${completedEvents.length} voltooide geleentheid${completedEvents.length !== 1 ? 'e' : ''}`}
                 />
                 <KpiCard
                     icon={<TrendingUp size={20} />}
                     tone="green"
                     label="Gem. Bywoning"
                     value={`${overallRate}%`}
-                    sub="ingeteken teenoor kapasiteit"
-                    help={metricHelp(METRICS.attendance)}
+                    sub="teenoor kapasiteit"
                 />
                 <KpiCard
                     icon={<CheckCircle size={20} />}
@@ -189,14 +181,14 @@ export default async function InsightsPage() {
             {rankedEvents.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <PerformerList
-                        title="Beste bywoning"
+                        title="Beste presterende geleenthede"
                         icon={<Trophy size={16} />}
                         tone="green"
                         events={topPerformers}
                     />
                     {bottomPerformers.length > 0 && (
                         <PerformerList
-                            title="Swakste bywoning"
+                            title="Swakste presterende geleenthede"
                             icon={<TrendingDown size={16} />}
                             tone="red"
                             events={bottomPerformers}
@@ -208,14 +200,9 @@ export default async function InsightsPage() {
             {/* ── Gemiddelde bywoning per tipe geleentheid ── */}
             {typeBreakdown.length > 0 && (
                 <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                    <div className="mb-3">
-                        <h2 className="text-base font-semibold text-[var(--color-text)]">
-                            Bywoning per Tipe Geleentheid
-                        </h2>
-                        <p className="text-xs text-[var(--color-text-subtle)]">
-                            Die gemiddelde bywoning van afgelope geleenthede van elke tipe. Bied meer aan van die tipe bo-aan.
-                        </p>
-                    </div>
+                    <h2 className="text-base font-semibold text-[var(--color-text)] mb-3">
+                        Bywoning per Tipe Geleentheid
+                    </h2>
                     <div className="space-y-3">
                         {typeBreakdown.map(({ type, count, avgRate }) => (
                             <div key={type} className="space-y-1.5">
@@ -223,7 +210,7 @@ export default async function InsightsPage() {
                                     <div className="flex items-center gap-2">
                                         <Pill tone={TYPE_TONE[type]}>{TYPE_LABELS[type]}</Pill>
                                         <span className="text-xs text-[var(--color-text-subtle)]">
-                                            {count} {eventWord(count)}
+                                            {count} geleentheid{count !== 1 ? 'e' : ''}
                                         </span>
                                     </div>
                                     <span className="text-sm font-bold text-[var(--color-text)]">{avgRate}%</span>
@@ -269,10 +256,7 @@ function PerformerList({
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
             <div className="flex items-center gap-2 mb-3">
                 <IconChip tone={tone} size="sm">{icon}</IconChip>
-                <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-[var(--color-text)]">{title}</h2>
-                    <p className="text-xs text-[var(--color-text-subtle)]">Ingeteken ÷ kapasiteit, van afgelope geleenthede</p>
-                </div>
+                <h2 className="text-sm font-semibold text-[var(--color-text)]">{title}</h2>
             </div>
             <div className="space-y-3">
                 {events.map((event) => {
@@ -300,23 +284,18 @@ function KpiCard({
     label,
     value,
     sub,
-    help,
 }: {
     icon: React.ReactNode;
     tone: Tone;
     label: string;
     value: string;
     sub: string;
-    help?: HelpContent;
 }) {
     return (
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-start gap-4">
             <IconChip tone={tone}>{icon}</IconChip>
-            <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-1">
-                    <p className="text-xs text-[var(--color-text-subtle)] mb-0.5">{label}</p>
-                    {help && <ChartHelpButton help={help} />}
-                </div>
+            <div className="min-w-0">
+                <p className="text-xs text-[var(--color-text-subtle)] mb-0.5">{label}</p>
                 <p className="text-2xl font-bold text-[var(--color-text)] leading-none">{value}</p>
                 <p className="text-xs text-[var(--color-text-subtle)] mt-1 leading-snug">{sub}</p>
             </div>

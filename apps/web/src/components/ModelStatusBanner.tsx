@@ -3,7 +3,6 @@ import type { ModelStatus, ModelHealth } from '@/lib/api/analytics';
 import { Pill, type Tone } from '@/components/ui/Pill';
 import { IconChip } from '@/components/ui/IconChip';
 import { formatDateShort } from '@/lib/format-date';
-import { ChartHelpButton } from '@/components/charts/ChartHelp';
 
 const HEALTH_META: Record<ModelHealth, { label: string; tone: Tone; icon: typeof CheckCircle2 }> = {
     good:    { label: 'Gesond',   tone: 'green',   icon: CheckCircle2 },
@@ -39,14 +38,6 @@ export default function ModelStatusBanner({ status }: { status: ModelStatus | nu
                     <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-[var(--color-text)]">KI-model status</p>
                         <Pill tone={meta.tone} dot>{meta.label}</Pill>
-                        <ChartHelpButton
-                            help={{
-                                title: 'KI-model',
-                                what: 'Die model voorspel hoe vol \'n geleentheid sal wees en hoeveel mense nie gaan opdaag nie. Dit leer uit afgelope geleenthede waar mense ingeteken is.',
-                                how: 'Akkuraatheid: as die model 70% voorspel en die werklike vulkoers was 80%, was dit 10 persentasiepunte af. "Gem. akkuraatheid 90%" beteken die voorspellings was gemiddeld 10 punte af. "Nie-opdaag fout ±8%" beteken die voorspelde no-show-koers was gemiddeld 8 punte van die werklike een af.',
-                                good: 'Gesond: gebruik die voorspellings gerus. Redelik: gebruik dit as \'n rowwe skatting. Swak: die model het meer afgelope geleenthede met inteken-data nodig.',
-                            }}
-                        />
                     </div>
                     {status.trainedAt && (
                         <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">

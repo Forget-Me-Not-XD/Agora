@@ -1,21 +1,14 @@
 import Link from 'next/link';
 import type { Event } from '@/lib/api/events';
 import { formatDateShort } from '@/lib/format-date';
-import { STATUS_LABELS, STATUS_TONE, deriveStatus } from '@/lib/event-view';
 import { Pill } from '@/components/ui/Pill';
 
 export default function MyEventsTable({ events }: { events: Event[] }) {
     if (events.length === 0) {
         return (
-            <div className="text-center py-8 space-y-3">
-                <p className="text-sm text-[var(--color-text-subtle)]">Jy het nog geen geleenthede geskep nie.</p>
-                <Link
-                    href="/events/create"
-                    className="inline-block px-4 py-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-semibold hover:opacity-90 transition-opacity"
-                >
-                    Skep jou eerste geleentheid
-                </Link>
-            </div>
+            <p className="text-xs text-[var(--color-text-subtle)] text-center py-8">
+                Jy het nog geen geleenthede geskep nie.
+            </p>
         );
     }
 
@@ -27,7 +20,7 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                         <th className="pb-2 font-medium">Titel</th>
                         <th className="pb-2 font-medium">Datum</th>
                         <th className="pb-2 font-medium">Ligging</th>
-                        <th className="pb-2 font-medium">RSVPs / plekke</th>
+                        <th className="pb-2 font-medium">Kapasiteit</th>
                         <th className="pb-2 font-medium text-right">Status</th>
                     </tr>
                 </thead>
@@ -36,7 +29,7 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                         const fillRate = e.maxCapacity > 0
                             ? Math.min(100, Math.round((e.confirmedAttendees / e.maxCapacity) * 100))
                             : 0;
-                        const status = deriveStatus(e);
+                        const isUpcoming = new Date(e.date).getTime() >= Date.now();
 
                         return (
                             <tr key={e.id} className="hover:bg-[var(--color-bg)]">
@@ -64,7 +57,9 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                                     </div>
                                 </td>
                                 <td className="py-2.5 text-right">
-                                    <Pill tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>
+                                    <Pill tone={isUpcoming ? 'green' : 'neutral'}>
+                                        {isUpcoming ? 'Opkomend' : 'Verby'}
+                                    </Pill>
                                 </td>
                             </tr>
                         );

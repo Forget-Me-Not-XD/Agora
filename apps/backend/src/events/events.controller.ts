@@ -45,7 +45,7 @@ export class EventsController {
     }
     
     @Get('venues')
-    getVenues(): {id: string; label: string; campus: string; maxCapacity: number; address: string}[] {
+    getVenues(): {id: string; label: string; campus: string; maxCapacity: number}[] {
         return this.eventsService.getVenues();
     }
 

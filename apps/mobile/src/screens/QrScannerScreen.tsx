@@ -289,7 +289,7 @@ export function QrScannerScreen() {
               returnKeyType="done"
               onSubmitEditing={handleWalkIn}
               editable={!walkInSubmitting}
-              accessibilityLabel="Persoon se naam vir loop-in registrasie"
+              accessibilityLabel="Persoon se naam vir walk-in registrasie"
             />
             <TouchableOpacity
               style={styles.walkInBtn}

@@ -82,7 +82,7 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                     <circle cx={cx} cy={cy} r={9} fill="var(--color-surface)" stroke="var(--color-purple)" strokeWidth={2} />
                     <circle cx={cx} cy={cy} r={3.5} fill="var(--color-purple)" />
                     <text x={cx} y={cy - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--color-purple)">
-                        Bo verwagting
+                        Ondersoek
                     </text>
                 </g>
             );
@@ -94,7 +94,7 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                     <circle cx={cx} cy={cy} r={9} fill="var(--color-surface)" stroke="var(--color-orange)" strokeWidth={2} />
                     <circle cx={cx} cy={cy} r={3.5} fill="var(--color-orange)" />
                     <text x={cx} y={cy - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--color-orange)">
-                        Onder verwagting
+                        Daling
                     </text>
                 </g>
             );
@@ -107,50 +107,50 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
         <div className="h-full flex flex-col">
             <div className="flex flex-wrap items-center gap-4 mb-3 shrink-0">
                 <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-red)' }} />
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-blue)' }} />
                     Geleenthede <span className="font-semibold text-[var(--color-text)]">{totalEvents}</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-xs text-[var(--color-text-subtle)]">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-blue)' }} />
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: 'var(--color-red)' }} />
                     RSVPs <span className="font-semibold text-[var(--color-text)]">{totalRsvps}</span>
                 </span>
                 {anomalyMonths.length > 0 && (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-purple)]">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[var(--color-purple)]" style={{ background: 'var(--color-surface)' }} />
-                        Meer RSVPs as verwag vir die aantal geleenthede
+                        Ongewone doeltreffendheid gemerk
                     </span>
                 )}
                 {declineMonths.length > 0 && (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-orange)]">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-[var(--color-orange)]" style={{ background: 'var(--color-surface)' }} />
-                        Minder RSVPs as verwag vir die aantal geleenthede
+                        Skerp RSVP-daling gemerk
                     </span>
                 )}
                 <span className="text-xs text-[var(--color-text-subtle)] ml-auto">
                     ~{avgRsvpsPerEvent} RSVPs per geleentheid
                 </span>
-                <TrendIndicator trend={trend} label="RSVPs hierdie week vs. verlede week" />
+                <TrendIndicator trend={trend} label="vs. verlede week" />
             </div>
 
             <div className="flex-1 min-h-0 flex items-center">
                 <div className="w-full aspect-[3/1] max-h-[320px] min-h-[160px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data} margin={{ top: 26, right: 10, left: 0, bottom: 0 }}>
+                        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="fillEvents" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--color-red)" stopOpacity={0.35} />
-                                    <stop offset="95%" stopColor="var(--color-red)" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="var(--color-blue)" stopOpacity={0.35} />
+                                    <stop offset="95%" stopColor="var(--color-blue)" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="fillRsvps" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--color-blue)" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="var(--color-blue)" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="var(--color-red)" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="var(--color-red)" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
                             <XAxis dataKey="label" stroke="var(--color-text-subtle)" fontSize={11} tickLine={false} axisLine={false} />
                             <YAxis
                                 yAxisId="events"
-                                stroke="var(--color-red)"
+                                stroke="var(--color-blue)"
                                 fontSize={11}
                                 tickLine={false}
                                 axisLine={false}
@@ -160,7 +160,7 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                             <YAxis
                                 yAxisId="rsvps"
                                 orientation="right"
-                                stroke="var(--color-blue)"
+                                stroke="var(--color-red)"
                                 fontSize={11}
                                 tickLine={false}
                                 axisLine={false}
@@ -168,8 +168,8 @@ export default function EventsRsvpsAreaChart({ data, trend }: { data: MonthlyPoi
                                 width={36}
                             />
                             <Tooltip content={ChartTooltip} />
-                            <Area yAxisId="events" type="monotone" dataKey="a" name="Geleenthede" stroke="var(--color-red)" fill="url(#fillEvents)" strokeWidth={2} />
-                            <Area yAxisId="rsvps" type="monotone" dataKey="b" name="RSVPs" stroke="var(--color-blue)" fill="url(#fillRsvps)" strokeWidth={2} dot={renderRsvpDot} />
+                            <Area yAxisId="events" type="monotone" dataKey="a" name="Geleenthede" stroke="var(--color-blue)" fill="url(#fillEvents)" strokeWidth={2} />
+                            <Area yAxisId="rsvps" type="monotone" dataKey="b" name="RSVPs" stroke="var(--color-red)" fill="url(#fillRsvps)" strokeWidth={2} dot={renderRsvpDot} />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

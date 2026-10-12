@@ -41,7 +41,7 @@ export default function RsvpStatusBreakdown({ data }: { data: RsvpStatusCount[] 
                 })}
             </ul>
 
-            <p className="text-xs text-[var(--color-text-subtle)] mt-3 pt-2 border-t border-[var(--color-border)]">
+            <p className="text-[16px] text-[var(--color-text-subtle)] mt-3 pt-2 border-t border-[var(--color-border)]">
                 {total} RSVPs in totaal
             </p>
         </div>

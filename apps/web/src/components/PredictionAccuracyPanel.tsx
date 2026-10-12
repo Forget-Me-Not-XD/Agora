@@ -7,7 +7,6 @@ import type { PredictionAccuracyItem } from '@/lib/api/analytics';
 import { Pill, type Tone } from '@/components/ui/Pill';
 import EventPickerModal, { type SelectableEvent } from '@/components/EventPickerModal';
 import PredictionAccuracyChart from '@/components/charts/PredictionAccuracyChart';
-import { eventWord } from '@/lib/metrics';
 
 function accuracyTone(accuracyPct: number): Tone {
     if (accuracyPct >= 80) return 'green';
@@ -86,7 +85,7 @@ export default function PredictionAccuracyPanel({ events }: { events: Selectable
                             {avgAccuracy !== null && (
                                 <div className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-3">
                                     <span className="text-sm font-medium text-[var(--color-text)]">
-                                        Gemiddelde akkuraatheid oor {results.length} {eventWord(results.length)}
+                                        Gemiddelde akkuraatheid oor {results.length} geleentheid{results.length !== 1 ? 'e' : ''}
                                     </span>
                                     <Pill tone={accuracyTone(avgAccuracy)} size="md" className="font-bold">{avgAccuracy}%</Pill>
                                 </div>

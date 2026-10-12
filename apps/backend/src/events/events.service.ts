@@ -50,7 +50,7 @@ export class EventsService {
             ...dto,
             date:       start,
             endDate:    end,
-            address:    this.storedAddress(dto.location, place, dto.address),
+            address:    place?.address ?? dto.address,
             placeId:    place?.placeId ?? '',
             lat:        place?.lat ?? null,
             lon:        place?.lon ?? null,
@@ -73,12 +73,6 @@ export class EventsService {
     // word nooit vertrou nie. Geokodering is 'n verrykings-stap, nie 'n harde vereiste
     // nie -- as Geoapify af is of kwota op is, moet funksie-skepping/-opdatering steeds
     // deurgaan met net die rou adres-string.
-    // 'n Akademia-lokaal se adres is vas: stoor die kampus se adres presies so. Geoapify sou dit
-    // herformateer; ons gebruik sy resultaat dan net vir die kaartposisie (placeId, lat, lon).
-    private storedAddress(location: string, place: PlaceDetailsDto | null, fallback: string): string {
-        return findVenueByLocation(location)?.address ?? place?.address ?? fallback;
-    }
-
     private async resolvePlace(
         address: string,
         lat?: number,
@@ -366,7 +360,7 @@ export class EventsService {
         }
         if (address) {
             const place = await this.resolvePlace(address, lat, lon);
-            event.address = this.storedAddress(event.location, place, address);
+            event.address = place?.address ?? address;
             event.placeId = place?.placeId ?? event.placeId;
             event.lat     = place?.lat     ?? event.lat;
             event.lon     = place?.lon     ?? event.lon;

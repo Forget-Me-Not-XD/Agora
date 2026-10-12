@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Calendar, MapPin, Users, Clock, CheckCircle2, Star, Settings2 } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, CheckCircle2, Star } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import {
     TYPE_LABELS,
@@ -8,9 +8,10 @@ import {
     STATUS_TONE,
     STATUS_COLORS,
     deriveStatus,
+    eventDateKey,
+    eventTime,
     fillPercentage,
 } from '@/lib/event-view';
-import { formatEventDate } from '@/lib/metrics';
 import { Pill } from '@/components/ui/Pill';
 import RsvpModal from './RsvpModal';
 import PaymentModal from './PaymentModal';
@@ -21,11 +22,9 @@ interface EventCardProps {
     alreadyRsvpd?: boolean;
     isNew?: boolean;
     reviewState?: 'reviewable' | 'reviewed' | 'closed' | 'upcoming';
-    /** Die kyker het die geleentheid self geskep: wys "Bestuur" eerder as RSVP of 'n kaartjie */
-    manageable?: boolean;
 }
 
-export default function EventCard({ event, alreadyRsvpd = false, isNew = false, reviewState, manageable = false }: EventCardProps) {
+export default function EventCard({ event, alreadyRsvpd = false, isNew = false, reviewState }: EventCardProps) {
     const status  = deriveStatus(event);
     const fillPct = fillPercentage(event);
     const isFull       = fillPct >= 100;
@@ -65,7 +64,9 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false, 
                 <div className="space-y-1.5 mt-auto">
                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-subtle)]">
                         <Calendar size={12} className="shrink-0" />
-                        <span>{formatEventDate(event.date)}</span>
+                        <span>{eventDateKey(event)}</span>
+                        <Clock size={12} className="ml-1 shrink-0" />
+                        <span>{eventTime(event)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-subtle)]">
                         <MapPin size={12} className="shrink-0" />
@@ -73,7 +74,7 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false, 
                     </div>
                     <div className="flex items-center gap-2 text-xs text-[var(--color-text-subtle)]">
                         <Users size={12} className="shrink-0" />
-                        <span>{event.confirmedAttendees} / {event.maxCapacity} RSVPs</span>
+                        <span>{event.confirmedAttendees} / {event.maxCapacity} geregistreer</span>
                     </div>
                 </div>
 
@@ -122,16 +123,7 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false, 
                     </p>
                 )}
 
-                {manageable ? (
-                    // Die organiseerder RSVP nie vir sy eie geleentheid nie; hy wil sien wie kom
-                    <Link
-                        href={`/events/${event.id}#deelnemers`}
-                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-[var(--color-border)] text-[var(--color-text)] text-sm font-medium hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
-                    >
-                        <Settings2 size={15} />
-                        Bestuur geleentheid
-                    </Link>
-                ) : alreadyRsvpd ? (
+                {alreadyRsvpd ? (
                     <AlreadyRsvpdTag eventId={event.id} />
                 ) : event.sellsTickets ? (
                     <PaymentModal event={event} />
