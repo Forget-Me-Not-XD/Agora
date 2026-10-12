@@ -10,7 +10,7 @@ WORKDIR /app/apps/backend
 COPY apps/backend/package*.json ./
 RUN npm ci
 
-COPY apps/backend/tsconfig.json apps/backend/nest-cli.json ./
+COPY apps/backend/tsconfig.json apps/backend/tsconfig.build.json apps/backend/nest-cli.json ./
 COPY apps/backend/src ./src
 RUN npm run build && find ./dist -name '*.js.map' -delete
 
