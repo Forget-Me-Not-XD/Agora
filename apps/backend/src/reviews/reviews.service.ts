@@ -1,11 +1,12 @@
 // ========== Imports: ==========
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schemas/review.schema';
 import { Event, EventDocument } from '../events/schemas/event.schema';
 import { ReviewCategory } from '../events/schemas/review-category.schema';
 import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { Notification, NotificationDocument, NotificationType } from '../notifications/schemas/notification.schema';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { RatingInputDto } from './dto/rating-input.dto';
 import { PendingReviewDto } from './dto/pending-review.dto';
@@ -19,10 +20,13 @@ const REVIEW_WINDOW_MS = REVIEW_LIMITS.windowDays * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ReviewsService {
+    private readonly logger = new Logger(ReviewsService.name);
+
     constructor(
         @InjectModel(Review.name) private readonly reviewModel: Model<ReviewDocument>,
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
         @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
     ) {}
 
     async create(dto: CreateReviewDto, userId: string): Promise<ReviewDocument> {
@@ -37,6 +41,7 @@ export class ReviewsService {
         await this.lockReviewCategories(event);
 
         const review = await this.saveReview(event._id, userId, dto);
+        await this.removeReviewRequest(event._id, userId);
         await this.recalculateEventRating(event._id);
         return review;
     }
@@ -134,6 +139,11 @@ export class ReviewsService {
 
     async deleteByEvent(eventId: string): Promise<void> {
         await this.reviewModel.deleteMany({ event: eventId }).exec();
+    }
+
+    // Vir die resensieversoek-skeduleerder: wie reeds 'n resensie gegee het, kry nie meer een nie
+    findReviewerIds(eventId: Types.ObjectId): Promise<Types.ObjectId[]> {
+        return this.reviewModel.distinct('user', { event: eventId }).exec();
     }
 
     private async findEventOrThrow(eventId: string): Promise<EventDocument> {
@@ -248,6 +258,19 @@ export class ReviewsService {
                 throw new ConflictException('Jy het hierdie geleentheid reeds beoordeel');
             }
             throw err;
+        }
+    }
+
+    // Die versoek is beantwoord, so dit hoort nie meer tussen die gebruiker se kennisgewings nie.
+    // Die resensie is reeds gestoor, so 'n fout hier word net gelog. 'n 500 sou die gebruiker laat
+    // dink die resensie het misluk, en dan kry hulle 'n 409 as hulle weer probeer.
+    private async removeReviewRequest(eventId: Types.ObjectId, userId: string): Promise<void> {
+        try {
+            await this.notificationModel
+                .deleteMany({ userId: new Types.ObjectId(userId), event: eventId, type: NotificationType.RESENSIE_VERSOEK })
+                .exec();
+        } catch (err) {
+            this.logger.error(`Kon nie die resensieversoek vir gebruiker ${userId} verwyder nie: ${(err as Error).message}`);
         }
     }
 

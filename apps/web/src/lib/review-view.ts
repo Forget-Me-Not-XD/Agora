@@ -19,3 +19,16 @@ export function roundScore(score: number): number {
 export function formatScore(score: number): string {
     return roundScore(score).toFixed(1).replace('.', ',');
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Hoe lank die resensie-venster nog oop is. Ons rond op, so reg ná die geleentheid staan daar
+// "7 dae oor". Onder 24 uur sou dit "1 dag oor" bly selfs met net 'n uur oor, daarom wys ons dan
+// eerder "Minder as 'n dag oor".
+export function daysLeftLabel(closesAt: string, now: number): string {
+    const msLeft = new Date(closesAt).getTime() - now;
+    if (msLeft < DAY_MS) return "Minder as 'n dag oor";
+
+    const days = Math.ceil(msLeft / DAY_MS);
+    return days === 1 ? '1 dag oor' : `${days} dae oor`;
+}

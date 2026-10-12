@@ -25,6 +25,7 @@ import {
   formatEventTime,
 } from '../lib/event-status';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { NotificationBell } from '../components/NotificationBell';
 import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -133,7 +134,7 @@ export function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Page header ── */}
-      <ScreenHeader title="Kalender" />
+      <ScreenHeader title="Kalender" right={<NotificationBell />} />
 
       {/* ── View mode toggle ── */}
       <View style={styles.toggleRow}>

@@ -50,6 +50,21 @@ export function getReviewEligibility(eventId: string): Promise<ReviewEligibility
   return apiClient.get<ReviewEligibility>(`/reviews/eligibility/${encodeURIComponent(eventId)}`);
 }
 
+// Geleenthede wat die gebruiker bygewoon het en nog kan beoordeel. Die een wat eerste sluit, kom eerste.
+export interface PendingReview {
+  eventId: string;
+  title: string;
+  date: string;
+  endDate: string | null;
+  reviewCategories: ReviewCategory[];
+  closesAt: string;
+}
+
+// GET /reviews/pending
+export function getPendingReviews(): Promise<PendingReview[]> {
+  return apiClient.get<PendingReview[]>('/reviews/pending');
+}
+
 export interface CategorySummary {
   id: string;
   name: string;

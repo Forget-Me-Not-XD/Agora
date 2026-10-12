@@ -8,6 +8,7 @@ import type { TokenPair } from '../api/client';
 import { useEventsStore } from './events.store';
 import { useRsvpsStore } from './rsvps.store';
 import { usePredictionsStore } from './predictions.store';
+import { useNotificationsStore } from './notifications.store';
 import { getErrorMessage, getErrorStatus } from '../lib/errors';
 
 export type SsoProvider = 'google' | 'microsoft';
@@ -174,10 +175,11 @@ logout: async () => {
 
   // 'n Volgende sessie (moontlik 'n ander gebruiker, op dieselfde toestel
   // sonder om die app heeltemal toe te maak) mag nooit hierdie een se
-  // gekaste funksies/RSVPs/voorspellings selfs vlugtig sien nie.
+  // gekaste funksies/RSVPs/voorspellings/kennisgewings selfs vlugtig sien nie.
   useEventsStore.getState().reset();
   useRsvpsStore.getState().reset();
   usePredictionsStore.getState().reset();
+  useNotificationsStore.getState().reset();
 },
 
 clearError: () => set({ error: null }),

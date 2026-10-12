@@ -2,7 +2,7 @@
 
 // ========== Imports: ==========
 import { useEffect } from 'react';
-import { Bell, BellRing } from 'lucide-react';
+import { Bell, BellRing, Star } from 'lucide-react';
 import type { NotificationItem } from '@/lib/api/notifications';
 import { formatDateLong } from '@/lib/format-date';
 import { useNotificationsStore, useOpenNotification } from '@/lib/stores/notifications.store';
@@ -57,7 +57,9 @@ export default function NotificationsList({ initial }: { initial: NotificationIt
                     ].join(' ')}
                 >
                     <div className="mt-0.5 shrink-0">
-                        {item.read ? (
+                        {item.type === 'RESENSIE_VERSOEK' ? (
+                            <Star size={18} className={item.read ? 'text-[var(--color-text-subtle)]' : 'text-[var(--color-primary)]'} />
+                        ) : item.read ? (
                             <Bell size={18} className="text-[var(--color-text-subtle)]" />
                         ) : (
                             <BellRing size={18} className="text-[var(--color-primary)]" />

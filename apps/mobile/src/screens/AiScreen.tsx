@@ -14,6 +14,7 @@ import { formatEventTime, getEventStatus } from '../lib/event-status';
 import { useEventsStore } from '../stores/events.store';
 import { usePredictionsStore } from '../stores/predictions.store';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { NotificationBell } from '../components/NotificationBell';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 
@@ -97,7 +98,7 @@ export function AiScreen() {
   if (!canViewAi) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="KI Insigte" />
+        <ScreenHeader title="KI Insigte" right={<NotificationBell />} />
         <View style={styles.noAccessCard}>
           <Feather name="lock" size={28} color={colors.textSubtle} />
           <Text style={styles.noAccessTitle}>Toegang beperk</Text>
@@ -124,13 +125,16 @@ export function AiScreen() {
         title="KI Insigte"
         subtitle="LSTM voorspellingsmodel"
         right={
-          <TouchableOpacity
-            style={styles.insightsBtn}
-            onPress={() => navigation.navigate('Insights')}
-            accessibilityLabel="Wys prestasie-insigte"
-          >
-            <Feather name="bar-chart-2" size={16} color={colors.primary} />
-          </TouchableOpacity>
+          <>
+            <NotificationBell />
+            <TouchableOpacity
+              style={styles.insightsBtn}
+              onPress={() => navigation.navigate('Insights')}
+              accessibilityLabel="Wys prestasie-insigte"
+            >
+              <Feather name="bar-chart-2" size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </>
         }
       />
 

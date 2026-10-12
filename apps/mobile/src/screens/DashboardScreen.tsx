@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -14,8 +14,11 @@ import { getEventStatus, formatFullDate, formatEventTime, formatEventDate } from
 import { useEventsStore } from '../stores/events.store';
 import { useRsvpsStore } from '../stores/rsvps.store';
 import { usePredictionsStore } from '../stores/predictions.store';
+import { useNotificationsStore } from '../stores/notifications.store';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ProfileModal } from '../components/ProfileModal';
+import { NotificationBell } from '../components/NotificationBell';
+import { PendingReviewsCard } from '../components/PendingReviewsCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { typography } from '../theme/typography';
 
@@ -27,6 +30,9 @@ export function DashboardScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [aiInfoOpen, setAiInfoOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // Die resensievel is deursigtig en lê bo-oor Tuis, so TalkBack moet dan nie hierdie skerm lees nie
+  const isFocused = useIsFocused();
 
   const isStaff = user?.role === 'ADMIN' || user?.role === 'DOSENT';
 
@@ -43,6 +49,8 @@ export function DashboardScreen() {
   const ensureRsvpsLoaded = useRsvpsStore((s) => s.ensureLoaded);
   const myRsvps = isStaff ? [] : storeRsvps;
 
+  const loadNotifications = useNotificationsStore((s) => s.load);
+
   const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
 
@@ -56,7 +64,10 @@ export function DashboardScreen() {
       if (!user) return;
       ensureEventsLoaded().catch(() => {});
       if (!isStaff) ensureRsvpsLoaded().catch(() => {});
-    }, [user?.id, isStaff, ensureEventsLoaded, ensureRsvpsLoaded]),
+      // Hou die klokkie se telling vars. Daar is geen poll op mobiel nie, so dit is een van die
+      // plekke waar dit herlaai.
+      loadNotifications();
+    }, [user?.id, isStaff, ensureEventsLoaded, ensureRsvpsLoaded, loadNotifications]),
   );
 
   // Die KI-voorspelling is per-funksie, so dit volg eers sodra ons weet wat
@@ -118,12 +129,13 @@ export function DashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} importantForAccessibility={isFocused ? 'auto' : 'no-hide-descendants'}>
       <ScreenHeader
         title={`Goeie dag, ${user.name}`}
         subtitle={`${roleLabel}${user.studyCenter ? ` • ${user.studyCenter}` : ''}`}
         right={
           <>
+            <NotificationBell />
             <TouchableOpacity
               style={styles.avatarBtn}
               onPress={() => setProfileOpen(true)}
@@ -143,6 +155,10 @@ export function DashboardScreen() {
         }
       />
       <ScrollView contentContainerStyle={styles.scroll}>
+
+        {/* Buite die laai-hek hieronder, sodat 'n fout met die funksies dit nie ook wegsteek nie.
+            Nie vir dosente en admins nie, soos die web wat dit net op die AttendeeDashboard wys. */}
+        {!isStaff && <PendingReviewsCard style={styles.pendingReviews} />}
 
         {loading && (
           <View style={styles.card}>
@@ -407,6 +423,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     scroll: { paddingHorizontal: 16, paddingBottom: 24 },
+    pendingReviews: { marginBottom: 14 },
 
     avatarBtn: {
       width: 36,

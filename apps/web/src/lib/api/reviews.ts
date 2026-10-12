@@ -93,6 +93,29 @@ export async function getMyReviewState(): Promise<MyReviewState> {
     return res.json() as Promise<MyReviewState>;
 }
 
+// Geleenthede wat die gebruiker bygewoon het en nog kan beoordeel. Die een wat eerste sluit, kom eerste.
+export interface PendingReview {
+    eventId:          string;
+    title:            string;
+    date:             string;
+    endDate:          string | null;
+    reviewCategories: ReviewCategory[];
+    closesAt:         string;
+}
+
+// GET /api/v1/reviews/pending
+export async function getPendingReviews(): Promise<PendingReview[]> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/reviews/pending`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) await throwHttpError(res);
+    return res.json() as Promise<PendingReview[]>;
+}
+
 export interface CategorySummary {
     id:           string;
     name:         string;

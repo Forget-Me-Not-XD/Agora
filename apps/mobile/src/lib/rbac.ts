@@ -33,10 +33,6 @@ export function canRsvpToEvent(role: UserRole): boolean {
   return role === 'STUDENT' || role === 'GAS';
 }
 
-export function canViewNotifications(role: UserRole): boolean {
-  return role === 'PHOTOGRAPHER';
-}
-
 export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     ADMIN: 'Administrateur',
