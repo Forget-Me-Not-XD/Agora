@@ -3,6 +3,10 @@ stages:
 
 .build_template:
   stage: build
+  # Only the in-cluster k3s runner (kubernetes executor) may take these jobs: DOCKER_HOST below
+  # relies on dind sharing the job's pod network, which a docker-executor runner doesn't do.
+  tags:
+    - k3s-arm64
   image: docker:27
   services:
     - name: docker:27-dind
