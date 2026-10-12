@@ -21,7 +21,7 @@ interface EventCardProps {
     alreadyRsvpd?: boolean;
     isNew?: boolean;
     reviewState?: 'reviewable' | 'reviewed' | 'closed' | 'upcoming';
-    /** Die kyker het die geleentheid geskep (of is admin): wys "Bestuur" eerder as RSVP */
+    /** Die kyker het die geleentheid self geskep: wys "Bestuur" eerder as RSVP of 'n kaartjie */
     manageable?: boolean;
 }
 

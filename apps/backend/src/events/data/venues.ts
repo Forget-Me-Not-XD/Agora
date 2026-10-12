@@ -45,7 +45,7 @@ const CAMPUS_ADDRESSES: Record<string, string> = {
     'Centurion - Gerhard straat': '117 Gerhard Street, Lyttleton L.H., Centurion, 0163, South Africa',
     'Paarl':                      '1 Breda Street, Drakenstein, Paarl, 7622, South Africa',
     'George':                     '100 Meade Street, George Central, George, 6530, South Africa',
-    'Somerset Wes':               '82 Firmount Road, Greenway Rise, Cape Town, 6665',
+    'Somerset Wes':               '82 Firmount Road, Greenway Rise, Somerset West, 7130, South Africa',
 };
 
 // Slugify die kode om dit na 'n skoon adres te maak

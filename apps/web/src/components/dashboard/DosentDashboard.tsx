@@ -6,18 +6,37 @@ import TopEventsBarChart from '@/components/charts/TopEventsBarChart';
 import MyEventsTable from './MyEventsTable';
 import AttentionList from './AttentionList';
 import NextEventCard from './NextEventCard';
-import { getEvents } from '@/lib/api/events';
+import { LoadError } from '@/components/ui/LoadError';
+import { getEvents, type Event } from '@/lib/api/events';
+import { deriveStatus } from '@/lib/event-view';
 import type { RsvpPerEvent } from '@/lib/api/analytics';
 import { METRICS, attentionItems, fillRateBand, metricHelp, topEventsInsight } from '@/lib/metrics';
 
 export default async function DosentDashboard({ userId }: { userId: string }) {
-    const visible = await getEvents().catch(() => []);
+    const visible = await getEvents().catch(() => null);
+
+    // Alles op hierdie paneelbord kom uit hierdie een versoek. Sonder dit sou elke kaart nul wys
+    // en die aandag-lys "Alles lyk goed" sê, so wys eerder net die fout.
+    if (!visible) {
+        return (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
+                <LoadError what="jou geleenthede" />
+            </div>
+        );
+    }
+
     const myEvents = visible.filter((e) => e.createdBy === userId);
 
     const now = new Date();
+    const byStart = (a: Event, b: Event) => new Date(a.date).getTime() - new Date(b.date).getTime();
     const upcoming = myEvents
         .filter((e) => new Date(e.date).getTime() >= now.getTime())
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        .sort(byStart);
+    // Die volgende geleentheid is die eerste een wat nog nie verby is nie, ook een wat nou aan die
+    // gang is: dan het die dosent die deelnemers-kortpad die nodigste, om mense in te teken.
+    const nextEvent = myEvents
+        .filter((e) => deriveStatus(e) === 'ongoing' || deriveStatus(e) === 'upcoming')
+        .sort(byStart)[0] ?? null;
     const totalRsvps = myEvents.reduce((s, e) => s + e.confirmedAttendees, 0);
     const withCapacity = myEvents.filter((e) => e.maxCapacity > 0);
     const avgFillRate = withCapacity.length > 0
@@ -60,7 +79,7 @@ export default async function DosentDashboard({ userId }: { userId: string }) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-                <NextEventCard event={upcoming[0] ?? null} />
+                <NextEventCard event={nextEvent} />
                 <ChartCard
                     title="Jou gewildste geleenthede"
                     subtitle="Jou 5 geleenthede met die meeste RSVPs"

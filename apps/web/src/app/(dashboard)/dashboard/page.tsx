@@ -7,7 +7,7 @@ import { getEvents } from '@/lib/api/events';
 import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getBudgetPerMonth, getTicketRevenueSummary, getRevenuePerEvent, getRevenuePerMonth, getRevenueTrend, getRsvpsTrend, getRsvpStatusBreakdown } from '@/lib/api/analytics';
 import { mergeMonthlySeries, mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import { AF_MONTHS_LONG } from '@/lib/format-date';
-import { canManageEvent } from '@/lib/rbac';
+import { isEventOrganiser } from '@/lib/rbac';
 import {
     METRICS,
     RSVP_STATUS_HELP,
@@ -35,6 +35,7 @@ import AttentionList from '@/components/dashboard/AttentionList';
 import DosentDashboard from '@/components/dashboard/DosentDashboard';
 import AttendeeDashboard from '@/components/dashboard/AttendeeDashboard';
 import AutoRefresh from '@/components/AutoRefresh';
+import { LoadError } from '@/components/ui/LoadError';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,7 +139,13 @@ async function AdminDashboard() {
     const revenueTrend = revenueTrendRes.status === 'fulfilled' ? revenueTrendRes.value : null;
     const rsvpsTrend = rsvpsTrendRes.status === 'fulfilled' ? rsvpsTrendRes.value : null;
     const rsvpStatusBreakdown = rsvpStatusBreakdownRes.status === 'fulfilled' ? rsvpStatusBreakdownRes.value : [];
-    const attentionEvents = attentionEventsRes.status === 'fulfilled' ? attentionEventsRes.value : [];
+    // null (nie []) as die versoek misluk het: 'n leë lys sou "Alles lyk goed" wys
+    const attentionEvents = attentionEventsRes.status === 'fulfilled' ? attentionEventsRes.value : null;
+
+    // Die leë reekse hierbo hou die grafieke aan die gang, maar 'n mislukte versoek mag nie as
+    // "geen data" of "0%" gelees word nie. Elke grafiek wys eerder 'n fout as sy bron misluk het.
+    const failed = (res: PromiseSettledResult<unknown>) => res.status === 'rejected';
+    const monthlyFailed = failed(eventsSummaryRes) || failed(rsvpsPerMonthRes);
 
     const monthly = mergeMonthlySeries(eventsSummary?.eventsPerMonth ?? [], rsvpsPerMonth);
     const monthlyBudget = mergeSingleMonthlySeries(budgetPerMonth);
@@ -146,7 +153,7 @@ async function AdminDashboard() {
 
     const topEvents = eventsSummary?.top5Events ?? [];
     const rsvpStatusTotal = rsvpStatusBreakdown.reduce((s, d) => s + d.count, 0);
-    const fillRatePct = Math.round((rsvpSummary?.averageFillRate ?? 0) * 100);
+    const fillRatePct = rsvpSummary ? Math.round(rsvpSummary.averageFillRate * 100) : null;
     const ticketsSold = ticketRevenueSummary?.totalTicketsSold ?? 0;
 
     // Die KPI's vergelyk kalendermaande, so noem die maande eerder as "hierdie maand"
@@ -163,17 +170,19 @@ async function AdminDashboard() {
             <ChartCard
                 title="Geleenthede vs RSVPs"
                 subtitle="Afgelope 12 maande"
-                insight={eventsVsRsvpsInsight(monthly)}
+                insight={monthlyFailed ? null : eventsVsRsvpsInsight(monthly)}
                 help={{
                     title: 'Geleenthede vs RSVPs',
                     what: 'Die rooi area is hoeveel geleenthede elke maand plaasgevind het (linkeras); die blou area is hoeveel RSVPs in daardie maand gemaak is (regteras). As die twee saam styg en daal, trek geleenthede ewe veel mense.',
                     how: 'Maande word gemerk as die RSVPs baie meer ("Bo verwagting") of baie minder ("Onder verwagting") is as wat die aantal geleenthede daardie maand laat verwag. Kyk na daardie maande om te sien wat anders was.',
                 }}
             >
-                <EventsRsvpsAreaChart data={monthly} trend={rsvpsTrend} />
+                {monthlyFailed
+                    ? <LoadError what="die maandelikse syfers" />
+                    : <EventsRsvpsAreaChart data={monthly} trend={rsvpsTrend} />}
             </ChartCard>
 
-            <AttentionList items={attentionItems(attentionEvents, now)} />
+            <AttentionList items={attentionEvents ? attentionItems(attentionEvents, now) : null} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
@@ -237,37 +246,43 @@ async function AdminDashboard() {
                     <ChartCard
                         title="RSVPs per maand"
                         subtitle="Afgelope 12 maande"
-                        insight={monthlyTrendInsight(monthly.map((p) => ({ label: p.label, value: p.b })), describeRsvps)}
+                        insight={failed(rsvpsPerMonthRes) ? null : monthlyTrendInsight(monthly.map((p) => ({ label: p.label, value: p.b })), describeRsvps)}
                         help={{
                             title: 'RSVPs per maand',
                             what: 'Elke staaf is die aantal RSVPs wat in daardie maand gemaak is. Die stippellyn is die gemiddeld van die volledige maande, sodat jy dadelik sien of \'n maand goed of swak was. Die ligter staaf is hierdie maand, wat nog nie klaar is nie.',
                             how: 'Beweeg oor \'n staaf om ook te sien hoeveel geleenthede daardie maand was en hoeveel RSVPs elkeen gemiddeld gekry het.',
                         }}
                     >
-                        <RsvpsPerMonthChart data={monthly} />
+                        {failed(rsvpsPerMonthRes)
+                            ? <LoadError what="die RSVPs per maand" />
+                            : <RsvpsPerMonthChart data={monthly} />}
                     </ChartCard>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                         <ChartCard
                             title="Gewildste geleenthede"
                             subtitle="Die 5 geleenthede met die meeste RSVPs"
-                            insight={topEventsInsight(topEvents)}
+                            insight={eventsSummary ? topEventsInsight(topEvents) : null}
                             help={{
                                 title: 'Gewildste geleenthede',
                                 what: 'Die vyf geleenthede met die meeste RSVPs nog ooit. Gebruik dit om te sien watter soort geleenthede mense trek.',
                             }}
                         >
-                            <TopEventsBarChart data={topEvents} />
+                            {eventsSummary
+                                ? <TopEventsBarChart data={topEvents} />
+                                : <LoadError what="die gewildste geleenthede" />}
                         </ChartCard>
                         <ChartCard
                             title="RSVP-status"
                             subtitle="Hoe alle RSVPs tans verdeel is"
-                            value={rsvpStatusTotal}
+                            value={failed(rsvpStatusBreakdownRes) ? undefined : rsvpStatusTotal}
                             valueLabel="RSVPs in totaal"
-                            insight={rsvpStatusInsight(rsvpStatusBreakdown)}
+                            insight={failed(rsvpStatusBreakdownRes) ? null : rsvpStatusInsight(rsvpStatusBreakdown)}
                             help={RSVP_STATUS_HELP}
                         >
-                            <RsvpStatusBreakdown data={rsvpStatusBreakdown} />
+                            {failed(rsvpStatusBreakdownRes)
+                                ? <LoadError what="die RSVP-status" />
+                                : <RsvpStatusBreakdown data={rsvpStatusBreakdown} />}
                         </ChartCard>
                     </div>
                 </div>
@@ -279,22 +294,26 @@ async function AdminDashboard() {
                     <ChartCard
                         title="Gemiddelde vulkoers"
                         subtitle="Oor alle geleenthede"
-                        insight={fillRateInsight(fillRatePct)}
+                        insight={fillRatePct === null ? null : fillRateInsight(fillRatePct)}
                         help={metricHelp(METRICS.fillRate)}
                     >
-                        <FillRateDonut percent={fillRatePct} />
+                        {fillRatePct === null
+                            ? <LoadError what="die vulkoers" />
+                            : <FillRateDonut percent={fillRatePct} />}
                     </ChartCard>
                     <ChartCard
                         title="Begroting per maand"
                         subtitle="Totale toegekende begroting van die geleenthede in elke maand"
                         className="lg:col-span-2"
-                        insight={monthlyTrendInsight(monthlyBudget, formatRand, 'begroting')}
+                        insight={failed(budgetPerMonthRes) ? null : monthlyTrendInsight(monthlyBudget, formatRand, 'begroting')}
                         help={{
                             title: 'Begroting per maand',
                             what: 'Die som van die begrotings wat aan geleenthede toegeken is, volgens die maand waarin die geleentheid plaasvind. Dit is die toegekende bedrag, nie wat werklik spandeer is nie.',
                         }}
                     >
-                        <BudgetTrendChart data={monthlyBudget} />
+                        {failed(budgetPerMonthRes)
+                            ? <LoadError what="die begroting per maand" />
+                            : <BudgetTrendChart data={monthlyBudget} />}
                     </ChartCard>
                 </div>
             </section>
@@ -379,7 +398,7 @@ async function EventsPreview() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {events.slice(0, 6).map((event) => (
-                <EventCard key={event.id} event={event} manageable={canManageEvent(user, event)} />
+                <EventCard key={event.id} event={event} manageable={isEventOrganiser(user, event)} />
             ))}
         </div>
     );

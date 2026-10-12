@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { BellRing, CheckCircle2, ChevronRight, ClipboardX, ScanLine, UserMinus, Users, type LucideIcon } from 'lucide-react';
 import { IconChip } from '@/components/ui/IconChip';
+import { LoadError } from '@/components/ui/LoadError';
 import type { AttentionItem, AttentionKind } from '@/lib/metrics';
 
 const KIND_ICON: Record<AttentionKind, LucideIcon> = {
@@ -14,9 +15,10 @@ const KIND_ICON: Record<AttentionKind, LucideIcon> = {
 /**
  * Bo-aan die dashboard: geleenthede waaroor die organiseerder nou iets moet doen. Die reëls
  * self is in attentionItems (lib/metrics). As niks aandag nodig het nie, sê ons dit ook, sodat
- * die gebruiker weet die toets het gehardloop.
+ * die gebruiker weet die toets het gehardloop. `null` beteken die geleenthede kon nie laai nie:
+ * dan weet ons nie of iets aandag nodig het nie, so ons sê dit eerder as "Alles lyk goed".
  */
-export default function AttentionList({ items }: { items: AttentionItem[] }) {
+export default function AttentionList({ items }: { items: AttentionItem[] | null }) {
     return (
         <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 space-y-3">
             <div className="flex items-center gap-3">
@@ -29,7 +31,9 @@ export default function AttentionList({ items }: { items: AttentionItem[] }) {
                 </div>
             </div>
 
-            {items.length === 0 ? (
+            {items === null ? (
+                <LoadError what="die geleenthede" />
+            ) : items.length === 0 ? (
                 <p className="flex items-center gap-2 text-sm text-[var(--color-text-subtle)]">
                     <CheckCircle2 size={16} className="text-[var(--color-green)] shrink-0" />
                     Alles lyk goed. Geen geleenthede het nou aandag nodig nie.

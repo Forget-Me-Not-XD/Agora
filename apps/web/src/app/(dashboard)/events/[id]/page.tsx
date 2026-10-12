@@ -7,7 +7,7 @@ import { getUsersByIds } from '@/lib/api/users';
 import { getEventRsvps, getMyRsvps } from '@/lib/api/rsvp';
 import { getReviewEligibility, getReviewSummary } from '@/lib/api/reviews';
 import { getCurrentUser } from '@/lib/get-current-user';
-import { canManageEvent as canManage } from '@/lib/rbac';
+import { canManageEvent as canManage, isEventOrganiser } from '@/lib/rbac';
 import { deriveStatus } from '@/lib/event-view';
 import { fillRateBand, percent } from '@/lib/metrics';
 import { getToken } from '@/lib/session';
@@ -38,6 +38,9 @@ export default async function EventDetailPage({ params }: { params: { id: string
 
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
     const canManageEvent = canManage(user, event);
+    // Net die skepper self RSVP nie en koop nie 'n kaartjie nie, soos op die geleentheidskaart.
+    // 'n Admin wat dit nie geskep het nie, sien die bestuurspanele en kan steeds self RSVP.
+    const isOrganiser = isEventOrganiser(user, event);
     const status = deriveStatus(event);
     // die begroting is sigbaar vir bestuurders van die geleentheid, en vir die
     // gebruiker met die Finansies-tag wat spesifiek hieraan toegeken is
@@ -129,7 +132,7 @@ export default async function EventDetailPage({ params }: { params: { id: string
                 )}
 
                 {/* Gratis geleenthede: RSVP hier, nie net vanaf die lys nie */}
-                {!canManageEvent && !event.sellsTickets && status !== 'past' && (
+                {!isOrganiser && !event.sellsTickets && status !== 'past' && (
                     <div className="pt-2 max-w-xs">
                         {alreadyRsvpd ? <AlreadyRsvpdTag eventId={event.id} /> : <RsvpModal event={event} />}
                     </div>
@@ -168,9 +171,11 @@ export default async function EventDetailPage({ params }: { params: { id: string
                         <span className="text-[var(--color-text-subtle)]">Beskikbaar</span>
                         <span className="font-medium text-[var(--color-text)]">{event.ticketsAvailable}</span>
                     </div>
-                    <div className="pt-1">
-                        {alreadyRsvpd ? <AlreadyRsvpdTag eventId={event.id} /> : <PaymentModal event={event} />}
-                    </div>
+                    {!isOrganiser && (
+                        <div className="pt-1">
+                            {alreadyRsvpd ? <AlreadyRsvpdTag eventId={event.id} /> : <PaymentModal event={event} />}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -15,7 +15,9 @@ interface HeaderProps {
 }
 
 export default function Header({ navOpen, onMenuClick }: HeaderProps) {
-    const { theme, setTheme } = useTheme();
+    // resolvedTheme is wat werklik op die skerm is. theme kan "system" wees, en dan sê dit nie of
+    // die stelsel donker of lig is nie: die knoppie het dan "donker modus" aangebied op 'n donker skerm.
+    const { resolvedTheme, setTheme } = useTheme();
     const user = useCurrentUser();
     const [isPending, startTransition] = useTransition();
     const [mounted, setMounted] = useState(false);
@@ -33,7 +35,7 @@ export default function Header({ navOpen, onMenuClick }: HeaderProps) {
         });
     }
 
-    const isDark = mounted && theme === 'dark';
+    const isDark = mounted && resolvedTheme === 'dark';
     const themeLabel = isDark ? 'Skakel oor na ligte modus' : 'Skakel oor na donker modus';
 
     return (
@@ -53,7 +55,7 @@ export default function Header({ navOpen, onMenuClick }: HeaderProps) {
             <div className="flex items-center gap-2 ml-auto">
                 <NotificationBell />
                 <button
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    onClick={() => setTheme(isDark ? 'light' : 'dark')}
                     className="p-2 rounded-lg text-[var(--color-text-subtle)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)] transition-colors"
                     title={themeLabel}
                     aria-label={themeLabel}

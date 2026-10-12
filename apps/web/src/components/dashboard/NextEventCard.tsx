@@ -4,6 +4,7 @@ import { CalendarClock, MapPin, Pencil, Users } from 'lucide-react';
 import type { Event } from '@/lib/api/events';
 import { IconChip } from '@/components/ui/IconChip';
 import { Pill, TONE_VAR } from '@/components/ui/Pill';
+import { deriveStatus } from '@/lib/event-view';
 import { fillRateBand, formatEventDate, percent, relativeDay } from '@/lib/metrics';
 
 /** Vir die dosent: sy eerste opkomende geleentheid, met hoe vol dit is en die twee aksies wat hy nodig het. */
@@ -24,13 +25,15 @@ export default function NextEventCard({ event }: { event: Event | null }) {
 
     const fill = percent(event.confirmedAttendees, event.maxCapacity);
     const band = fill !== null ? fillRateBand(fill) : null;
+    // DosentDashboard stuur ook 'n geleentheid wat reeds begin het; "vandag" sou dan onduidelik wees
+    const ongoing = deriveStatus(event) === 'ongoing';
 
     return (
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex flex-col gap-4">
             <div className="flex items-center gap-2">
                 <IconChip tone="blue" size="sm"><CalendarClock size={14} /></IconChip>
                 <p className="text-xs font-medium text-[var(--color-text-subtle)]">
-                    Jou volgende geleentheid · {relativeDay(event.date)}
+                    {ongoing ? 'Nou aan die gang' : `Jou volgende geleentheid · ${relativeDay(event.date)}`}
                 </p>
             </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 // ========== Imports: ==========
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, MapPin, FileText, Wallet, Star, type LucideIcon } from 'lucide-react';
 import { IconChip } from '@/components/ui/IconChip';
@@ -18,6 +18,7 @@ import TimeRangeInput from '@/components/TimeRangeInput';
 import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
 import ReviewCategoryEditor from '@/components/ReviewCategoryEditor';
 import type { Venue } from '@/lib/api/events';
+import { toSastIso } from '@/lib/format-date';
 import {
     createDraft,
     hasReviewCategoryErrors,
@@ -64,6 +65,14 @@ function venueLocation(venue: Venue): string {
     return `${venue.campus} - ${venue.label}`;
 }
 
+// Die vorm het noValidate, so die blaaier keur nie self 12.5 of 10.555 af nie. Die backend sou
+// dit met 'n Engelse fout weier (heelgetal) of net so stoor (bedrag), so ons toets die teks self.
+const WHOLE_NUMBER = /^\d+$/;
+const RAND_AMOUNT  = /^\d+(\.\d{1,2})?$/;
+
+// Voorstelle van die KI-panele kan breuke wees; rond af na wat die vorm self sou aanvaar
+const toRandString = (value: number) => String(Math.round(value * 100) / 100);
+
 export default function EventForm({ mode, eventId, initialValues, ratingCount = 0 }: EventFormProps) {
     const router = useRouter();
     const user = useCurrentUser();
@@ -86,6 +95,12 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
     const [venuesError, setVenuesError] = useState<string | null>(null);
     const [useVenue, setUseVenue] = useState(mode === 'create');
     const [venueId, setVenueId] = useState('');
+    // Het die gebruiker al self aan die ligging geraak? Dan mag die lokale wat (dalk stadig) laai
+    // nie meer die keuse oorskryf nie. 'n Ref, want dit verander niks op die skerm nie.
+    const locationTouched = useRef(false);
+
+    const aiPanelRef = useRef<HTMLDivElement>(null);
+    const aiPanelFits = useFitsInScrollArea(aiPanelRef);
 
     useEffect(() => {
         getVenuesAction().then((result) => {
@@ -99,7 +114,7 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
             setVenues(loaded);
 
             const existing = loaded.find((v) => venueLocation(v) === initialValues.location);
-            if (existing) {
+            if (existing && !locationTouched.current) {
                 setUseVenue(true);
                 setVenueId(existing.id);
                 setFormData((prev) => ({ ...prev, studyCenter: existing.campus }));
@@ -141,20 +156,25 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
             if (!selectedVenue) e.location = "Kies asseblief 'n lokaal";
         } else {
             if (!formData.location.trim()) e.location = 'Ligging is verpligtend';
-            if (mode === 'create' && !formData.placeId) e.address = 'Kies \'n geldige adres uit die soeklys';
+            // 'n Nuwe geleentheid moet 'n adres uit die soeklys hê. 'n Bestaande een mag sy ou adres
+            // hou (ouer geleenthede het dalk geen placeId nie), maar nie sonder adres gestoor word
+            // nie: ná 'n wissel na "Ander plek" is die adres leeg, en die backend weier 'n leë adres.
+            if (!formData.placeId && (mode === 'create' || !formData.address.trim())) {
+                e.address = 'Kies \'n geldige adres uit die soeklys';
+            }
         }
-        if (!formData.capacity || Number(formData.capacity) <= 0)
-            e.capacity = 'Geldige kapasiteit is verpligtend';
-        if (useVenue && selectedVenue && Number(formData.capacity) > selectedVenue.maxCapacity) {
+        if (!WHOLE_NUMBER.test(formData.capacity) || Number(formData.capacity) <= 0)
+            e.capacity = 'Kapasiteit moet \'n heelgetal groter as 0 wees';
+        else if (useVenue && selectedVenue && Number(formData.capacity) > selectedVenue.maxCapacity) {
             e.capacity = `${selectedVenue.label} se kapasiteit is ${selectedVenue.maxCapacity} - kies 'n groter lokaal of verlaag die kapasiteit`;
         }
-        if (formData.budget === '' || Number(formData.budget) < 0)
-            e.budget = 'Geldige begroting is verpligtend';
+        if (!RAND_AMOUNT.test(formData.budget))
+            e.budget = 'Begroting moet 0 of meer wees, met hoogstens 2 desimale';
         if (formData.sellsTickets) {
-            if (!formData.ticketPrice || Number(formData.ticketPrice) <= 0)
-                e.ticketPrice = 'Geldige kaartjieprys is verpligtend';
-            if (!formData.ticketsAvailable || Number(formData.ticketsAvailable) <= 0)
-                e.ticketsAvailable = 'Geldige aantal kaartjies is verpligtend';
+            if (!RAND_AMOUNT.test(formData.ticketPrice) || Number(formData.ticketPrice) <= 0)
+                e.ticketPrice = 'Kaartjieprys moet meer as R0 wees, met hoogstens 2 desimale';
+            if (!WHOLE_NUMBER.test(formData.ticketsAvailable) || Number(formData.ticketsAvailable) <= 0)
+                e.ticketsAvailable = 'Aantal kaartjies moet \'n heelgetal groter as 0 wees';
         }
         return e;
     }
@@ -176,8 +196,8 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
             const payload = {
                 title:              formData.title,
                 description:        formData.description,
-                date:               `${formData.date}T${formData.time}`,
-                endDate:            `${formData.date}T${formData.endTime}`,
+                date:               toSastIso(formData.date, formData.time),
+                endDate:            toSastIso(formData.date, formData.endTime),
                 location:           atVenue ? venueLocation(selectedVenue) : formData.location,
                 address:            atVenue ? selectedVenue.address : formData.address,
                 placeId:            atVenue ? undefined : (formData.placeId || undefined),
@@ -233,6 +253,7 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
 
     function handleUseVenue(next: boolean) {
         if (next === useVenue) return;
+        locationTouched.current = true;
         setUseVenue(next);
         setVenueId('');
         // Wat vir die een opsie ingevul is, geld nie vir die ander nie
@@ -241,12 +262,14 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
     }
 
     function handleCampusChange(campus: string) {
+        locationTouched.current = true;
         setFormData((prev) => ({ ...prev, studyCenter: campus }));
         setVenueId('');
         clearErrors('location');
     }
 
     function handleVenueChange(id: string) {
+        locationTouched.current = true;
         setVenueId(id);
         const venue = campusVenues.find((v) => v.id === id);
         // Die lokaal se maksimum is 'n goeie begin; die dosent kan dit nog verlaag
@@ -262,17 +285,17 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
     }
 
     function handleApplyBudget(budget: number) {
-        setFormData((prev) => ({ ...prev, budget: String(budget) }));
+        setFormData((prev) => ({ ...prev, budget: toRandString(budget) }));
         if (errors.budget) setErrors((prev) => ({ ...prev, budget: '' }));
     }
 
     function handleApplyAlternative(date: string, capacity: number) {
-        setFormData((prev) => ({ ...prev, date, capacity: String(capacity) }));
+        setFormData((prev) => ({ ...prev, date, capacity: String(Math.round(capacity)) }));
         setErrors((prev) => ({ ...prev, date: '', capacity: '' }));
     }
 
     function handleApplySandbox(date: string, capacity: number, budget: number) {
-        setFormData((prev) => ({ ...prev, date, capacity: String(capacity), budget: String(budget) }));
+        setFormData((prev) => ({ ...prev, date, capacity: String(Math.round(capacity)), budget: toRandString(budget) }));
         setErrors((prev) => ({ ...prev, date: '', capacity: '', budget: '' }));
     }
 
@@ -486,7 +509,10 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
                                             type="text"
                                             placeholder="Saal, gebou, ens..."
                                             value={formData.location}
-                                            onChange={(e) => handleChange('location', e.target.value)}
+                                            onChange={(e) => {
+                                                locationTouched.current = true;
+                                                handleChange('location', e.target.value);
+                                            }}
                                             className={inputClass('location')}
                                         />
                                         <FieldError message={errors.location} />
@@ -497,6 +523,7 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
                                         <AddressAutocompleteInput
                                             initialAddress={formData.address}
                                             onSelect={(details) => {
+                                                locationTouched.current = true;
                                                 setFormData((prev) => ({
                                                     ...prev,
                                                     placeId: details?.placeId ?? '',
@@ -646,8 +673,10 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
                 </div>
             </form>
 
-            {/* Die KI-panele bly langs die vorm sigbaar terwyl jy afrol */}
-            <div className="space-y-6 xl:sticky xl:top-0">
+            {/* Die KI-panele bly langs die vorm sigbaar terwyl jy afrol, maar net as hulle in die
+                skerm pas. 'n Hoër paneel sou vassit met sy onderkant buite die skerm, en dan kom jy
+                eers daarby uit wanneer die vorm self op sy einde is. */}
+            <div ref={aiPanelRef} className={`space-y-6 ${aiPanelFits ? 'xl:sticky xl:top-0' : ''}`}>
                 <EventPredictionPanel
                     date={formData.date}
                     capacity={formData.capacity}
@@ -662,6 +691,30 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
             </div>
         </div>
     );
+}
+
+/**
+ * Pas die element in die hoogte van die bladsy se rol-area (<main>)? Kyk weer wanneer een van die
+ * twee van grootte verander, bv. as 'n voorspelling laai of die venster kleiner word. 'n Rol-balk
+ * binne die paneel sou die DatePicker se oopvou-kalender afsny, daarom eerder net nie sticky nie.
+ */
+function useFitsInScrollArea(ref: React.RefObject<HTMLElement>): boolean {
+    const [fits, setFits] = useState(true);
+
+    useEffect(() => {
+        const element = ref.current;
+        const scrollArea = element?.closest('main');
+        if (!element || !scrollArea) return;
+
+        const check = () => setFits(element.offsetHeight <= scrollArea.clientHeight);
+        check();
+        const observer = new ResizeObserver(check);
+        observer.observe(element);
+        observer.observe(scrollArea);
+        return () => observer.disconnect();
+    }, [ref]);
+
+    return fits;
 }
 
 // ── Klein boustene vir die vorm ──

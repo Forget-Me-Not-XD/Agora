@@ -8,7 +8,7 @@ import InfoModal from '@/components/InfoModal';
 import DateRangePicker from '@/components/DateRangePicker';
 import { toIsoRange } from '@/lib/date-range';
 import ExportCsvButton from '@/components/ExportCsvButton';
-import { canCreateEvents, canManageEvent, getRoleLabel } from '@/lib/rbac';
+import { canCreateEvents, getRoleLabel, isEventOrganiser } from '@/lib/rbac';
 import { ATTENDANCE_OPTIONS } from '@/lib/attendance';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
@@ -425,7 +425,7 @@ export default function EventsPage() {
                             event={event}
                             alreadyRsvpd={rsvpdEventIds.has(event.id)}
                             isNew={event.id === newEventId}
-                            manageable={canManageEvent(user, event)}
+                            manageable={isEventOrganiser(user, event)}
                             reviewState={
                                 reviewableEventIds.has(event.id) ? 'reviewable'
                                 : reviewedEventIds.has(event.id) ? 'reviewed'

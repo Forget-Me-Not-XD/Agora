@@ -70,7 +70,7 @@ export class CreateEventDto {
     maxCapacity!: number;
 
     @IsOptional()
-    @IsNumber()
+    @IsNumber({ maxDecimalPlaces: 2 }, { message: '$property mag hoogstens 2 desimale hê' })
     @Min(0)
     budget?: number;
 
@@ -101,7 +101,7 @@ export class CreateEventDto {
     sellsTickets?: boolean;
 
     @ValidateIf((dto: CreateEventDto) => dto.sellsTickets === true)
-    @IsNumber()
+    @IsNumber({ maxDecimalPlaces: 2 }, { message: '$property mag hoogstens 2 desimale hê' })
     @Min(0.01)
     ticketPrice?: number;
 

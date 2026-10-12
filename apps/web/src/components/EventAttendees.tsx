@@ -47,7 +47,7 @@ export default function EventAttendees({ eventId, initialRsvps, checkInOpen, has
     const [isPending, startTransition] = useTransition();
 
     // Elke herlaai en elke eie verandering kry 'n nommer. 'n Herlaai wat begin het voor 'n
-    // inteken hier klaar was, mag nie daardie inteken met ouer data oorskryf nie.
+    // inteken hier klaar was, mag nie daardie inteken met ouer data oorskryf nie (sien mutate).
     const latestRequest = useRef(0);
 
     const refresh = useCallback(() => {
@@ -94,14 +94,35 @@ export default function EventAttendees({ eventId, initialRsvps, checkInOpen, has
         });
     }
 
+    /**
+     * Voer 'n eie verandering uit en maak elke herlaai ongeldig wat voor sy einde begin het. Die
+     * nommer gaan voor én ná die versoek op: 'n poll wat tydens die inteken begin, kan nog die ou
+     * toestand terugkry, en sou die ry anders vir tien sekondes terugswaai na "Teken in".
+     */
+    async function mutate<T>(action: () => Promise<T>): Promise<T> {
+        latestRequest.current++;
+        try {
+            return await action();
+        } finally {
+            latestRequest.current++;
+        }
+    }
+
     function handleCheckIn(rsvp: EventRsvp) {
         setError(null);
         setBusyId(rsvp.id);
-        latestRequest.current++;
         startTransition(async () => {
-            const result = await checkInRsvpAction(rsvp.id);
-            if (result.rsvp) replace(result.rsvp);
-            else setError(result.error ?? 'Kon nie die persoon inteken nie.');
+            const result = await mutate(() => checkInRsvpAction(rsvp.id));
+            if (result.rsvp) {
+                replace(result.rsvp);
+            } else {
+                // Dalk het die app dieselfde persoon net-net voor ons ingeteken (die backend gee dan
+                // 'n 409). Vra die bediener wat nou waar is eerder as om die fout blindelings te wys.
+                const latest = await mutate(() => getEventRsvpsAction(eventId));
+                if (latest.rsvps) setRsvps(latest.rsvps);
+                const nowCheckedIn = latest.rsvps?.find((r) => r.id === rsvp.id)?.checkedIn ?? false;
+                if (!nowCheckedIn) setError(result.error ?? 'Kon nie die persoon inteken nie.');
+            }
             setBusyId(null);
         });
     }
@@ -111,9 +132,8 @@ export default function EventAttendees({ eventId, initialRsvps, checkInOpen, has
         const name = walkInName.trim();
         if (!name) return;
         setError(null);
-        latestRequest.current++;
         startTransition(async () => {
-            const result = await registerWalkInAction(eventId, name);
+            const result = await mutate(() => registerWalkInAction(eventId, name));
             if (result.rsvp) {
                 replace(result.rsvp);
                 setWalkInName('');
