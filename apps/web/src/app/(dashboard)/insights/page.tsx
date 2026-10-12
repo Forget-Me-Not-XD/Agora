@@ -2,7 +2,7 @@ import { AlertCircle, Users, TrendingUp, TrendingDown, CheckCircle, Trophy } fro
 import { canViewInsights } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents, type Event, type EventType } from '@/lib/api/events';
-import { getModelStatus } from '@/lib/api/analytics';
+import { getKeyFindings, getModelStatus } from '@/lib/api/analytics';
 import { formatDateShort } from '@/lib/format-date';
 import { TYPE_LABELS, TYPE_TONE } from '@/lib/event-view';
 import { Pill, type Tone } from '@/components/ui/Pill';
@@ -10,6 +10,7 @@ import { IconChip } from '@/components/ui/IconChip';
 import InfoModal from '@/components/InfoModal';
 import ExportCsvButton from '@/components/ExportCsvButton';
 import ModelStatusBanner from '@/components/ModelStatusBanner';
+import KeyFindings from '@/components/KeyFindings';
 import PredictedAttendanceCard from '@/components/PredictedAttendanceCard';
 import PredictionAccuracyPanel from '@/components/PredictionAccuracyPanel';
 import AutoRefresh from '@/components/AutoRefresh';
@@ -47,9 +48,10 @@ export default async function InsightsPage() {
         );
     }
 
-    const [allEvents, modelStatus] = await Promise.all([
+    const [allEvents, modelStatus, keyFindings] = await Promise.all([
         getEvents().catch(() => [] as Event[]),
         getModelStatus().catch(() => null),
+        getKeyFindings().catch(() => null),
     ]);
     const relevantEvents = (user.role === 'ADMIN' ? allEvents : allEvents.filter((e) => e.createdBy === user.id))
         .slice()
@@ -113,6 +115,10 @@ export default async function InsightsPage() {
                             label="Bywoning %"
                             body="Die aantal ingecheckte gaste teenoor die geleentheid se maksimum kapasiteit. Slegs beskikbaar vir geleenthede wat reeds plaasgevind het."
                         />
+                        <InfoRow
+                            label="Sleutelbevindinge"
+                            body="Patrone uit afgelope geleenthede, elk met 'n aksie wat jy kan neem. 'n Bevinding word net gewys as daar ten minste vyf geleenthede agter sit. Dosente sien net hul eie geleenthede; admins sien alle geleenthede."
+                        />
                     </div>
 
                     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 space-y-1.5">
@@ -137,6 +143,9 @@ export default async function InsightsPage() {
 
             {/* ── Model-status — moet sonder scroll sigbaar wees ── */}
             <ModelStatusBanner status={modelStatus} />
+
+            {/* ── Sleutelbevindinge: syfer, sin en aksie per patroon ── */}
+            <KeyFindings findings={keyFindings} />
 
             {/* ── Predicted Attendance Card ── */}
             <PredictedAttendanceCard />

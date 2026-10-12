@@ -160,8 +160,6 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
                         Pas hierdie instellings toe op die vorm
                     </button>
 
-                    <PredictionAdvice prediction={prediction} onChooseAlternative={handleChooseAlternative} />
-
                     <div>
                         <p className="text-xs font-medium text-[var(--color-text-subtle)] mb-2">
                             Waarom hierdie voorspelling?
@@ -175,6 +173,8 @@ export default function EventPlannerSandbox({ initialDate, initialCapacity, onAp
                             ))}
                         </ul>
                     </div>
+
+                    <PredictionAdvice prediction={prediction} onChooseAlternative={handleChooseAlternative} />
                 </div>
             )}
         </div>
