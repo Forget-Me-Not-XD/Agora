@@ -17,6 +17,7 @@ import { TYPE_LABELS, formatFullDate } from '../lib/event-status';
 import { useEventsStore } from '../stores/events.store';
 import { canViewInsights } from '../lib/rbac';
 import { ModelStatusCard } from '../components/ModelStatusCard';
+import { KeyFindingsCard, useKeyFindings } from '../components/KeyFindingsCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EventPickerModal } from '../components/EventPickerModal';
 import { PredictionAccuracyBarChart } from '../components/charts/PredictionAccuracyBarChart';
@@ -62,6 +63,7 @@ export function InsightsScreen({ navigation }: Props) {
 
   const role = user?.role ?? 'STUDENT';
   const allowed = canViewInsights(role);
+  const keyFindings = useKeyFindings(allowed);
 
   useEffect(() => {
     if (!allowed) return;
@@ -167,6 +169,12 @@ export function InsightsScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <KeyFindingsCard
+            findings={keyFindings.findings}
+            loading={keyFindings.loading}
+            onRetry={keyFindings.retry}
+          />
+
           <View style={styles.kpiGrid}>
             <InsightStat
               icon="users"

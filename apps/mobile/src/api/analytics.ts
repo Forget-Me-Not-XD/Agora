@@ -91,6 +91,21 @@ export async function getModelStatus(): Promise<ModelStatus> {
     return apiClient.get<ModelStatus>('/analytics/model-status');
 }
 
+// 'value' kom sonder eenheid (23 kan 'n persentasie, 'n aantal sitplekke of 'n bedrag in rand
+// wees), so lib/key-findings.ts formateer dit volgens 'key'.
+export interface KeyFinding {
+    key: string;
+    title: string;
+    value: string | number;
+    sentence: string;
+    action: string;
+}
+
+// GET /analytics/key-findings -- ADMIN/DOSENT; 'n dosent kry net bevindinge oor hul eie geleenthede
+export async function getKeyFindings(): Promise<KeyFinding[]> {
+    return apiClient.get<KeyFinding[]>('/analytics/key-findings');
+}
+
 export interface PredictionAccuracyItem {
     eventId: string;
     title: string;
