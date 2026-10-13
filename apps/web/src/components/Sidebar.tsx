@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -14,6 +14,7 @@ import {
     Ticket,
     Bell,
     X,
+    Loader2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useCurrentUser } from './UserContext';
@@ -54,6 +55,22 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         onClose();
     }, [pathname, onClose]);
 
+    // Die item waarop pas geklik is. Dit lig dadelik op, nog voor die nuwe bladsy (of sy laaiskerm)
+    // daar is: 'n stadige bladsy soos KI Insigte het anders gelyk asof die klik niks gedoen het nie.
+    const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+    // Sodra die adres verander het, is die klik verwerk en neem die gewone aktief-toets oor
+    useEffect(() => {
+        setPendingHref(null);
+    }, [pathname]);
+
+    function handleNavClick(event: React.MouseEvent, href: string) {
+        // Ctrl/Cmd/Shift-klik of die middelste knoppie maak 'n nuwe oortjie oop; hierdie bladsy bly
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+        if (isActive(pathname, href)) return;
+        setPendingHref(href);
+    }
+
     const mainItems: NavItem[] = [
         { href: '/dashboard', label: 'Oorsig', icon: LayoutDashboard },
         { href: '/events', label: 'Geleenthede', icon: Calendar },
@@ -70,12 +87,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
     const renderItem = (item: NavItem) => {
         const Icon = item.icon;
-        const active = isActive(pathname, item.href);
+        const pending = pendingHref === item.href;
+        // Terwyl 'n klik besig is, is net daardie item aktief, nie meer die bladsy wat ons verlaat nie
+        const active = pendingHref ? pending : isActive(pathname, item.href);
         return (
             <Link
                 key={item.href}
                 href={item.href}
+                onClick={(event) => handleNavClick(event, item.href)}
                 aria-current={active ? 'page' : undefined}
+                aria-busy={pending || undefined}
                 className={[
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                     active
@@ -85,6 +106,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             >
                 <Icon size={18} />
                 {item.label}
+                {pending && <Loader2 size={14} className="ml-auto animate-spin" aria-hidden="true" />}
             </Link>
         );
     };
