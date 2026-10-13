@@ -77,7 +77,7 @@ export default function PhotographerSection({ eventId, initialAssigned, initialI
                 <div className="px-5 pb-5 pt-1 space-y-4 border-t border-[var(--color-border)]">
                     {/* Soek */}
                     <div>
-                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">Soek 'n fotograaf</label>
+                        <label className="text-xs font-medium text-[var(--color-text-subtle)] block mb-1.5">Soek &apos;n fotograaf</label>
                         <div className="flex items-center gap-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2">
                             <Search size={15} className="text-[var(--color-text-subtle)] shrink-0" />
                             <input

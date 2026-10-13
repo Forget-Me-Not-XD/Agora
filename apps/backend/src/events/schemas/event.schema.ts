@@ -16,10 +16,15 @@ export class Event {
     @Prop ({ required: true, trim: true })
     description!: string;
 
-    @Prop ({ required: true, type: Date })
+    // Die lyste van geleenthede sorteer op hierdie datum, en die analise tel geleenthede per maand.
+    // Albei gebruik die indeks.
+    @Prop ({ required: true, type: Date, index: true })
     date!: Date;
 
-    @Prop ({ required: false, type: Date })
+    // findAll en findTrainableEvents kyk na endDate, of na date as 'n geleentheid nie 'n einde het
+    // nie. Mongo kan so 'n $or net met indekse beantwoord as albei velde een het, daarom kry
+    // endDate ook een.
+    @Prop ({ required: false, type: Date, index: true })
     endDate?: Date;
 
     @Prop ({ required: true, trim: true})

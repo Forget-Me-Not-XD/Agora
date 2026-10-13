@@ -207,7 +207,7 @@ export default function RsvpModal({ event, onClose }: RsvpModalProps) {
                                                     onChange={(e) => setWantsPlusOne(e.target.checked)}
                                                     className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
                                                 />
-                                                Bring 'n +1
+                                                Bring &apos;n +1
                                             </label>
 
                                             {wantsPlusOne && (

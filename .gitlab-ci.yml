@@ -1,5 +1,71 @@
 stages:
+  - quality
   - build
+
+# These checks run on every merge request and on main. A type error or a failing test stops the
+# pipeline, so on main the images below only get built from code that compiles. The lint jobs are
+# allowed to fail for now, so they only warn.
+.quality_template:
+  stage: quality
+  tags:
+    - k3s-arm64
+  # The same Node version the backend and web Dockerfiles use. Plain Node is enough for these
+  # jobs, so they don't need the docker-in-docker setup the build jobs have.
+  image: node:20-bookworm-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  variables:
+    # npm keeps its downloads inside the project folder, where the GitLab cache below can save
+    # them between runs.
+    npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  cache:
+    key: npm-$APP
+    paths:
+      - .npm/
+  before_script:
+    - cd "apps/$APP"
+    - npm ci --no-audit --no-fund --prefer-offline
+
+backend-typecheck-test:
+  extends: .quality_template
+  variables:
+    APP: backend
+  script:
+    - npx tsc --noEmit
+    - npm test --if-present
+
+web-typecheck-test:
+  extends: .quality_template
+  variables:
+    APP: web
+  script:
+    - npx tsc --noEmit
+    - npm test --if-present
+
+mobile-typecheck:
+  extends: .quality_template
+  variables:
+    APP: mobile
+  script:
+    - npx tsc --noEmit
+
+backend-lint:
+  extends: .quality_template
+  allow_failure: true
+  variables:
+    APP: backend
+  script:
+    - npm run lint
+
+web-lint:
+  extends: .quality_template
+  allow_failure: true
+  variables:
+    APP: web
+    NEXT_TELEMETRY_DISABLED: "1"
+  script:
+    - npm run lint
 
 .build_template:
   stage: build

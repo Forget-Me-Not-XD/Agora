@@ -82,3 +82,6 @@ RsvpSchema.index(
     { event: 1, user: 1 },
     { unique: true, partialFilterExpression: { user: { $exists: true } } },
 );
+
+// findCheckedInAttendees soek die ingecheckte gaste van een geleentheid
+RsvpSchema.index({ event: 1, checkedIn: 1 });

@@ -74,7 +74,7 @@ export default function PredictedAttendanceCard() {
                     onChange={(e) => setSelectedEventId(e.target.value)}
                     className="text-sm border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 >
-                    <option value="">Kies 'n geleentheid...</option>
+                    <option value="">Kies &apos;n geleentheid...</option>
                     {events.map((event) => (
                         <option key={event.id} value={event.id}>
                             {event.title}
@@ -85,7 +85,7 @@ export default function PredictedAttendanceCard() {
 
             {!selectedEventId && (
                 <p className="text-sm text-[var(--color-text-subtle)]">
-                    Kies 'n geleentheid om 'n voorspelling te sien
+                    Kies &apos;n geleentheid om &apos;n voorspelling te sien
                 </p>
             )}
 

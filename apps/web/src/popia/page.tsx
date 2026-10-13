@@ -47,9 +47,9 @@ export default function PopiaPage() {
             Belangrike konteks
         </p>
         <p className="text-[16px]" style={{ color: 'var(--color-text-subtle)', lineHeight: '1.6' }}>
-            AGORA is 'n universiteits-kapstoneprojek (studente-bouwerk), nie 'n geregistreerde
+            AGORA is &apos;n universiteits-kapstoneprojek (studente-bouwerk), nie &apos;n geregistreerde
             maatskappy nie. Ons pas POPIA se beginsels toe waar tegnies moontlik, maar sekere
-            formele vereistes (soos 'n geregistreerde Inligtingsbeampte by die Inligting-Regulator)
+            formele vereistes (soos &apos;n geregistreerde Inligtingsbeampte by die Inligting-Regulator)
             is nog nie in plek nie. Hierdie bladsy lys daardie gapings eerlik onderaan — ons maak
             geen aansprake wat ons nie kan bewys nie.
         </p>
@@ -68,7 +68,7 @@ export default function PopiaPage() {
         </ul>
         <p className="mt-2">
             By elke aanmelding, registrasie en wysiging aan beskermde data hou ons outomaties
-            'n oudit-rekord: gebruiker-ID, aksie, IP-adres, blaaier/toestel-inligting (user agent)
+            &apos;n oudit-rekord: gebruiker-ID, aksie, IP-adres, blaaier/toestel-inligting (user agent)
             en tydstempel.
         </p>
     </Section>
@@ -76,7 +76,7 @@ export default function PopiaPage() {
     <Section title="2. Waarvoor ons dit gebruik">
         <ul className="list-disc pl-5 space-y-1">
             <li>Stelseltoegangsbeheer (aanmelding en rol-gebaseerde toestemmings)</li>
-            <li>Om jou aan geleenthede, RSVP's en bywoningsrekords te koppel</li>
+            <li>Om jou aan geleenthede, RSVP&apos;s en bywoningsrekords te koppel</li>
             <li>Sekuriteit en aanspreeklikheid — die oudit-rekord bewys wie wat wanneer gedoen het</li>
         </ul>
         <p className="mt-2">
@@ -90,7 +90,7 @@ export default function PopiaPage() {
         <Server size={16} className="shrink-0 mt-0.5" />
         <p>
             Die databasis (MongoDB) loop op ons eie self-gehoste k3s-Kubernetes-cluster
-            (3 Raspberry Pi's) — nie op 'n derdeparty-wolkdiens soos AWS of MongoDB Atlas nie.
+            (3 Raspberry Pi&apos;s) — nie op &apos;n derdeparty-wolkdiens soos AWS of MongoDB Atlas nie.
             Kubernetes NetworkPolicy-reëls beperk watter interne dienste met die databasis mag praat.
         </p>
         </div>
@@ -100,8 +100,8 @@ export default function PopiaPage() {
         <div className="flex items-start gap-2 mb-2">
             <Lock size={16} className="shrink-0 mt-0.5" />
             <p>
-            Ons cluster sit agter CGNAT, dus gebruik ons 'n Cloudflare Tunnel (<code>cloudflared</code>)
-            vir publieke HTTPS-toegang. Die tonnel maak net 'n uitgaande verbinding oop — daar is
+            Ons cluster sit agter CGNAT, dus gebruik ons &apos;n Cloudflare Tunnel (<code>cloudflared</code>)
+            vir publieke HTTPS-toegang. Die tonnel maak net &apos;n uitgaande verbinding oop — daar is
             geen binnekomende poort of sertifikaatlêer op ons kant nie. Die sertifikaat wat jou
             blaaier sien, word deur Cloudflare se Universal SSL-diens uitgereik en outomaties hernu.
             </p>
@@ -147,7 +147,7 @@ Geverifieer teen:         web.use-agora.com:443 en api.use-agora.com:443`}
     <Section title="7. Jou regte ingevolge POPIA">
         <ul className="list-disc pl-5 space-y-1">
             <li>Toegang tot jou eie data — sigbaar in jou profiel</li>
-            <li>Regstelling — jy (of 'n admin) kan jou profiel wysig</li>
+            <li>Regstelling — jy (of &apos;n admin) kan jou profiel wysig</li>
             <li>Beswaar teen verwerking — kontak ons (sien punt 9)</li>
         </ul>
         </Section>
@@ -169,7 +169,7 @@ Geverifieer teen:         web.use-agora.com:443 en api.use-agora.com:443`}
         <Section title="9. Kontak">
         <p>
             Vir vrae oor hierdie beleid of jou data, kontak die AGORA-spanne via die
-            universiteitsmodule-kanaal. <em>(Opvolgpunt: 'n vaste kontak-e-posadres moet hier
+            universiteitsmodule-kanaal. <em>(Opvolgpunt: &apos;n vaste kontak-e-posadres moet hier
             bygevoeg word sodra die span dit formaliseer.)</em>
         </p>
         </Section>
