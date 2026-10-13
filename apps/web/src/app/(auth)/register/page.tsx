@@ -336,7 +336,7 @@ export default function RegisterPage() {
           {/* Ek is 'n: dropdown */}
           <label className="block mb-3">
             <span className="text-[16px] font-bold" style={{ color: 'var(--color-text-subtle)' }}>
-              Ek is 'n: <span style={{ color: 'var(--color-primary)' }}>*</span>
+              Ek is &apos;n: <span style={{ color: 'var(--color-primary)' }}>*</span>
             </span>
             <div className="relative mt-1" ref={roleRef}>
               <button

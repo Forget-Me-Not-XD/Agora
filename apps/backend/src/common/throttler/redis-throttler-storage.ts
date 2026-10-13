@@ -138,7 +138,8 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnApplicationShu
             const done = (err?: Error) => {
                 clearTimeout(timer);
                 this.redis.off('ready', onReady);
-                err ? reject(err) : resolve();
+                if (err) reject(err);
+                else resolve();
             };
             const onReady = () => done();
             const timer = setTimeout(() => done(new Error(`no connection within ${timeoutMs}ms`)), timeoutMs);
