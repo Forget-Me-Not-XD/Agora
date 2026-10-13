@@ -7,6 +7,7 @@ import { getUsersByIds } from '@/lib/api/users';
 import { getEventRsvps, getMyRsvps } from '@/lib/api/rsvp';
 import { getReviewEligibility, getReviewSummary } from '@/lib/api/reviews';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { backLink, originQuery, parseOrigin } from '@/lib/event-origin';
 import { canManageEvent as canManage, isEventOrganiser } from '@/lib/rbac';
 import { deriveStatus } from '@/lib/event-view';
 import { fillRateBand, percent } from '@/lib/metrics';
@@ -30,11 +31,18 @@ function fmtRand(v: number): string {
     return `R${Math.round(v).toLocaleString('af-ZA')}`;
 }
 
-export default async function EventDetailPage({ params }: { params: { id: string } }) {
+export default async function EventDetailPage({ params, searchParams }: {
+    params: { id: string };
+    searchParams: Record<string, string | string[] | undefined>;
+}) {
     const user = getCurrentUser();
 
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
+
+    // Waarvandaan die gebruiker gekom het (kalender, oorsig, ...), sodat "Terug" daarheen lei
+    const origin = parseOrigin(searchParams);
+    const back = backLink(origin);
 
     // admin bestuur/wysig alle geleenthede, dosent net wat hy self geskep het
     const canManageEvent = canManage(user, event);
@@ -76,14 +84,14 @@ export default async function EventDetailPage({ params }: { params: { id: string
         <div className="space-y-6 max-w-3xl">
             <div className="flex items-center justify-between gap-4">
                 <Link
-                    href="/events"
+                    href={back.href}
                     className="inline-flex items-center gap-1 text-sm text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] transition-colors"
                 >
-                    <ChevronLeft size={16} /> Terug na geleenthede
+                    <ChevronLeft size={16} /> {back.label}
                 </Link>
                 {canManageEvent && (
                     <Link
-                        href={`/events/${event.id}/edit`}
+                        href={`/events/${event.id}/edit${originQuery(origin)}`}
                         className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl text-sm font-medium hover:border-[var(--color-primary)] transition-colors"
                     >
                         <Pencil size={14} /> Wysig

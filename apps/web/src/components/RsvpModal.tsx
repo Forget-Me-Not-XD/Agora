@@ -16,9 +16,11 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 interface RsvpModalProps {
     event: Event;
+    /** Wanneer die venster toegaan, bv. sodat die kalender sy RSVP-status kan herlaai */
+    onClose?: () => void;
 }
 
-export default function RsvpModal({ event }: RsvpModalProps) {
+export default function RsvpModal({ event, onClose }: RsvpModalProps) {
     const router = useRouter();
     const [open, setOpen]                   = useState(false);
     const [loading, setLoading]             = useState(false);
@@ -51,6 +53,7 @@ export default function RsvpModal({ event }: RsvpModalProps) {
         setPlusOneSurname('');
         setPlusOneEmail('');
         setPlusOneError(null);
+        onClose?.();
     }
 
     async function handleConfirm() {

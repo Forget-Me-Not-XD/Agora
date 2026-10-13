@@ -19,6 +19,7 @@ import AddressAutocompleteInput from '@/components/AddressAutocompleteInput';
 import ReviewCategoryEditor from '@/components/ReviewCategoryEditor';
 import type { Venue } from '@/lib/api/events';
 import { toSastIso } from '@/lib/format-date';
+import { todayKey } from '@/lib/date-range';
 import {
     createDraft,
     hasReviewCategoryErrors,
@@ -58,6 +59,8 @@ interface EventFormProps {
     eventId?:      string;
     initialValues: EventFormValues;
     ratingCount?:  number;
+    /** Waarheen ná 'n suksesvolle wysiging; behou bv. die kalender as herkoms */
+    returnTo?:     string;
 }
 
 // Hoe die backend 'n lokaal in `location` stoor (sien formatVenueLabel in events/data/venues.ts)
@@ -73,7 +76,7 @@ const RAND_AMOUNT  = /^\d+(\.\d{1,2})?$/;
 // Voorstelle van die KI-panele kan breuke wees; rond af na wat die vorm self sou aanvaar
 const toRandString = (value: number) => String(Math.round(value * 100) / 100);
 
-export default function EventForm({ mode, eventId, initialValues, ratingCount = 0 }: EventFormProps) {
+export default function EventForm({ mode, eventId, initialValues, ratingCount = 0, returnTo }: EventFormProps) {
     const router = useRouter();
     const user = useCurrentUser();
 
@@ -151,6 +154,16 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
         if (!formData.endTime) e.endTime = 'Eindtyd is verpligtend';
         if (formData.time && formData.endTime && formData.endTime <= formData.time) {
             e.endTime = 'Eindtyd moet na begintyd wees';
+        }
+        // Soos die backend: 'n nuwe begintyd moet in die toekoms wees. Die kalender keur net verlede
+        // dae af, nie vandag om 08:00 as dit reeds middag is nie. By wysig net as datum of tyd
+        // verander het, sodat 'n afgelope geleentheid steeds sy begroting ens. kan laat wysig.
+        const startChanged = mode === 'create'
+            || formData.date !== initialValues.date
+            || formData.time !== initialValues.time;
+        if (formData.date && formData.time && startChanged
+            && new Date(toSastIso(formData.date, formData.time)).getTime() <= Date.now()) {
+            e.date = 'Die geleentheid moet in die toekoms begin';
         }
         if (useVenue) {
             if (!selectedVenue) e.location = "Kies asseblief 'n lokaal";
@@ -230,7 +243,7 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
                 if (err) {
                     setApiError(err);
                 } else {
-                    router.push(`/events/${eventId}`);
+                    router.push(returnTo ?? `/events/${eventId}`);
                 }
             }
         });
@@ -349,6 +362,7 @@ export default function EventForm({ mode, eventId, initialValues, ratingCount = 
                                     value={formData.date}
                                     onChange={(date) => handleChange('date', date)}
                                     placeholder="Kies datum"
+                                    minDate={todayKey()}
                                 />
                                 <FieldError message={errors.date} />
                             </div>

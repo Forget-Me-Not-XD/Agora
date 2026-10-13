@@ -5,6 +5,7 @@ import type { Event } from '@/lib/api/events';
 import { IconChip } from '@/components/ui/IconChip';
 import { Pill, TONE_VAR } from '@/components/ui/Pill';
 import { deriveStatus } from '@/lib/event-view';
+import { eventDetailHref } from '@/lib/event-origin';
 import { fillRateBand, formatEventDate, percent, relativeDay } from '@/lib/metrics';
 
 /** Vir die dosent: sy eerste opkomende geleentheid, met hoe vol dit is en die twee aksies wat hy nodig het. */
@@ -67,7 +68,7 @@ export default function NextEventCard({ event }: { event: Event | null }) {
 
             <div className="flex flex-wrap gap-2 mt-auto">
                 <Link
-                    href={`/events/${event.id}#deelnemers`}
+                    href={eventDetailHref(event.id, { from: 'oorsig' }, 'deelnemers')}
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-semibold hover:opacity-90 transition-opacity"
                 >
                     <Users size={15} /> Sien deelnemers

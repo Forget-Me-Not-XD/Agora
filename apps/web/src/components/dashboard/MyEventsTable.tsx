@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { eventDetailHref } from '@/lib/event-origin';
 import type { Event } from '@/lib/api/events';
 import { formatDateShort } from '@/lib/format-date';
 import { STATUS_LABELS, STATUS_TONE, deriveStatus } from '@/lib/event-view';
@@ -42,7 +43,7 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                             <tr key={e.id} className="hover:bg-[var(--color-bg)]">
                                 <td className="py-2.5">
                                     <Link
-                                        href={`/events/${e.id}`}
+                                        href={eventDetailHref(e.id, { from: 'oorsig' })}
                                         className="text-[var(--color-text)] font-medium hover:text-[var(--color-primary)] hover:underline"
                                     >
                                         {e.title}

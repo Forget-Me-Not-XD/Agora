@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, Calendar, MapPin, Users, Clock } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, X, Calendar, MapPin, Users, Clock, ArrowRight, Settings2 } from 'lucide-react';
 import { listEventsAction } from '@/lib/actions/event.actions';
+import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
+import { useCurrentUser } from '@/components/UserContext';
+import { isEventOrganiser } from '@/lib/rbac';
+import RsvpModal from '@/components/RsvpModal';
+import PaymentModal from '@/components/PaymentModal';
+import AlreadyRsvpdTag from '@/components/AlreadyRsvpdTag';
+import { useSearchParams } from 'next/navigation';
+import { eventDetailHref, monthKey, parseMonthKey, type EventOrigin } from '@/lib/event-origin';
 import type { Event } from '@/lib/api/events';
 import {
     TYPE_COLORS,
@@ -26,13 +35,30 @@ const MONTHS = [
 const DAYS = ['So', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Sa'];
 
 export default function CalendarPage() {
+    const user = useCurrentUser();
     const [events, setEvents]       = useState<Event[]>([]);
+    // Geleenthede waarvoor die gebruiker reeds RSVP het, sodat die venster nie weer "RSVP" aanbied nie
+    const [rsvpdEventIds, setRsvpdEventIds] = useState<Set<string>>(new Set());
     const [loading, setLoading]     = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
 
     const today = new Date();
-    const [viewYear, setViewYear] = useState(today.getFullYear());
-    const [viewMonth, setViewMonth] = useState(today.getMonth());
+    // Die maand kom uit die adres (?maand=2026-12) as dit daar is, bv. ná "Terug na kalender"
+    const searchParams = useSearchParams();
+    const initialMonth = parseMonthKey(searchParams.get('maand'));
+    const [viewYear, setViewYear] = useState(initialMonth?.year ?? today.getFullYear());
+    const [viewMonth, setViewMonth] = useState(initialMonth?.monthIndex ?? today.getMonth());
+    const currentMonthKey = monthKey(viewYear, viewMonth);
+
+    // Hou die maand in die adres, sodat die blaaier se eie terug-knoppie ook by dieselfde maand
+    // uitkom. replaceState (nie router.replace nie): dit skep geen nuwe geskiedenis-inskrywing
+    // nie en laai niks van die bediener af nie; Next 14 hou useSearchParams daarmee in lyn.
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('maand') === currentMonthKey) return;
+        url.searchParams.set('maand', currentMonthKey);
+        window.history.replaceState(window.history.state, '', url);
+    }, [currentMonthKey]);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
@@ -48,6 +74,27 @@ export default function CalendarPage() {
         })();
         return () => { active = false; };
     }, []);
+
+    // Soos die geleenthede-bladsy: misluk dit, wys die venster net "RSVP", en die backend
+    // keur 'n tweede RSVP in elk geval af
+    const loadRsvps = useCallback(async () => {
+        const result = await getMyRsvpsAction();
+        if (!result.rsvps) return;
+        setRsvpdEventIds(new Set(
+            result.rsvps.filter((r) => r.status !== 'GEKANSELLEER' && r.event).map((r) => r.event!._id),
+        ));
+    }, []);
+
+    useEffect(() => { loadRsvps(); }, [loadRsvps]);
+
+    // Ná 'n RSVP in die venster: die gebruiker se RSVPs en die geleentheid se RSVP-telling het verander
+    const refreshAfterRsvp = useCallback(async () => {
+        await loadRsvps();
+        const result = await listEventsAction();
+        if (!result.events) return;
+        setEvents(result.events);
+        setSelectedEvent((current) => current && (result.events!.find((e) => e.id === current.id) ?? current));
+    }, [loadRsvps]);
 
     const eventsByDate = useMemo(() => {
         const map: Record<string, Event[]> = {};
@@ -285,7 +332,7 @@ export default function CalendarPage() {
                         <div className="p-6">
                             {/* Title + close */}
                             <div className="flex items-start justify-between gap-3 mb-3">
-                                <h3 className="text-base font-bold text-[var(--color-text)] leading-snug">
+                                <h3 className="text-base font-bold text-[var(--color-text)] leading-snug [overflow-wrap:anywhere]">
                                     {selectedEvent.title}
                                 </h3>
                                 <button
@@ -350,10 +397,63 @@ export default function CalendarPage() {
                                     {fillPercentage(selectedEvent)}% vol
                                 </p>
                             </div>
+
+                            <EventActions
+                                event={selectedEvent}
+                                isOrganiser={isEventOrganiser(user, selectedEvent)}
+                                origin={{ from: 'kalender', month: currentMonthKey }}
+                                alreadyRsvpd={rsvpdEventIds.has(selectedEvent.id)}
+                                onRsvpClose={refreshAfterRsvp}
+                            />
                         </div>
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+/**
+ * Onderaan die geleentheid-venster: wat die gebruiker met die geleentheid kan doen, soos op 'n
+ * geleentheidskaart. Die organiseerder bestuur dit, ander RSVP of koop 'n kaartjie, en almal kan
+ * die volledige bladsy oopmaak.
+ */
+function EventActions({ event, isOrganiser, origin, alreadyRsvpd, onRsvpClose }: {
+    event:        Event;
+    isOrganiser:  boolean;
+    /** Sodat die geleentheid se "Terug" na hierdie maand in die kalender lei */
+    origin:       EventOrigin;
+    alreadyRsvpd: boolean;
+    onRsvpClose:  () => void;
+}) {
+    const isPast = deriveStatus(event) === 'past';
+
+    return (
+        <div className="mt-5 pt-5 border-t border-[var(--color-border)] space-y-2">
+            {isOrganiser ? (
+                <Link
+                    href={eventDetailHref(event.id, origin, 'deelnemers')}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-text)] rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                    <Settings2 size={15} /> Bestuur geleentheid
+                </Link>
+            ) : alreadyRsvpd ? (
+                <AlreadyRsvpdTag eventId={event.id} />
+            ) : isPast ? (
+                <p className="text-xs text-[var(--color-text-subtle)] text-center">
+                    Hierdie geleentheid is verby, so RSVP is gesluit.
+                </p>
+            ) : event.sellsTickets ? (
+                <PaymentModal event={event} />
+            ) : (
+                <RsvpModal event={event} onClose={onRsvpClose} />
+            )}
+
+            <Link
+                href={eventDetailHref(event.id, origin)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-[var(--color-border)] text-[var(--color-text)] text-sm font-medium hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+            >
+                Sien besonderhede <ArrowRight size={15} />
+            </Link>
         </div>
     );
 }
