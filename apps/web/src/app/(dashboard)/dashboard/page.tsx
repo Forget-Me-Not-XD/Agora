@@ -4,6 +4,7 @@ import StatCard from '@/components/StatCard';
 import EventCard from '@/components/EventCard';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { getEvents } from '@/lib/api/events';
+import { getMyRsvps } from '@/lib/api/rsvp';
 import { getAdminKpis, getEventsSummary, getRsvpSummary, getRsvpsPerMonth, getBudgetPerMonth, getTicketRevenueSummary, getRevenuePerEvent, getRevenuePerMonth, getRevenueTrend, getRsvpsTrend, getRsvpStatusBreakdown } from '@/lib/api/analytics';
 import { mergeMonthlySeries, mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import { AF_MONTHS_LONG } from '@/lib/format-date';
@@ -65,10 +66,15 @@ export default function DashboardPage() {
             </Suspense>
 
             <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-base font-semibold text-[var(--color-text)]">
-                        {isAdmin || isDosent ? 'Opkomende Geleenthede' : 'Beskikbare Geleenthede'}
-                    </h2>
+                <div className="flex items-end justify-between gap-3 mb-3">
+                    <div>
+                        <h2 className="text-base font-semibold text-[var(--color-text)]">
+                            {isAdmin || isDosent ? 'Opkomende Geleenthede' : 'Beskikbare Geleenthede'}
+                        </h2>
+                        {!isAdmin && !isDosent && (
+                            <p className="text-sm text-[var(--color-text-subtle)]">Geleenthede waarvoor jy nog nie RSVP het nie</p>
+                        )}
+                    </div>
                     <a href="/events" className="text-sm text-[var(--color-primary)] font-medium hover:underline">
                         Sien almal
                     </a>
@@ -383,13 +389,35 @@ function EventsPreviewSkeleton() {
 
 async function EventsPreview() {
     const user = getCurrentUser();
-    const events = await getEvents({ from: new Date().toISOString() }).catch(() => null);
+    const [allEvents, myRsvps] = await Promise.all([
+        getEvents({ from: new Date().toISOString() }).catch(() => null),
+        getMyRsvps().catch(() => []),
+    ]);
 
-    if (!events || events.length === 0) {
+    // 'n Mislukte versoek is nie dieselfde as "daar is niks nie"
+    if (!allEvents) {
+        return (
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8">
+                <LoadError what="die geleenthede" />
+            </div>
+        );
+    }
+
+    // Sonder dit kry 'n geleentheid waarvoor jy reeds RSVP het steeds 'n RSVP-knoppie
+    const rsvpdEventIds = new Set(
+        myRsvps.filter((r) => r.status !== 'GEKANSELLEER' && r.event).map((r) => r.event!._id),
+    );
+    // Studente en GAS-lede sien net wat hulle nog kan kies; hul eie RSVPs staan reeds bo-aan
+    const isAttendee = user.role !== 'ADMIN' && user.role !== 'DOSENT';
+    const events = isAttendee ? allEvents.filter((e) => !rsvpdEventIds.has(e.id)) : allEvents;
+
+    if (events.length === 0) {
         return (
             <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-8 text-center">
                 <p className="text-[var(--color-text-subtle)] text-sm">
-                    Geen geleenthede beskikbaar nie.
+                    {isAttendee && allEvents.length > 0
+                        ? 'Jy het reeds vir al die opkomende geleenthede RSVP. Mooi so!'
+                        : 'Geen opkomende geleenthede nie.'}
                 </p>
             </div>
         );
@@ -398,7 +426,13 @@ async function EventsPreview() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {events.slice(0, 6).map((event) => (
-                <EventCard key={event.id} event={event} manageable={isEventOrganiser(user, event)} />
+                <EventCard
+                    key={event.id}
+                    event={event}
+                    alreadyRsvpd={rsvpdEventIds.has(event.id)}
+                    manageable={isEventOrganiser(user, event)}
+                    origin={{ from: 'oorsig' }}
+                />
             ))}
         </div>
     );

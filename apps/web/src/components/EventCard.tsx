@@ -15,6 +15,7 @@ import { Pill } from '@/components/ui/Pill';
 import RsvpModal from './RsvpModal';
 import PaymentModal from './PaymentModal';
 import AlreadyRsvpdTag from './AlreadyRsvpdTag';
+import { eventDetailHref, type EventOrigin } from '@/lib/event-origin';
 
 interface EventCardProps {
     event: Event;
@@ -23,9 +24,11 @@ interface EventCardProps {
     reviewState?: 'reviewable' | 'reviewed' | 'closed' | 'upcoming';
     /** Die kyker het die geleentheid self geskep: wys "Bestuur" eerder as RSVP of 'n kaartjie */
     manageable?: boolean;
+    /** Waar die kaart staan (bv. die oorsig), sodat die geleentheid se "Terug" daarheen lei */
+    origin?: EventOrigin;
 }
 
-export default function EventCard({ event, alreadyRsvpd = false, isNew = false, reviewState, manageable = false }: EventCardProps) {
+export default function EventCard({ event, alreadyRsvpd = false, isNew = false, reviewState, manageable = false, origin }: EventCardProps) {
     const status  = deriveStatus(event);
     const fillPct = fillPercentage(event);
     const isFull       = fillPct >= 100;
@@ -43,7 +46,7 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false, 
             {/* Coloured top accent */}
             <div className={`h-1 w-full ${STATUS_COLORS[status]}`} />
 
-            <Link href={`/events/${event.id}`} className="p-5 pb-0 flex flex-col gap-3 flex-1">
+            <Link href={eventDetailHref(event.id, origin)} className="p-5 pb-0 flex flex-col gap-3 flex-1">
                 {/* Title + badges */}
                 <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-[var(--color-text)] leading-snug flex-1">
@@ -125,7 +128,7 @@ export default function EventCard({ event, alreadyRsvpd = false, isNew = false, 
                 {manageable ? (
                     // Die organiseerder RSVP nie vir sy eie geleentheid nie; hy wil sien wie kom
                     <Link
-                        href={`/events/${event.id}#deelnemers`}
+                        href={eventDetailHref(event.id, origin, 'deelnemers')}
                         className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-[var(--color-border)] text-[var(--color-text)] text-sm font-medium hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
                     >
                         <Settings2 size={15} />

@@ -347,8 +347,9 @@ function DayEventCard({
         <Text style={styles.dayEventMeta}>
           {formatEventTime(event.date)} · {event.location} · {event.confirmedAttendees} / {event.maxCapacity}
         </Text>
-        <TouchableOpacity style={styles.openBtn} onPress={onOpen} accessibilityLabel={`Maak ${event.title} oop`}>
-          <Text style={styles.openBtnText}>Maak oop</Text>
+        {/* Die geleentheid-skerm het die RSVP-knoppie (of kaartjie) en al die besonderhede */}
+        <TouchableOpacity style={styles.openBtn} onPress={onOpen} accessibilityLabel={`RSVP of sien besonderhede vir ${event.title}`}>
+          <Text style={styles.openBtnText}>RSVP en besonderhede</Text>
           <Feather name="arrow-right" size={14} color={colors.surface} />
         </TouchableOpacity>
       </View>

@@ -4,6 +4,7 @@ import { BellRing, CheckCircle2, ChevronRight, ClipboardX, ScanLine, UserMinus, 
 import { IconChip } from '@/components/ui/IconChip';
 import { LoadError } from '@/components/ui/LoadError';
 import type { AttentionItem, AttentionKind } from '@/lib/metrics';
+import { eventDetailHref } from '@/lib/event-origin';
 
 const KIND_ICON: Record<AttentionKind, LucideIcon> = {
     'check-in-now': ScanLine,
@@ -45,7 +46,7 @@ export default function AttentionList({ items }: { items: AttentionItem[] | null
                         return (
                             <li key={`${item.kind}-${item.eventId}`}>
                                 <Link
-                                    href={`/events/${item.eventId}`}
+                                    href={eventDetailHref(item.eventId, { from: 'oorsig' })}
                                     className="group flex items-start gap-3 py-3 -mx-2 px-2 rounded-xl hover:bg-[var(--color-bg)] transition-colors"
                                 >
                                     <IconChip tone={item.tone} size="sm" className="mt-0.5"><Icon size={14} /></IconChip>

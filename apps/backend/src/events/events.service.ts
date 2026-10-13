@@ -36,6 +36,7 @@ export class EventsService {
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
         const start = new Date(dto.date);
         const end   = new Date(dto.endDate);
+        this.assertStartInFuture(start);
         this.assertEndAfterStart(start, end);
         this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
         this.assertVenueCapacity(dto.location, dto.maxCapacity);
@@ -355,6 +356,13 @@ export class EventsService {
         }
 
         const { date, endDate, address, placeId, lat, lon, reviewCategories, ...rest } = dto;
+        // Net 'n nuwe begintyd moet in die toekoms wees. Die vorms stuur die datum altyd saam, ook
+        // as net die begroting verander, en 'n afgelope geleentheid moet steeds wysigbaar bly.
+        // Op die minuut vergelyk: die vorm stuur net uur en minuut, die databasis het dalk sekondes.
+        const toMinute = (d: Date) => Math.floor(d.getTime() / 60_000);
+        if (date && toMinute(new Date(date)) !== toMinute(event.date)) {
+            this.assertStartInFuture(new Date(date));
+        }
         Object.assign(event, rest);
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
@@ -527,6 +535,13 @@ export class EventsService {
             throw new ForbiddenException(
                 `You do not have permission to modify this event`,
             );
+        }
+    }
+
+    // Die mobiele app keur verlede datums net op die skerm af; hier geld dit vir elke kliënt
+    private assertStartInFuture(start: Date): void {
+        if (start.getTime() <= Date.now()) {
+            throw new BadRequestException('Die geleentheid moet in die toekoms begin');
         }
     }
 
