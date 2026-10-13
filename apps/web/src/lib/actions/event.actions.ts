@@ -1,7 +1,7 @@
 'use server';
 
 // ========== Imports: ==========
-import { createEvent, getEvents, getVenues, updateEvent } from '@/lib/api/events';
+import { createEvent, deleteEvent, getEvents, getVenues, updateEvent } from '@/lib/api/events';
 import type { CreateEventPayload, Event, EventFilters, UpdateEventPayload, Venue } from '@/lib/api/events';
 
 export interface CreateEventResult {
@@ -28,6 +28,16 @@ export async function updateEventAction(
         await updateEvent(id, payload);
     } catch (err) {
         return err instanceof Error ? err.message : 'Geleentheid opdateer het misluk.';
+    }
+    return null;
+}
+
+// Gee 'n foutboodskap terug, of null as die geleentheid geskrap is
+export async function deleteEventAction(id: string): Promise<string | null> {
+    try {
+        await deleteEvent(id);
+    } catch (err) {
+        return err instanceof Error ? err.message : 'Kon nie die geleentheid skrap nie.';
     }
     return null;
 }

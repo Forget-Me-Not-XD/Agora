@@ -20,7 +20,7 @@ import {
 import { canManageEvent, canViewBudget, canViewInsights } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
+import { getEvent, createEvent, deleteEvent, getVenues, type EventResponse, type Venue } from '../api/events';
 import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput';
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
@@ -62,6 +62,7 @@ export function EventDetailScreen() {
   const isFocused = useIsFocused();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [wantsPlusOne, setWantsPlusOne] = useState(false);
   const [plusOneName, setPlusOneName] = useState('');
   const [plusOneSurname, setPlusOneSurname] = useState('');
@@ -198,6 +199,36 @@ export function EventDetailScreen() {
 
   function handleQrScanner() {
     navigation.navigate('QrScanner', { eventId: event!.id });
+  }
+
+  // Net vir admins, soos die backend. Skrap is permanent en vee ook die RSVPs uit, so eers bevestig.
+  function handleDelete() {
+    const rsvps = event!.confirmedAttendees;
+    Alert.alert(
+      'Skrap geleentheid?',
+      `"${event!.title}" word permanent geskrap${rsvps > 0 ? `, saam met ${rsvps} ${rsvps === 1 ? 'RSVP' : 'RSVPs'} en die resensies` : ''}. Dit kan nie ongedaan gemaak word nie.`,
+      [
+        { text: 'Kanselleer', style: 'cancel' },
+        {
+          text: 'Skrap',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteEvent(event!.id);
+              // Die lys op die vorige skerm moet nie die geskrapte geleentheid uit die kas wys nie
+              useEventsStore.getState().invalidate();
+              safeGoBack(navigation);
+            } catch (err) {
+              // Bv. 'n geleentheid met betaalde kaartjies: die backend sê wat om te doen
+              Alert.alert('Kon nie skrap nie', getApiErrorMessage(err, 'Kon nie die geleentheid skrap nie. Probeer weer.'));
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleRsvp() {
@@ -418,6 +449,22 @@ export function EventDetailScreen() {
               <Text style={styles.secondaryBtnText}>QR Skandeerder</Text>
             </TouchableOpacity>
           </>
+        )}
+
+        {role === 'ADMIN' && (
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: colors.red }]}
+            onPress={handleDelete}
+            disabled={deleting}
+            accessibilityLabel="Skrap geleentheid"
+          >
+            {deleting
+              ? <ActivityIndicator color={colors.red} />
+              : <Feather name="trash-2" size={16} color={colors.red} />}
+            <Text style={[styles.secondaryBtnText, { color: colors.red }]}>
+              {deleting ? 'Besig om te skrap…' : 'Skrap geleentheid'}
+            </Text>
+          </TouchableOpacity>
         )}
 
         {(status === 'upcoming' || status === 'ongoing') && (

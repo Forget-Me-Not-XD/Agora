@@ -82,7 +82,10 @@ export class EventsController {
         return EventResponseDto.fromDocument(event);
     }
 
+    // Net admins skrap: dit vee ook al die geleentheid se RSVPs uit (sien EventsService.deleteEvent)
     @Delete(':id')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.NO_CONTENT)
     async remove(
         @Param('id') id: string,

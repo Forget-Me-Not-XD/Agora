@@ -128,3 +128,20 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
         body:   JSON.stringify(payload),
     });
 }
+
+// DELETE /api/v1/events/:id — net admins; skrap ook die RSVPs. Die antwoord is 204 sonder inhoud,
+// en apiFetch lees altyd JSON, daarom 'n eie fetch.
+export async function deleteEvent(id: string): Promise<void> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/events/${id}`, {
+        method:  'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        throw new Error(httpErrorMessage(res, body));
+    }
+}

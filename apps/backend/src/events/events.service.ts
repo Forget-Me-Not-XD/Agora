@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { ForbiddenException, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model, Types } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';
@@ -19,18 +19,28 @@ import { v4 as uuidv4 } from 'uuid';
 import { ReviewCategory } from './schemas/review-category.schema';
 import { ReviewCategoryInputDto } from './dto/review-category-input.dto';
 import { DEFAULT_REVIEW_CATEGORIES } from '../common/constants/review-categories';
+import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { Payment, PaymentDocument, PaymentStatus } from '../payments/schemas/payment.schema';
+import { Notification, NotificationDocument } from '../notifications/schemas/notification.schema';
+import { CalendarSyncService } from '../calendar/calendar-sync.service';
 import { ReviewsService } from '../reviews/reviews.service';
 
 const DEFAULT_EVENT_DURATION_MS = 3 * 60 * 60 * 1000;
 
 @Injectable()
 export class EventsService {
+    private readonly logger = new Logger(EventsService.name);
+
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
+        @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
+        @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
         private readonly rabbitMQService: RabbitMQService,
         private readonly usersService: UsersService,
         private readonly placesService: PlacesService,
         private readonly reviewsService: ReviewsService,
+        private readonly calendarSyncService: CalendarSyncService,
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
@@ -402,8 +412,47 @@ export class EventsService {
 
         this.assertOwnership(event, requesterId, requesterRole);
 
+        // Iemand het al vir 'n kaartjie betaal: daardie geld moet eers terugbetaal word, en die
+        // betaling bly die bewys daarvan. Ons skrap dit dus nie stilweg saam met die geleentheid nie.
+        const paidTickets = await this.paymentModel
+            .countDocuments({ event: event._id, status: PaymentStatus.VOLTOOI })
+            .exec();
+        if (paidTickets > 0) {
+            throw new ConflictException(
+                `Hierdie geleentheid het ${paidTickets} betaalde kaartjie${paidTickets === 1 ? '' : 's'} en kan nie geskrap word nie. Betaal die kopers eers terug.`,
+            );
+        }
+
+        await this.removeCalendarEntries(event._id);
+
+        // Alles wat na die geleentheid verwys, eerste; die geleentheid self laaste. Misluk iets
+        // halfpad, bestaan die geleentheid nog en kan die admin weer probeer.
+        await Promise.all([
+            this.rsvpModel.deleteMany({ event: event._id }).exec(),
+            this.paymentModel.deleteMany({ event: event._id }).exec(),   // net hangende of mislukte
+            this.notificationModel.deleteMany({ event: event._id }).exec(),
+            this.reviewsService.deleteByEvent(id),
+        ]);
         await event.deleteOne();
-        await this.reviewsService.deleteByEvent(id);
+    }
+
+    // Verwyder die geleentheid uit die Google/Outlook-kalenders van wie RSVP het, soos 'n
+    // kansellasie doen. Best effort: 'n kalender wat nie antwoord nie, keer nie die skrap nie.
+    private async removeCalendarEntries(eventId: Types.ObjectId): Promise<void> {
+        const synced = await this.rsvpModel.find({
+            event: eventId,
+            user: { $ne: null },
+            $or: [{ googleCalendarEventId: { $ne: null } }, { outlookCalendarEventId: { $ne: null } }],
+        }).exec();
+
+        for (const rsvp of synced) {
+            try {
+                const user = await this.usersService.findById(rsvp.user!.toString());
+                await this.calendarSyncService.syncRsvpCancelled(user, rsvp.googleCalendarEventId, rsvp.outlookCalendarEventId);
+            } catch (err) {
+                this.logger.warn(`Kon nie RSVP ${rsvp._id} se kalender-inskrywing verwyder nie: ${(err as Error).message}`);
+            }
+        }
     }
 
     async assignPhotographer(

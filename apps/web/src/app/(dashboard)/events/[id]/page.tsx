@@ -18,6 +18,7 @@ import { Pill } from '@/components/ui/Pill';
 import { TONE_VAR } from '@/components/ui/Pill';
 import PaymentModal from '@/components/PaymentModal';
 import RsvpModal from '@/components/RsvpModal';
+import DeleteEventButton from '@/components/DeleteEventButton';
 import EventAttendees from '@/components/EventAttendees';
 import AlreadyRsvpdTag from '@/components/AlreadyRsvpdTag';
 import ReviewEventCard from '@/components/ReviewEventCard';
@@ -89,14 +90,25 @@ export default async function EventDetailPage({ params, searchParams }: {
                 >
                     <ChevronLeft size={16} /> {back.label}
                 </Link>
-                {canManageEvent && (
-                    <Link
-                        href={`/events/${event.id}/edit${originQuery(origin)}`}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl text-sm font-medium hover:border-[var(--color-primary)] transition-colors"
-                    >
-                        <Pencil size={14} /> Wysig
-                    </Link>
-                )}
+                <div className="flex items-center gap-2">
+                    {canManageEvent && (
+                        <Link
+                            href={`/events/${event.id}/edit${originQuery(origin)}`}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl text-sm font-medium hover:border-[var(--color-primary)] transition-colors"
+                        >
+                            <Pencil size={14} /> Wysig
+                        </Link>
+                    )}
+                    {/* Skrap is net vir admins, soos die backend dit afdwing */}
+                    {user.role === 'ADMIN' && (
+                        <DeleteEventButton
+                            eventId={event.id}
+                            eventTitle={event.title}
+                            rsvpCount={event.confirmedAttendees}
+                            afterDeleteHref={back.href}
+                        />
+                    )}
+                </div>
             </div>
 
             {/* Geleentheid-besonderhede */}
