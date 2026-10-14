@@ -1,9 +1,10 @@
 /**
  * seed-analytics-mock-data.ts
  *
- * Inserts 300 synthetic historical university events and their RSVP attendance
- * records into MongoDB so the LSTM model has enough labeled training data to
- * learn real patterns before any actual events have accumulated in production.
+ * Inserts ~120 synthetic historical university events with their RSVP
+ * attendance records and reviews into MongoDB. The set is deliberately small
+ * enough for the dashboards to stay readable and explainable, while keeping
+ * the same patterns so the LSTM model still has credible training data.
  *
  * Patterns baked into the data:
  *   • South African academic calendar
@@ -24,17 +25,30 @@
  *       - Orientation week and well-promoted events: 5-10% no-show
  *   • Gaussian noise (±8% fill, ±5% no-show) so patterns are learnable but
  *     not trivially deterministic
+ *   • Event type follows venue size
+ *       - Small venues lean PRIVATE / DEPARTMENT, large venues lean PUBLIC
+ *   • Budget scales with capacity (rand per seat differs per event type)
+ *   • Reviews
+ *       - ~40% of checked-in attendees leave a review
+ *       - Scores (0-5) per DEFAULT_REVIEW_CATEGORIES rise with the fill rate
+ *       - ~20% of reviews carry a short Afrikaans comment
+ *       - ratingAvg / ratingCount are stored on every event
  *
- * Volume: 300 events × Jul 2021 → Jun 2026 (5 academic years)
- *         ~1 000 student users + 5 dosents + 1 admin
- *         ~18 000–25 000 RSVP documents
+ * Volume: ~120 events × Oct 2023 → Sep 2026 (36 months, 40 events per year)
+ *         1 000 student users + 5 dosents + 1 admin
+ *         ~7 000–10 000 RSVP documents, ~2 000–3 500 reviews
+ *         No event is ever scheduled after the moment the script runs.
  *
  * Run from apps/backend/:
  *   npx ts-node src/database/seeds/seed-analytics-mock-data.ts
+ *   npx ts-node src/database/seeds/seed-analytics-mock-data.ts --reset
  *
- * Idempotent: re-running is a no-op if sentinel user already exists.
- * To wipe and re-seed, delete the user with email seed-admin@akademia.ac.za
- * and all events/rsvps whose createdBy is that user's _id.
+ * Idempotent: without --reset, re-running is a no-op if the sentinel admin
+ * (seed-analytics-admin@akademia.ac.za) already exists.
+ * --reset removes ONLY this script's own data first (the sentinel admin,
+ * the dosent.seed.* / student.seed.* users, and the events, RSVPs and
+ * reviews that belong to them) and then seeds again. Data from
+ * seed-demo-data.ts and real users is never touched.
  */
 
 import mongoose, { Types } from 'mongoose';
@@ -42,6 +56,8 @@ import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { EventType } from '../../common/enums/event-type.enum';
+import { DEFAULT_REVIEW_CATEGORIES } from '../../common/constants/review-categories';
 
 // ── Environment loading ────────────────────────────────────────────────────────
 // We parse the root .env manually so this script has zero extra dependencies
@@ -73,20 +89,20 @@ if (mongoUri.includes('@mongodb:')) {
 }
 
 // ── Academic calendar: how many events to generate per month ──────────────────
-// Sums to 60 events per year × 5 years = 300 total.
+// Sums to 40 events per year × 3 years = 120 total.
 const EVENTS_PER_MONTH: Record<number, number> = {
-    1:  2,   // January  – long summer vacation
-    2: 11,   // February – orientation week + semester 1 start  ← busiest
-    3:  9,   // March    – mid-semester 1
-    4:  8,   // April    – mid-semester 1
-    5:  3,   // May      – exams approaching, events tail off
-    6:  2,   // June     – exams + winter recess
-    7:  4,   // July     – semester 2 start
-    8:  8,   // August   – mid-semester 2
-    9:  7,   // September– mid-semester 2
-    10: 3,   // October  – exams approaching
-    11: 2,   // November – exams
-    12: 1,   // December – summer vacation
+    1:  1,
+    2:  7,
+    3:  6,
+    4:  5,
+    5:  2,
+    6:  1,
+    7:  3,
+    8:  6,
+    9:  5,
+    10: 2,
+    11: 1,
+    12: 1,
 };
 
 // ── Fill-rate pattern factors ──────────────────────────────────────────────────
@@ -255,6 +271,116 @@ const LOCATIONS = [
     'Rektorate Vergadersaal',
 ];
 
+const RESET = process.argv.includes('--reset');
+
+const SEED_ADMIN_EMAIL = 'seed-analytics-admin@akademia.ac.za';
+
+const LEGACY_SEED_ADMIN = {
+    email: 'seed-admin@akademia.ac.za',
+    name: 'Saad',
+    surname: 'Administrateur',
+};
+
+const SEED_SENTINEL_FILTER = {
+    $or: [{ email: SEED_ADMIN_EMAIL }, LEGACY_SEED_ADMIN],
+};
+
+const SEED_USER_FILTER = {
+    $or: [
+        { email: SEED_ADMIN_EMAIL },
+        LEGACY_SEED_ADMIN,
+        { email: /^dosent\.seed\.\d+@akademia\.ac\.za$/ },
+        { email: /^student\.seed\.\d+@studs\.akademia\.ac\.za$/ },
+    ],
+};
+
+const REVIEW_SHARE = 0.40;
+const COMMENT_SHARE = 0.20;
+const REVIEW_WINDOW_HOURS = 14 * 24;
+
+function eventTypeWeights(cap: number): [EventType, number][] {
+    if (cap < 80) {
+        return [
+            [EventType.PRIVATE, 0.25],
+            [EventType.DEPARTMENT, 0.35],
+            [EventType.INTERNAL_STUDENT, 0.30],
+            [EventType.PUBLIC, 0.10],
+        ];
+    }
+    if (cap < 200) {
+        return [
+            [EventType.PRIVATE, 0.10],
+            [EventType.DEPARTMENT, 0.25],
+            [EventType.INTERNAL_STUDENT, 0.40],
+            [EventType.PUBLIC, 0.25],
+        ];
+    }
+    return [
+        [EventType.PRIVATE, 0.00],
+        [EventType.DEPARTMENT, 0.10],
+        [EventType.INTERNAL_STUDENT, 0.35],
+        [EventType.PUBLIC, 0.55],
+    ];
+}
+
+function pickEventType(cap: number): EventType {
+    let roll = Math.random();
+    for (const [type, weight] of eventTypeWeights(cap)) {
+        if (roll < weight) return type;
+        roll -= weight;
+    }
+    return EventType.PUBLIC;
+}
+
+const BUDGET_PER_SEAT: Record<EventType, [number, number]> = {
+    [EventType.PUBLIC]:           [60, 120],
+    [EventType.INTERNAL_STUDENT]: [40,  90],
+    [EventType.DEPARTMENT]:       [30,  70],
+    [EventType.PRIVATE]:          [80, 150],
+};
+
+function randomBudget(cap: number, type: EventType): number {
+    const [low, high] = BUDGET_PER_SEAT[type];
+    const raw = 1_500 + cap * randInt(low, high);
+    return Math.round(raw / 500) * 500;
+}
+
+function reviewScore(base: number): number {
+    return clamp(Math.round(base + noise(0.5)), 0, 5);
+}
+
+const POSITIVE_COMMENTS = [
+    'Baie goed georganiseer, ek het dit geniet!',
+    'Uitstekende sprekers en lekker atmosfeer.',
+    'Een van die beste geleenthede hierdie jaar.',
+    'Goeie inhoud en alles het betyds begin.',
+    'Sal beslis weer bywoon.',
+];
+
+const NEUTRAL_COMMENTS = [
+    'Redelik goed, maar die program was bietjie lank.',
+    'Interessant, al was die lokaal te warm.',
+    'Goeie idee, maar die kommunikasie vooraf kon beter wees.',
+    'Gemiddeld - niks spesiaals nie, maar ook nie sleg nie.',
+];
+
+const NEGATIVE_COMMENTS = [
+    'Min mense het opgedaag en dit het leeg gevoel.',
+    'Swak beplanning, ons moes lank wag.',
+    'Die klank was sleg en ek kon niks hoor nie.',
+    'Het meer verwag van die inhoud.',
+];
+
+function pickComment(averageScore: number): string {
+    if (averageScore >= 3.5) return POSITIVE_COMMENTS[randInt(0, POSITIVE_COMMENTS.length - 1)];
+    if (averageScore >= 2.0) return NEUTRAL_COMMENTS[randInt(0, NEUTRAL_COMMENTS.length - 1)];
+    return NEGATIVE_COMMENTS[randInt(0, NEGATIVE_COMMENTS.length - 1)];
+}
+
+function roundTwo(value: number): number {
+    return Math.round(value * 100) / 100;
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 async function seed(): Promise<void> {
@@ -262,14 +388,35 @@ async function seed(): Promise<void> {
     console.log(`Connecting to ${redacted} …\n`);
     await mongoose.connect(mongoUri);
 
-    const usersCol  = mongoose.connection.collection('users');
-    const eventsCol = mongoose.connection.collection('events');
-    const rsvpsCol  = mongoose.connection.collection('rsvps');
+    const usersCol   = mongoose.connection.collection('users');
+    const eventsCol  = mongoose.connection.collection('events');
+    const rsvpsCol   = mongoose.connection.collection('rsvps');
+    const reviewsCol = mongoose.connection.collection('reviews');
+    const now        = new Date();
 
-    // Idempotency guard — skip everything if the sentinel admin already exists
-    if (await usersCol.findOne({ email: 'seed-admin@akademia.ac.za' })) {
+    async function resetSeedData(): Promise<void> {
+        const seedUsers  = await usersCol.find(SEED_USER_FILTER, { projection: { _id: 1 } }).toArray();
+        const userIds    = seedUsers.map((user) => user._id);
+        const seedEvents = await eventsCol.find({ createdBy: { $in: userIds } }, { projection: { _id: 1 } }).toArray();
+        const eventIds   = seedEvents.map((event) => event._id);
+        const ownedBySeed = { $or: [{ event: { $in: eventIds } }, { user: { $in: userIds } }] };
+
+        const [reviews, rsvps, events, users] = await Promise.all([
+            reviewsCol.deleteMany(ownedBySeed),
+            rsvpsCol.deleteMany(ownedBySeed),
+            eventsCol.deleteMany({ _id: { $in: eventIds } }),
+            usersCol.deleteMany({ _id: { $in: userIds } }),
+        ]);
+
+        console.log('--reset: removed this seed\'s own data only:');
+        console.log(`  ${users.deletedCount} users, ${events.deletedCount} events, ${rsvps.deletedCount} RSVPs, ${reviews.deletedCount} reviews.\n`);
+    }
+
+    if (RESET) {
+        await resetSeedData();
+    } else if (await usersCol.findOne(SEED_SENTINEL_FILTER)) {
         console.log('Seed data already present (sentinel user found). Skipping.');
-        console.log('To re-seed, delete the user seed-admin@akademia.ac.za first.');
+        console.log('To re-seed, run the script again with --reset.');
         await mongoose.disconnect();
         return;
     }
@@ -283,7 +430,7 @@ async function seed(): Promise<void> {
     const adminDoc = {
         _id: new Types.ObjectId(),
         name: 'Saad', surname: 'Administrateur',
-        email: 'seed-admin@akademia.ac.za',
+        email: SEED_ADMIN_EMAIL,
         passwordHash, role: 'ADMIN', studyCenter: 'Hoofkampus',
         isActive: true, failedLoginAttempts: 0, lockedUntil: null, title: 'NONE',
         createdAt: new Date('2021-01-01'), updatedAt: new Date('2021-01-01'),
@@ -332,25 +479,44 @@ async function seed(): Promise<void> {
             photographerInstructions: string;
             confirmedAttendees: number;
             checkedInCount: number;
+            type: EventType;
+            budget: number;
+            reviewCategories: { id: string; name: string }[];
+            ratingAvg: number | null;
+            ratingCount: number;
+            reviewRequestsSentAt: Date;
             createdAt: Date;
             updatedAt: Date;
         };
         checkedInCount: number;
+        fillRate: number;
     }
 
-    console.log('Generating 300 events (Jul 2021 → Jun 2026)…');
+    interface ReviewSeed {
+        _id: Types.ObjectId;
+        event: Types.ObjectId;
+        user: Types.ObjectId;
+        ratings: { categoryId: string; score: number }[];
+        comment?: string;
+        createdAt: Date;
+        updatedAt: Date;
+    }
+
+    console.log('Generating events (Oct 2023 → Sep 2026)…');
     const eventSeeds: EventSeed[] = [];
 
-    // July 2021 to June 2026 inclusive = exactly 5 academic years = 300 events
-    for (let year = 2021; year <= 2026; year++) {
-        const monthStart = year === 2021 ? 7 : 1;
-        const monthEnd   = year === 2026 ? 6 : 12;
+    // October 2023 to September 2026 inclusive = 36 months ≈ 120 events
+    for (let year = 2023; year <= 2026; year++) {
+        const monthStart = year === 2023 ? 10 : 1;
+        const monthEnd   = year === 2026 ? 9 : 12;
 
         for (let month = monthStart; month <= monthEnd; month++) {
             const count = EVENTS_PER_MONTH[month];
 
             for (let i = 0; i < count; i++) {
                 const eventDate     = randomEventDate(year, month);
+                if (eventDate.getTime() > now.getTime()) continue;
+
                 const daysInAdvance = randInt(7, 60);
                 const createdAt     = new Date(eventDate.getTime() - daysInAdvance * 86_400_000);
                 const capacity      = randomCapacity();
@@ -376,6 +542,8 @@ async function seed(): Promise<void> {
                 const noShowRate = clamp(rawNoShow + noise(0.05), 0.03, 0.45);
                 const checkedInCount = Math.round(confirmedAttendees * (1 - noShowRate));
 
+                const type = pickEventType(capacity);
+
                 eventSeeds.push({
                     doc: {
                         _id: new Types.ObjectId(),
@@ -389,17 +557,21 @@ async function seed(): Promise<void> {
                         photographerInstructions: '',
                         confirmedAttendees,
                         checkedInCount,
+                        type,
+                        budget: randomBudget(capacity, type),
+                        reviewCategories: DEFAULT_REVIEW_CATEGORIES.map((name) => ({ id: uuidv4(), name })),
+                        ratingAvg: null,
+                        ratingCount: 0,
+                        reviewRequestsSentAt: eventDate,
                         createdAt,
                         updatedAt: eventDate,
                     },
                     checkedInCount,
+                    fillRate,
                 });
             }
         }
     }
-
-    await eventsCol.insertMany(eventSeeds.map(e => e.doc));
-    console.log(`✓ Inserted ${eventSeeds.length} events.\n`);
 
     // ─── RSVPs ────────────────────────────────────────────────────────────────
     // For each event we create one RSVP per confirmed attendee, assigning unique
@@ -419,13 +591,45 @@ async function seed(): Promise<void> {
         batch = [];
     }
 
-    for (const { doc: event, checkedInCount } of eventSeeds) {
+    const reviewSeeds: ReviewSeed[] = [];
+
+    for (const { doc: event, checkedInCount, fillRate } of eventSeeds) {
         if (event.confirmedAttendees === 0) continue;
 
         const selectedIndices = pickUniqueIndices(NUM_STUDENTS, event.confirmedAttendees);
+        const eventScores: number[] = [];
+        let eventReviewCount = 0;
 
         for (let pos = 0; pos < selectedIndices.length; pos++) {
             const didCheckIn = pos < checkedInCount;
+
+            if (didCheckIn && Math.random() < REVIEW_SHARE) {
+                const reviewerBase = 1.5 + fillRate * 3.5 + noise(0.6);
+                const ratings = event.reviewCategories.map((category) => ({
+                    categoryId: category.id,
+                    score: reviewScore(reviewerBase),
+                }));
+                const averageScore = ratings.reduce((sum, rating) => sum + rating.score, 0) / ratings.length;
+                const hoursAfter = randInt(2, REVIEW_WINDOW_HOURS);
+                const reviewedAt = new Date(Math.min(event.date.getTime() + hoursAfter * 3_600_000, now.getTime()));
+
+                const review: ReviewSeed = {
+                    _id: new Types.ObjectId(),
+                    event: event._id,
+                    user: studentIds[selectedIndices[pos]],
+                    ratings,
+                    createdAt: reviewedAt,
+                    updatedAt: reviewedAt,
+                };
+                if (Math.random() < COMMENT_SHARE) {
+                    review.comment = pickComment(averageScore);
+                }
+
+                reviewSeeds.push(review);
+                eventScores.push(...ratings.map((rating) => rating.score));
+                eventReviewCount++;
+            }
+
             batch.push({
                 _id: new Types.ObjectId(),
                 event:      event._id,
@@ -441,9 +645,22 @@ async function seed(): Promise<void> {
 
             if (batch.length >= BATCH) await flushBatch();
         }
+
+        if (eventReviewCount > 0) {
+            event.ratingCount = eventReviewCount;
+            event.ratingAvg = roundTwo(eventScores.reduce((sum, score) => sum + score, 0) / eventScores.length);
+        }
     }
     await flushBatch();
     console.log(`\n✓ Inserted ${totalRsvps} RSVPs.\n`);
+
+    await eventsCol.insertMany(eventSeeds.map(e => e.doc));
+    console.log(`✓ Inserted ${eventSeeds.length} events.\n`);
+
+    if (reviewSeeds.length > 0) {
+        await reviewsCol.insertMany(reviewSeeds);
+    }
+    console.log(`✓ Inserted ${reviewSeeds.length} reviews.\n`);
 
     // ─── Summary ──────────────────────────────────────────────────────────────
     const docs = eventSeeds.map(e => e.doc);
@@ -458,12 +675,18 @@ async function seed(): Promise<void> {
         0,
     ) / eventSeeds.length;
 
+    const typeCounts = Object.values(EventType)
+        .map((type) => `${type}: ${docs.filter((e) => e.type === type).length}`)
+        .join(', ');
+
     console.log('──────────────────────────────────────────────────────────────');
     console.log('Seed complete.');
     console.log(`  Events inserted:     ${docs.length}`);
     console.log(`  RSVPs inserted:      ${totalRsvps}`);
+    console.log(`  Reviews inserted:    ${reviewSeeds.length}`);
     console.log(`  Avg fill rate:       ${(avgFill   * 100).toFixed(1)} %`);
     console.log(`  Avg no-show rate:    ${(avgNoShow * 100).toFixed(1)} %`);
+    console.log(`  Event types:         ${typeCounts}`);
     console.log('──────────────────────────────────────────────────────────────');
 
     // Print sample feature vectors so you can verify the patterns look sane

@@ -13,6 +13,9 @@ import { RSVP_STATUS_LABELS, getRsvpStatusColors } from '../lib/rsvp-status';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { typography } from '../theme/typography';
 import { safeGoBack } from '../lib/navigation';
+import { useEventsStore } from '../stores/events.store';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'RsvpManagement'>;
 type Route = RouteProp<RootStackParamList, 'RsvpManagement'>;
@@ -34,6 +37,7 @@ export function RsvpManagementScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
 
   const loadData = useCallback(async () => {
     setLoadError(null);
@@ -60,8 +64,9 @@ export function RsvpManagementScreen() {
     try {
       const updated = await checkInRsvp(rsvp.id);
       setRsvps((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-    } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
+      invalidateEvents(); // checkedInCount het verander
+    } catch (err) {
+      const status = getErrorStatus(err);
       Alert.alert(
         'Kon nie inteken nie',
         status === 409 ? 'Hierdie gas het reeds ingeteken.' : 'Probeer asseblief weer.',
@@ -87,6 +92,7 @@ export function RsvpManagementScreen() {
               setRsvps((prev) =>
                 prev.map((r) => (r.id === rsvp.id ? { ...r, status: 'GEKANSELLEER' as RsvpStatus } : r)),
               );
+              invalidateEvents(); // confirmedAttendees het verander
             } catch {
               Alert.alert('Kon nie kanselleer nie', 'Probeer asseblief weer.');
             } finally {
@@ -110,7 +116,7 @@ export function RsvpManagementScreen() {
 
       {loading ? (
         <View style={styles.centerWrap}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       ) : loadError ? (
         <View style={styles.centerWrap}>
@@ -151,7 +157,7 @@ export function RsvpManagementScreen() {
                       {attendeeName(rsvp)}{rsvp.primaryRsvpId ? ' (+1-gas)' : ''}
                     </Text>
                     <Text style={styles.rowMeta}>
-                      {rsvp.user ? rsvp.user.email : rsvp.guestEmail ?? 'Walk-in (geen rekening nie)'}
+                      {rsvp.user ? rsvp.user.email : rsvp.guestEmail ?? 'Loop-in (geen rekening nie)'}
                     </Text>
                     {rsvp.plusOneName && (
                       <Text style={styles.rowMeta}>

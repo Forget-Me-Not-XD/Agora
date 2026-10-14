@@ -8,10 +8,13 @@ import InfoModal from '@/components/InfoModal';
 import DateRangePicker from '@/components/DateRangePicker';
 import { toIsoRange } from '@/lib/date-range';
 import ExportCsvButton from '@/components/ExportCsvButton';
-import { canCreateEvents } from '@/lib/rbac';
+import { canCreateEvents, getRoleLabel, isEventOrganiser } from '@/lib/rbac';
+import { ATTENDANCE_OPTIONS } from '@/lib/attendance';
 import { useCurrentUser } from '@/components/UserContext';
 import { listEventsAction } from '@/lib/actions/event.actions';
 import { getMyRsvpsAction } from '@/lib/actions/rsvp.actions';
+import { getPaymentStatusAction } from '@/lib/actions/payments.actions';
+import { getMyReviewStateAction } from '@/lib/actions/review.actions';
 import { usePollWhileActive } from '@/lib/user-activity';
 import type { Event, EventType } from '@/lib/api/events';
 import { deriveStatus } from '@/lib/event-view';
@@ -19,32 +22,22 @@ import type { EventStatus } from '@/lib/event-view';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 
-const EVENT_TYPE_INFO: { type: string; label: string; color: string; description: string }[] = [
-    {
-        type: 'public',
-        label: 'Publiek',
-        color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-        description: 'Oop vir alle gebruikers ongeag hul rol. Geen uitnodiging nodig nie. Sigbaar vir GAS, studente, dosente en admins.',
-    },
-    {
-        type: 'internal_student',
-        label: 'Intern - Student',
-        color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-        description: 'Slegs vir geregistreerde studente. Dosente en admins kan ook sien. GAS-lede moet spesifiek uitgenooi word.',
-    },
-    {
-        type: 'private',
-        label: 'Privaat',
-        color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-        description: 'Slegs vir spesifiek uitgenodigde gebruikers. Jy moet \'n direkte uitnodiging van die organiseerder ontvang het om dit te sien.',
-    },
-    {
-        type: 'department',
-        label: 'Departement',
-        color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-        description: 'Slegs vir dosente en administrateurs. Nie sigbaar vir studente of GAS-lede nie.',
-    },
+// Die tipe is net 'n kategorie (vir filters en insigte). Wie 'n geleentheid sien, hang af van sy
+// sigbaarheid (intendedAttendance), soos die backend se events.service dit afdwing.
+const EVENT_TYPE_INFO: { type: string; label: string; color: string }[] = [
+    { type: 'public',           label: 'Publiek',          color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' },
+    { type: 'internal_student', label: 'Intern - Student', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+    { type: 'private',          label: 'Privaat',          color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+    { type: 'department',       label: 'Departement',      color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400' },
 ];
+
+const VISIBILITY_FOR_ROLE: Record<string, string> = {
+    ADMIN:        'Jy sien alle geleenthede.',
+    DOSENT:       'Jy sien alle geleenthede behalwe dié wat net vir admins is.',
+    STUDENT:      'Jy sien geleenthede vir "Almal" en vir "Studente en hoër".',
+    GAS:          'Jy sien geleenthede wat vir "Almal" oop is.',
+    PHOTOGRAPHER: 'Jy sien net geleenthede waarvoor jy as fotograaf toegewys is.',
+};
 
 export default function EventsPage() {
     const user = useCurrentUser();
@@ -53,6 +46,10 @@ export default function EventsPage() {
     const [loading, setLoading]     = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [rsvpdEventIds, setRsvpdEventIds] = useState<Set<string>>(new Set());
+    const [reviewableEventIds, setReviewableEventIds] = useState<Set<string>>(new Set());
+    const [reviewedEventIds, setReviewedEventIds]     = useState<Set<string>>(new Set());
+    const [closedReviewEventIds, setClosedReviewEventIds] = useState<Set<string>>(new Set());
+    const [upcomingReviewEventIds, setUpcomingReviewEventIds] = useState<Set<string>>(new Set());
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
@@ -68,24 +65,13 @@ export default function EventsPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const [newEventId, setNewEventId] = useState<string | null>(null);
-    const [paymentNotice, setPaymentNotice] = useState<'success' | 'cancelled' | null>(null);
+    const [paymentNotice, setPaymentNotice] = useState<'confirming' | 'success' | 'cancelled' | 'pending' | null>(null);
 
     useEffect(() => {
         const created = searchParams.get('created');
         if (created) {
             setNewEventId(created);
             router.replace('/events'); // vee die query-param uit sodat 'n verfris nie die gloed herhaal nie
-        }
-    }, [searchParams, router]);
-
-    // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
-    // /payments/return en /cancel) -- PayFast se eie ITN bevestig die kaartjie
-    // reeds op die agtergrond, hierdie is bloot terugvoer vir die gebruiker.
-    useEffect(() => {
-        const payment = searchParams.get('payment');
-        if (payment === 'success' || payment === 'cancelled') {
-            setPaymentNotice(payment);
-            router.replace('/events');
         }
     }, [searchParams, router]);
 
@@ -152,6 +138,83 @@ export default function EventsPage() {
         }
     }, []);
 
+    // Die eerste laai en die poll kan oorvleuel, so net die jongste versoek se antwoord tel
+    const reviewStateRequestId = useRef(0);
+
+    const loadReviewState = useCallback(async () => {
+        const requestId = ++reviewStateRequestId.current;
+
+        try {
+            const { state } = await getMyReviewStateAction();
+            if (!state || requestId !== reviewStateRequestId.current) return;
+            setReviewableEventIds(new Set(state.reviewable));
+            setReviewedEventIds(new Set(state.reviewed));
+            setClosedReviewEventIds(new Set(state.closed));
+            setUpcomingReviewEventIds(new Set(state.upcoming));
+        } catch {
+            // Soos die RSVP's: die kaarte werk steeds sonder die resensie-aanduiding
+        }
+    }, []);
+
+    // Land hier ná 'n regte PayFast-herleiding (sien payments.controller.ts se
+    // /payments/return en /cancel). PayFast se eie ITN skep die kaartjie
+    // heeltemal server-tot-server, onafhanklik van wanneer die blaaier hierheen
+    // herlei -- die twee gebeure is NIE gewaarborg in enige volgorde nie (sien
+    // die kommentaar daaroor in payments.controller.ts). Sonder hierdie peiling
+    // sou die RSVP-lys/kaartjie soms eenvoudig ontbreek totdat iets anders
+    // toevallig 'n herlaai veroorsaak.
+    useEffect(() => {
+        const payment = searchParams.get('payment');
+        const reference = searchParams.get('reference');
+
+        if (payment === 'cancelled') {
+            setPaymentNotice('cancelled');
+            router.replace('/events');
+            return;
+        }
+
+        if (payment !== 'success') return;
+        router.replace('/events');
+
+        if (!reference) {
+            // Behoort nie te gebeur nie (return_url dra dit altyd), maar los
+            // liewer 'n opgevoede boodskap as om te crash.
+            setPaymentNotice('success');
+            loadEvents(false);
+            loadRsvps();
+            return;
+        }
+
+        setPaymentNotice('confirming');
+        let active = true;
+        const POLL_INTERVAL_MS = 1500;
+        const POLL_MAX_ATTEMPTS = 12; // ~18s -- ruim bo wat 'n ITN normaalweg neem
+
+        (async () => {
+            for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+                const statusResult = await getPaymentStatusAction(reference);
+                if (!active) return;
+
+                if (statusResult.result?.status === 'VOLTOOI') {
+                    setPaymentNotice('success');
+                    loadEvents(false);
+                    loadRsvps();
+                    return;
+                }
+                if (statusResult.result?.status === 'MISLUK') {
+                    setPaymentNotice(null);
+                    return;
+                }
+                await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            }
+            // Nog steeds HANGENDE ná al ons pogings -- die geld is heel moontlik
+            // reeds gehef, so wys 'n sagter boodskap i.p.v. 'n fout.
+            if (active) setPaymentNotice('pending');
+        })();
+
+        return () => { active = false; };
+    }, [searchParams, router, loadEvents, loadRsvps]);
+
     // Herlaai die geleenthede sodra die datumfilter verander (of by die eerste laai).
     useEffect(() => {
         loadEvents(true);
@@ -161,12 +224,17 @@ export default function EventsPage() {
         loadRsvps();
     }, [loadRsvps]);
 
-    // Haal elke 60 s die geleenthede en RSVP-status weer op, maar net terwyl die gebruiker
-    // die bladsy gebruik. Die hook gebruik altyd die jongste datumfilter, sonder dat 'n
-    // filterklik die opname herbegin.
+    useEffect(() => {
+        loadReviewState();
+    }, [loadReviewState]);
+
+    // Haal elke 60 s die geleenthede, RSVP-status en resensies weer op, maar net terwyl die
+    // gebruiker die bladsy gebruik. Die hook gebruik altyd die jongste datumfilter, sonder dat
+    // 'n filterklik die opname herbegin.
     usePollWhileActive(() => {
         loadEvents(false);
         loadRsvps();
+        loadReviewState();
     }, 60000);
 
     const filtered = events
@@ -177,10 +245,11 @@ export default function EventsPage() {
             // 'Alle Status' beteken hier alle nie-verby geleenthede, 'n verby
             // geleentheid wys slegs as die 'Verby'-status spesifiek gekies is.
             // Uitsondering: het die gebruiker self 'n datumreeks gekies, dan is die
-            // verby geleenthede binne daardie reeks juis wat hy gevra het.
+            // verby geleenthede binne daardie reeks juis wat hy gevra het. 'n Verby
+            // geleentheid wat die gebruiker nog kan beoordeel, wys ook.
             const matchesStatus =
                 statusFilter === 'all'
-                    ? rangeActive || deriveStatus(event) !== 'past'
+                    ? rangeActive || deriveStatus(event) !== 'past' || reviewableEventIds.has(event.id)
                     : deriveStatus(event) === statusFilter;
             const matchesType = typeFilter === 'all' || event.type === typeFilter;
             return matchesSearch && matchesStatus && matchesType;
@@ -204,17 +273,25 @@ export default function EventsPage() {
                     className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${
                         paymentNotice === 'success'
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400'
+                            : paymentNotice === 'confirming'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-400'
                             : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400'
                     }`}
                 >
                     <span>
-                        {paymentNotice === 'success'
-                            ? 'Jou betaling is ontvang — jou kaartjie word tans bevestig.'
+                        {paymentNotice === 'confirming'
+                            ? 'Jou betaling word bevestig…'
+                            : paymentNotice === 'success'
+                            ? 'Jou kaartjie is bevestig — kyk by "My RSVPs".'
+                            : paymentNotice === 'pending'
+                            ? 'Jou betaling neem langer as gewoonlik om te bevestig. Jou kaartjie sal binnekort by "My RSVPs" verskyn.'
                             : 'Die betaling is gekanselleer.'}
                     </span>
-                    <button onClick={() => setPaymentNotice(null)} className="text-xs underline shrink-0">
-                        Maak toe
-                    </button>
+                    {paymentNotice !== 'confirming' && (
+                        <button onClick={() => setPaymentNotice(null)} className="text-xs underline shrink-0">
+                            Maak toe
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -223,11 +300,12 @@ export default function EventsPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--color-text)]">Geleenthede</h1>
                     <p className="text-sm text-[var(--color-text-subtle)] mt-1">
-                        {loading ? 'Laai geleenthede…' : `${filtered.length} geleenthede sigbaar vir jou rol`}
+                        {loading ? 'Laai geleenthede…' : `${filtered.length} geleenthede wat jy kan sien`}
                     </p>
                 </div>
                 <div className="flex item-center gap-2">
-                    <ExportCsvButton type="rsvp-summary"/>
+                    {/* Die backend se uitvoer is net vir admins */}
+                    {user.role === 'ADMIN' && <ExportCsvButton type="rsvp-summary" />}
                 {canCreateEvents(user.role) && (
                     <Link
                         href="/events/create"
@@ -278,36 +356,34 @@ export default function EventsPage() {
                         <option value="department">Departement</option>
                     </select>
 
-                    <InfoModal title="Geleentheid Tipes">
+                    <InfoModal title="Wie sien watter geleenthede?">
                         <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
-                            Elke geleentheid het 'n tipe wat bepaal wie dit kan sien.
-                            Jou rol bepaal watter tipes vir jou sigbaar is.
+                            Wie &apos;n geleentheid kan sien, hang af van sy <strong className="text-[var(--color-text)]">sigbaarheid</strong>,
+                            wat die organiseerder kies wanneer hy dit skep:
                         </p>
-                        <div className="space-y-2">
-                            {EVENT_TYPE_INFO.map((item) => (
-                                <div
-                                    key={item.type}
-                                    className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${item.color}`}>
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                        {item.description}
-                                    </p>
-                                </div>
+                        <ul className="space-y-1.5">
+                            {ATTENDANCE_OPTIONS.map((o) => (
+                                <li key={o.value} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text)]">
+                                    {o.label}
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-                            <p className="text-xs font-semibold text-[var(--color-text)] mb-1">Jou rol: {user.role}</p>
-                            <p className="text-xs text-[var(--color-text-subtle)] leading-relaxed">
-                                {user.role === 'ADMIN' && 'Jy kan alle geleenthede sien, ongeag tipe.'}
-                                {user.role === 'DOSENT' && 'Jy kan alle aanstaande geleenthede sien, plus geleenthede wat jy geskep het.'}
-                                {user.role === 'STUDENT' && 'Jy kan publieke, intern-student geleenthede, en geleenthede waarvoor jy uitgenooi is sien.'}
-                                {user.role === 'GAS' && 'Jy kan publieke geleenthede en geleenthede waarvoor jy spesifiek uitgenooi is sien.'}
+                            <p className="text-xs font-semibold text-[var(--color-text)] mb-1">Jou rol: {getRoleLabel(user.role)}</p>
+                            <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+                                {VISIBILITY_FOR_ROLE[user.role]} Is jy as Finansies aan &apos;n geleentheid toegeken, sien jy dit ook.
                             </p>
+                        </div>
+                        <p className="text-sm text-[var(--color-text-subtle)] leading-relaxed">
+                            Die <strong className="text-[var(--color-text)]">tipe</strong> is net &apos;n kategorie. Gebruik dit om die lys te filter;
+                            dit bepaal nie wie die geleentheid sien nie.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {EVENT_TYPE_INFO.map((item) => (
+                                <span key={item.type} className={`text-xs px-2 py-0.5 rounded-full font-semibold ${item.color}`}>
+                                    {item.label}
+                                </span>
+                            ))}
                         </div>
                     </InfoModal>
                 </div>
@@ -349,6 +425,14 @@ export default function EventsPage() {
                             event={event}
                             alreadyRsvpd={rsvpdEventIds.has(event.id)}
                             isNew={event.id === newEventId}
+                            manageable={isEventOrganiser(user, event)}
+                            reviewState={
+                                reviewableEventIds.has(event.id) ? 'reviewable'
+                                : reviewedEventIds.has(event.id) ? 'reviewed'
+                                : closedReviewEventIds.has(event.id) ? 'closed'
+                                : upcomingReviewEventIds.has(event.id) ? 'upcoming'
+                                : undefined
+                            }
                         />
                     ))}
                 </div>

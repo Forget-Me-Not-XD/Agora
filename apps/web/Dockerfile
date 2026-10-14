@@ -26,6 +26,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app/apps/web
 ENV NODE_ENV=production
 
+# Die bladsye word op die bediener gebou, en die datum-helpers (getHours, getDate) gebruik die
+# proses se tydsone. Sonder TZ is dit UTC: 'n geleentheid om 14:00 sou as 12:00 wys, en tussen
+# middernag en 02:00 sou "vandag" en "môre" een dag mis wees. tzdata gee Alpine die sone-data.
+RUN apk add --no-cache tzdata
+ENV TZ=Africa/Johannesburg
+
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nextjs -u 1001
 

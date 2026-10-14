@@ -4,6 +4,8 @@ export interface NotificationItem {
     _id:        string;
     message:    string;
     read:       boolean;
+    event:      { _id: string; title: string } | null;
+    type:       'FOTOGRAAF' | 'RESENSIE_VERSOEK';
     createdAt:  string;
 }
 

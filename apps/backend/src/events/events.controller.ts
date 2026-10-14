@@ -24,7 +24,6 @@ import { UpdateEventDto } from './dto/update-event.dto';
 import { AssignPhotographerDto } from './dto/assign-photographer.dto';
 import { EventResponseDto } from './dto/event-response.dto';
 import { FindEventsQueryDto } from './dto/find-events-query.dto';
-import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 @Controller('events')
 @UseGuards(JwtAuthGuard)
@@ -32,9 +31,6 @@ export class EventsController {
     constructor(private readonly eventsService: EventsService) {}
 
     @Get()
-    @UseGuards(ThrottlerGuard)
-    @Throttle({ polling: { limit: 60, ttl: 60000 } })
-    @SkipThrottle({ default: true })
     async findAll(
         @CurrentUser() user: JwtPayload,
         @Query() query: FindEventsQueryDto,
@@ -49,7 +45,7 @@ export class EventsController {
     }
     
     @Get('venues')
-    getVenues(): {id: string; label: string; campus: string; maxCapacity: number}[] {
+    getVenues(): {id: string; label: string; campus: string; maxCapacity: number; address: string}[] {
         return this.eventsService.getVenues();
     }
 
@@ -86,7 +82,10 @@ export class EventsController {
         return EventResponseDto.fromDocument(event);
     }
 
+    // Net admins skrap: dit vee ook al die geleentheid se RSVPs uit (sien EventsService.deleteEvent)
     @Delete(':id')
+    @UseGuards(RolesGuard)
+    @Roles(Role.ADMIN)
     @HttpCode(HttpStatus.NO_CONTENT)
     async remove(
         @Param('id') id: string,

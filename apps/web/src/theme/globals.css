@@ -29,6 +29,8 @@
   --color-yellow: #854D0E;
   --color-purple: #7E22CE;
 
+  --color-star: #D97706;
+
   --color-gold: #06647F;
 }
 
@@ -56,6 +58,8 @@
   --color-orange: #FB923C;
   --color-yellow: #FACC15;
   --color-purple: #C084FC;
+
+  --color-star: #FBBF24;
 
   --color-gold: #0DC9D0;
 }

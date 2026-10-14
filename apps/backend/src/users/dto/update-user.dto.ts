@@ -1,7 +1,8 @@
-import { IsArray, IsEnum, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { UserTitle } from '../../common/enums/user-title.enum';
 import { UserTag } from '../../common/enums/user-tag.enum';
+import { Role } from '../../common/enums/role.enums';
 
 /**
  * Slaan validasie oor slegs wanneer die veld heeltemal afwesig is.
@@ -32,7 +33,7 @@ export class UpdateUserDto {
 
     @IsPresent()
     @IsEnum(UserTitle, {
-        message: `Titel moet een van die volgende wees: ${Object.values(UserTitle).filter(v => v !== '').join(', ')} of 'n leë string`,
+        message: `Titel moet een van die volgende wees: ${Object.values(UserTitle).filter(v => v !== '').join(', ')} of 'n leÃ« string`,
     })
     title?: UserTitle;
 
@@ -40,4 +41,21 @@ export class UpdateUserDto {
     @IsArray()
     @IsEnum(UserTag, { each: true })
     tags?: UserTag[];
+
+    // Vanaf hier: slegs ADMINS mag hierdie velde stel -- afgedwing in die controller,
+    // soos reeds met tags gedoen word.
+
+    @IsPresent()
+    @IsEnum(Role, { message: 'Ongeldige rol' })
+    role?: Role;
+
+    @IsPresent()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(80, { message: 'Studiesentrum mag hoogstens 80 karakters wees' })
+    studyCenter?: string;
+
+    @IsPresent()
+    @IsBoolean({ message: 'isActive moet true of false wees' })
+    isActive?: boolean;
 }

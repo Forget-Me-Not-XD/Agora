@@ -1,6 +1,8 @@
 // ========== Imports: ==========
 import { getToken } from '../session';
 import type { AttendanceRole } from '../attendance';
+import type { ReviewCategory, ReviewCategoryInput } from '../review-categories';
+import { httpErrorMessage } from './http-error';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -24,12 +26,16 @@ export interface Event {
     photographerInstructions: string;
     assignedTo:               string | null;
     confirmedAttendees:       number;
+    checkedInCount:           number;
     intendedAttendance:       AttendanceRole;
     type:                     EventType;
     sellsTickets:             boolean;
     ticketPrice:              number | null;
     ticketsAvailable:         number | null;
     allowsPlusOne:            boolean;
+    reviewCategories:         ReviewCategory[];
+    ratingAvg:                number | null;
+    ratingCount:              number;
     createdAt:                string;
     updatedAt:                string;
 }
@@ -38,7 +44,7 @@ export interface CreateEventPayload {
     title:                     string;
     description:               string;
     date:                      string;
-    endDate?:                  string;
+    endDate:                   string;
     location:                  string;
     address:                   string;
     placeId?:                  string;
@@ -55,6 +61,7 @@ export interface CreateEventPayload {
     ticketPrice?:              number;
     ticketsAvailable?:         number;
     allowsPlusOne?:            boolean;
+    reviewCategories?:         ReviewCategoryInput[];
 }
 
 export interface Venue {
@@ -62,6 +69,7 @@ export interface Venue {
     label:       string;
     campus:      string;
     maxCapacity: number;
+    address:     string;   // die kampus se straatadres
 }
 
 export async function getVenues(): Promise<Venue[]> {
@@ -89,8 +97,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        const msg  = body.message ?? res.statusText;
-        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+        throw new Error(httpErrorMessage(res, body));
     }
 
     return res.json() as Promise<T>;
@@ -120,4 +127,21 @@ export async function updateEvent(id: string, payload: UpdateEventPayload): Prom
         method: 'PATCH',
         body:   JSON.stringify(payload),
     });
+}
+
+// DELETE /api/v1/events/:id — net admins; skrap ook die RSVPs. Die antwoord is 204 sonder inhoud,
+// en apiFetch lees altyd JSON, daarom 'n eie fetch.
+export async function deleteEvent(id: string): Promise<void> {
+    const token = getToken();
+
+    const res = await fetch(`${BASE_URL}/api/v1/events/${id}`, {
+        method:  'DELETE',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        cache:   'no-store',
+    });
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string | string[] };
+        throw new Error(httpErrorMessage(res, body));
+    }
 }

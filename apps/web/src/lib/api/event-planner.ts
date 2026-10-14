@@ -2,6 +2,7 @@
 import { getToken } from '../session';
 import { PredictionUnavailableError } from './analytics';
 import type { PredictionResult } from './analytics';
+import { httpErrorMessage } from './http-error';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -29,8 +30,7 @@ export async function previewEvent(payload: PreviewEventPayload): Promise<Predic
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { message?: string | string[] };
-        const msg  = body.message ?? res.statusText;
-        throw new Error(`[${res.status}] ${typeof msg === 'string' ? msg : msg.join(', ')}`);
+        throw new Error(httpErrorMessage(res, body));
     }
 
     return res.json() as Promise<PredictionResult>;

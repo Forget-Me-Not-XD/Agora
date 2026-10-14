@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { eventDetailHref } from '@/lib/event-origin';
 import { Calendar, MapPin, X, Loader2, Search } from 'lucide-react';
 import type { MyRsvp, RsvpStatus } from '@/lib/api/rsvp';
 import { formatDateLong } from '@/lib/format-date';
@@ -190,7 +191,7 @@ export default function MyRsvpList({ initialRsvps, initialDateFrom, initialDateT
                                     <div className="min-w-0 flex-1">
                                         {r.event ? (
                                             <Link
-                                                href={`/events/${r.event._id}`}
+                                                href={eventDetailHref(r.event._id, { from: 'rsvps' })}
                                                 className="text-sm font-semibold text-[var(--color-text)] hover:text-[var(--color-primary)] hover:underline truncate block"
                                             >
                                                 {r.event.title}

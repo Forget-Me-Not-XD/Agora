@@ -4,19 +4,25 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import type { PredictionResult } from '@/lib/api/analytics';
-import { getDraftAttendancePredictionAction } from '@/lib/actions/analytics.actions';
+import { usePredictionsStore } from '@/lib/stores/predictions.store';
+import PredictionAdvice from '@/components/PredictionAdvice';
 
 interface EventPredictionPanelProps {
     date: string;
     capacity: string;
     onApplyBudget: (budget: number) => void;
+    onApplyAlternative: (date: string, capacity: number) => void;
 }
 
-export default function EventPredictionPanel({ date, capacity, onApplyBudget }: EventPredictionPanelProps) {
+export default function EventPredictionPanel({ date, capacity, onApplyBudget, onApplyAlternative }: EventPredictionPanelProps) {
     const [prediction, setPrediction] = useState<PredictionResult | null>(null);
     const [loading, setLoading]       = useState(false);
     const [unavailable, setUnavailable] = useState(false);
     const [error, setError]           = useState<string | null>(null);
+    // Deel die kas met die Speeltuin. Op die wysig-bladsy begin albei op dieselfde datum en
+    // kapasiteit, so die model word net een keer gevra. 'n Kombinasie wat die afgelope vyf
+    // minute al suksesvol voorspel is, kom sonder 'n nuwe oproep terug.
+    const ensureDraftPrediction = usePredictionsStore((s) => s.ensureDraftLoaded);
 
     useEffect(() => {
         const capacityNum = Number(capacity);
@@ -25,6 +31,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
             setPrediction(null);
             setUnavailable(false);
             setError(null);
+            setLoading(false);
             return;
         }
 
@@ -34,7 +41,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
             setUnavailable(false);
             setError(null);
 
-            getDraftAttendancePredictionAction({ date, maxCapacity: capacityNum })
+            ensureDraftPrediction({ date, maxCapacity: capacityNum })
                 .then((result) => {
                     if (cancelled) return;
                     if (result.prediction) {
@@ -54,7 +61,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [date, capacity]);
+    }, [date, capacity, ensureDraftPrediction]);
 
     if (!date || !Number(capacity)) {
         return (
@@ -64,7 +71,7 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
                     <h2 className="text-base font-semibold text-[var(--color-text)]">KI-Voorspelling</h2>
                 </div>
                 <p className="text-sm text-[var(--color-text-subtle)]">
-                    Vul die datum en kapasiteit in op die vorm om 'n voorspelling te sien.
+                    Vul die datum en kapasiteit in op die vorm om &apos;n voorspelling te sien.
                 </p>
             </div>
         );
@@ -124,6 +131,11 @@ export default function EventPredictionPanel({ date, capacity, onApplyBudget }: 
                             ))}
                         </ul>
                     </div>
+
+                    <PredictionAdvice
+                        prediction={prediction}
+                        onChooseAlternative={(alternative) => onApplyAlternative(alternative.date.slice(0, 10), alternative.capacity)}
+                    />
                 </div>
             )}
         </div>

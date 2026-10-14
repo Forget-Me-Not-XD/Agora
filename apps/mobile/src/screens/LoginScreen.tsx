@@ -12,6 +12,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors } from '../theme/theme';
 import { useThemeStore } from '../stores/theme.store';
 import { GoogleLogo, MicrosoftLogo } from '../components/BrandIcons';
+import { getErrorMessage } from '../lib/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -63,10 +64,10 @@ export function LoginScreen({ navigation }: Props) {
   const handleBiometricLogin = async () => {
     try {
       await loginWithBiometrics();
-    } catch (err: any) {
+    } catch (err) {
       Alert.alert(
         'Biometriese aanmelding',
-        err?.message ?? 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord',
+        getErrorMessage(err, 'Kon nie met biometrie aanmeld nie. Meld asseblief aan met jou wagwoord'),
       );
     }
   };
@@ -197,7 +198,9 @@ export function LoginScreen({ navigation }: Props) {
 
             <TouchableOpacity
               style={styles.forgotBtn}
-              onPress={() => Alert.alert('Wagwoord', 'Kontak die Agora stelseladministrateur om jou wagwoord te herstel.')}
+              onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() })}
+              disabled={isLoading}
+              accessibilityRole="button"
             >
               <Text style={styles.forgotText}>Wagwoord vergeet?</Text>
             </TouchableOpacity>

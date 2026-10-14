@@ -5,6 +5,11 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { apiClient, API_URL, UserResponse } from '../api/client';
 import type { TokenPair } from '../api/client';
+import { useEventsStore } from './events.store';
+import { useRsvpsStore } from './rsvps.store';
+import { usePredictionsStore } from './predictions.store';
+import { useNotificationsStore } from './notifications.store';
+import { getErrorMessage, getErrorStatus } from '../lib/errors';
 
 export type SsoProvider = 'google' | 'microsoft';
 
@@ -80,9 +85,8 @@ login: async (email, password) => {
     const result = await apiClient.post<TokenPair>('/auth/login', { email, password });
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isLoading: false });
-  } catch (err: any) {
-    const msg = err?.response?.data?.message ?? 'Login failed';
-    set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Login failed', isLoading: false });
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Login failed'), isLoading: false });
     throw err;
   }
 },
@@ -137,9 +141,8 @@ register: async (payload) => {
     const result = await apiClient.post<TokenPair>('/auth/register', payload);
     await apiClient.setTokens(result.accessToken, result.refreshToken);
     set({ user: result.user, isLoading: false });
-  } catch (err: any) {
-    const msg = err?.response?.data?.message ?? 'Registration failed';
-    set({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Registration failed', isLoading: false });
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Registration failed'), isLoading: false });
     throw err;
   }
 },
@@ -152,17 +155,14 @@ register: async (payload) => {
 changePassword: async (currentPassword, newPassword) => {
   set({ isLoading: true, error: null });
   try {
-    await apiClient.post('/auth/change-password', { currentPassword, newPassword });
-    const { user } = get();
-    if (user) {
-      set({ user: { ...user, mustChangePassword: false }, isLoading: false });
-    } else {
-      set({ isLoading: false });
-    }
-    }catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Password change failed';
-      set ({ error: typeof msg === 'string' ? msg : msg.join?.(', ') ?? 'Password change failed', isLoading: false});
-      throw err;
+    // The backend ends every session when the password changes, this one included, and hands
+    // back a fresh pair. Without storing it the app would be signed out at the next refresh.
+    const result = await apiClient.post<TokenPair>('/auth/change-password', { currentPassword, newPassword });
+    await apiClient.setTokens(result.accessToken, result.refreshToken);
+    set({ user: result.user, isLoading: false });
+  } catch (err) {
+    set({ error: getErrorMessage(err, 'Password change failed'), isLoading: false });
+    throw err;
   }
 },
 
@@ -172,6 +172,14 @@ logout: async () => {
     await apiClient.clearTokens();
   }
   set({ user: null, error: null });
+
+  // 'n Volgende sessie (moontlik 'n ander gebruiker, op dieselfde toestel
+  // sonder om die app heeltemal toe te maak) mag nooit hierdie een se
+  // gekaste funksies/RSVPs/voorspellings/kennisgewings selfs vlugtig sien nie.
+  useEventsStore.getState().reset();
+  useRsvpsStore.getState().reset();
+  usePredictionsStore.getState().reset();
+  useNotificationsStore.getState().reset();
 },
 
 clearError: () => set({ error: null }),
@@ -247,9 +255,9 @@ loginWithBiometrics: async () => {
 
     const user = await apiClient.get<UserResponse>('/users/me');
     set({ user, isLoading: false });
-  } catch (err: any) {
+  } catch (err) {
     set({ isLoading: false });
-    if (err?.response) {
+    if (getErrorStatus(err) !== undefined) {
       throw new Error('Jou sessie het verval. Meld asseblief weer aan met jou wagwoord.');
     }
     throw err;

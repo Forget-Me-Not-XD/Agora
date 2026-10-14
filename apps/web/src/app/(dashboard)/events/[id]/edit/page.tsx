@@ -4,8 +4,10 @@ import { AlertCircle, ChevronLeft } from 'lucide-react';
 import { getEventById } from '@/lib/api/events';
 import { getUsersByIds } from '@/lib/api/users';
 import { getCurrentUser } from '@/lib/get-current-user';
+import { eventDetailHref, parseOrigin } from '@/lib/event-origin';
 import { getToken } from '@/lib/session';
 import EventForm from '@/components/EventForm';
+import { defaultReviewCategories } from '@/lib/review-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +22,17 @@ function toDateTimeInputs(iso: string): { date: string; time: string } {
     };
 }
 
-export default async function EditEventPage({ params }: { params: { id: string } }) {
+export default async function EditEventPage({ params, searchParams }: {
+    params: { id: string };
+    searchParams: Record<string, string | string[] | undefined>;
+}) {
     const user = getCurrentUser();
 
     const event = await getEventById(params.id).catch(() => null);
     if (!event) notFound();
+
+    // Hou die herkoms (bv. die kalender) vas, sodat die geleentheid se "Terug" ná wysig steeds reg lei
+    const eventHref = eventDetailHref(event.id, parseOrigin(searchParams));
 
     // Admin mag enige geleentheid wysig; 'n dosent slegs een wat hy self geskep het.
     // Word ook op die backend afgedwing (PATCH /events/:id) -- hierdie is net vir 'n gawe UI.
@@ -53,7 +61,7 @@ export default async function EditEventPage({ params }: { params: { id: string }
     return (
         <div className="max-w-7xl space-y-6">
             <Link
-                href={`/events/${event.id}`}
+                href={eventHref}
                 className="inline-flex items-center gap-1 text-sm text-[var(--color-text-subtle)] hover:text-[var(--color-primary)] transition-colors"
             >
                 <ChevronLeft size={16} /> Terug na geleentheid
@@ -67,6 +75,8 @@ export default async function EditEventPage({ params }: { params: { id: string }
             <EventForm
                 mode="edit"
                 eventId={event.id}
+                returnTo={eventHref}
+                ratingCount={event.ratingCount}
                 initialValues={{
                     title: event.title,
                     description: event.description,
@@ -89,6 +99,11 @@ export default async function EditEventPage({ params }: { params: { id: string }
                     ticketPrice: event.ticketPrice !== null ? String(event.ticketPrice) : '',
                     ticketsAvailable: event.ticketsAvailable !== null ? String(event.ticketsAvailable) : '',
                     allowsPlusOne: event.allowsPlusOne,
+                    // Ou geleenthede van voor resensie-kategorieë het 'n leë lys, en dan kan die vorm nie
+                    // stoor nie. Gee hulle die standaard-kategorieë, die backend gee hulle dan self id's.
+                    reviewCategories: event.reviewCategories.length > 0
+                        ? event.reviewCategories
+                        : defaultReviewCategories(),
                 }}
             />
         </div>

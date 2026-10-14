@@ -1,15 +1,12 @@
 // ========== Imports: ==========
 import { Injectable, BadRequestException, ServiceUnavailableException } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import { Model } from 'mongoose';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { EventDocument } from "../events/schemas/event.schema";
 import { EventsService } from "../events/events.service";
-import { Rsvp, RsvpDocument }from '../rsvp/schemas/rsvp.schema';
-import { Role } from '../common/enums/role.enums';
 import { PredictDraftEventDto } from './dto/predict-draft-event.dto';
+import { RecommendationService, Recommendation } from './recommendation.service';
 
 // ============================================================
 // This interface is the boundary between the NestJS world and the Python world
@@ -30,6 +27,22 @@ export interface TrainingDataItem {
     };
 }
 
+export type AlternativeKind = 'sameWeek' | 'laterWeek' | 'recommendedCapacity';
+
+export interface AlternativePrediction {
+    kind:                AlternativeKind;
+    date:                string;
+    capacity:            number;
+    dayOfWeek:           number;
+    month:               number;
+    dayOfMonth:          number;
+    daysInAdvance:       number;
+    predictedFillRate:   number;
+    predictedNoShowRate: number;
+    estimatedRsvps:      number;
+    estimatedAttendees:  number;
+}
+
 // Mirrors the JSON object predict.py prints to stdout:
 export interface PredictionResult {
     predictedFillRate:   number;
@@ -38,6 +51,23 @@ export interface PredictionResult {
     estimatedAttendees:  number;
     estimatedBudgetZAR:  number;
     reasoning:           string[];
+    alternatives:        AlternativePrediction[];
+    recommendations:     Recommendation[];
+}
+
+type ModelPrediction = Omit<PredictionResult, 'recommendations'>;
+
+type ScriptAlternative = Omit<AlternativePrediction, 'kind' | 'date'>;
+
+interface PredictScriptOutput extends Omit<PredictionResult, 'alternatives' | 'recommendations'> {
+    alternatives?:        ScriptAlternative[];
+    recommendedCapacity?: ScriptAlternative | null;
+}
+
+interface AlternativeCandidate {
+    kind:     AlternativeKind;
+    date:     Date;
+    features: EventFeatures;
 }
 
 // Retrospective: the model's forward-looking guess for a now-completed event,
@@ -63,7 +93,7 @@ export interface ModelStatus {
     fillRateMae:    number | null;
     noShowMae:      number | null;
     health:         ModelHealth;
-} 
+}
 
 // Only the fields we actually read out of model_meta.json.
 interface ModelMetaFile {
@@ -78,6 +108,10 @@ interface ModelMetaFile {
 // the saved model was compiled for this many timestamps and cannot accept any other shape.
 const SEQUENCE_LENGTH = 10;
 
+const DAYS_PER_WEEK = 7;
+const WEEKS_AHEAD = 2;
+const MAX_SUGGESTED_ALTERNATIVES = 5;
+
 @Injectable()
 export class LstmService {
     private readonly MODEL_HEALTH_GOOD_MAE = 0.10;
@@ -85,43 +119,28 @@ export class LstmService {
 
     constructor(
         private readonly eventsService: EventsService,
-        // Direct injection of the RSVP model so we can run aggregate queries:
-        @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        private readonly recommendationService: RecommendationService,
     ) {}
 
-    // Returns training data for all past events, or for a single event by id:
-    // While fetching all we filter to events that already happened:
+    // Returns training data for all trainable events, or for a single event by id:
+    // trainable = not demo data, already finished, and at least one check-in recorded
     async getTrainingData(eventId ?: string): Promise <TrainingDataItem[]> {
         if (eventId !== undefined) {
             const event = await this.eventsService.findById(eventId);
-            return [await this.toTrainingItem(event)];
+            return [this.toTrainingItem(event)];
         }
 
-        // findAll supports an optional 'to' date filter - we use this to exclude future events
-        const events = await this.eventsService.findAll(
-            Role.ADMIN,
-            '',
-            undefined,
-            new Date().toISOString(),
-        );
-
-        // Promise.all runs all the RSVP queries concurrently instead of serially
-        return Promise.all(events.map(event => this.toTrainingItem(event)));
+        const events = await this.eventsService.findTrainableEvents(new Date());
+        return events.map(event => this.toTrainingItem(event));
     }
 
-    private async toTrainingItem(event: EventDocument): Promise <TrainingDataItem> {
-        // Feature: fill rate (Label not input - or else an expected output begin sent as input will caude ML leakage)
+    private toTrainingItem(event: EventDocument): TrainingDataItem {
         const fillRate = event.maxCapacity > 0
             ? event.confirmedAttendees / event.maxCapacity
-            : 0
-
-        // Label: no-show rate:
-        const checkedInCount = await this.rsvpModel
-            .countDocuments({ event: event._id, checkedIn: true })
-            .exec();
+            : 0;
 
         const noShowRate = event.confirmedAttendees > 0
-            ? 1 - checkedInCount / event.confirmedAttendees
+            ? 1 - event.checkedInCount / event.confirmedAttendees
             : 0;
 
         return {
@@ -137,59 +156,34 @@ export class LstmService {
     }
 
     private computeFeatures(event: EventDocument): EventFeatures {
+        return this.computeFeaturesAt(event.maxCapacity, event.date, event.createdAt ?? event.date);
+    }
+
+    private computeFeaturesAt(capacity: number, date: Date, plannedAt: Date): EventFeatures {
         // Feature: days in advance:
         // Previously used implementation can result in negative values for past events - causes Neural Network result unstability:
-        const createdAt = event.createdAt ?? event.date;
         const daysInAdvance = Math.max(
             0,
-            Math.round((event.date.getTime() - createdAt.getTime()) / 86_400_000),
+            Math.round((date.getTime() - plannedAt.getTime()) / 86_400_000),
         );
 
         return [
-            event.maxCapacity,              //<-- Seats available
-            event.date.getDay(),            //<-- 0 = Sunday, 1 = Monday, 2 = Tuesday, ...
-            event.date.getMonth() + 1,      //<-- 1 = Jan, 2 = Feb, 3 = Mar, ...
-            event.date.getDate(),           //<-- Day of the month, 1, ..., 31
+            capacity,                       //<-- Seats available
+            date.getDay(),                  //<-- 0 = Sunday, 1 = Monday, 2 = Tuesday, ...
+            date.getMonth() + 1,            //<-- 1 = Jan, 2 = Feb, 3 = Mar, ...
+            date.getDate(),                 //<-- Day of the month, 1, ..., 31
             daysInAdvance,                  // Planning Lead Time
         ];
     }
 
-    private computeDraftFeatures(dto: PredictDraftEventDto): EventFeatures {
-        const eventDate = new Date(dto.date);
-        const now = new Date();
-        const daysInAdvance = Math.max(
-            0,
-            Math.round((eventDate.getTime() - now.getTime()) / 86_400_000),
-        );
-
-        return [
-            dto.maxCapacity,
-            eventDate.getDay(),
-            eventDate.getMonth() + 1,
-            eventDate.getDate(),
-            daysInAdvance,
-        ];
-    }
-
-    // Fetches the SEQUENCE_LENGTH - 1 most recent real events strictly before targetDate,
-    // computes their features the same way training does, and appends the target event's
-    // own features as the final timestep - giving predict.py a genuine temporal window
-    // instead of one event repeated.
-    private async buildFeatureSequence(
-        targetFeatures: EventFeatures,
+    // Fetches the SEQUENCE_LENGTH - 1 most recent real events strictly before targetDate.
+    private async findRecentHistory(
         targetDate: Date,
         excludeEventId?: string,
-    ): Promise<EventFeatures[]> {
-        const historyNeeded = SEQUENCE_LENGTH - 1;
+    ): Promise<EventDocument[]> {
+        const candidates = await this.eventsService.findTrainableEvents(targetDate);
 
-        const candidates = await this.eventsService.findAll(
-            Role.ADMIN,
-            '',
-            undefined,
-            targetDate.toISOString(),
-        );
-
-        // findAll's `to` filter is inclusive and returns events sorted ascending by date -
+        // findTrainableEvents' result is sorted ascending by date -
         // keep only events strictly before the target, and defensively exclude the target's
         // own id in case of an exact date collision.
         const strictlyPast = candidates.filter(e =>
@@ -197,8 +191,18 @@ export class LstmService {
             (excludeEventId === undefined || e._id.toString() !== excludeEventId),
         );
 
-        const mostRecent = strictlyPast.slice(-historyNeeded);
-        let historyFeatures = mostRecent.map(e => this.computeFeatures(e));
+        return strictlyPast.slice(-(SEQUENCE_LENGTH - 1));
+    }
+
+    // Computes the history's features the same way training does, and appends the target event's
+    // own features as the final timestep - giving predict.py a genuine temporal window
+    // instead of one event repeated.
+    private buildFeatureSequence(
+        targetFeatures: EventFeatures,
+        history: EventDocument[],
+    ): EventFeatures[] {
+        const historyNeeded = SEQUENCE_LENGTH - 1;
+        let historyFeatures = history.map(e => this.computeFeatures(e));
 
         if (historyFeatures.length < historyNeeded) {
             if (historyFeatures.length === 0) {
@@ -215,6 +219,50 @@ export class LstmService {
         return [...historyFeatures, targetFeatures];
     }
 
+    // Die 9-geleentheid-geskiedenis van die teikendatum word vir elke alternatief hergebruik.
+    // Dit is 'n benadering wat net vir nabye datums geld: 'n alternatief tot 6 dae vroeër of
+    // 20 dae later sien nie die geleenthede wat tussen die teikendatum en sy eie datum val nie.
+    private buildAlternativeCandidates(
+        capacity: number,
+        targetDate: Date,
+        plannedAt: Date,
+    ): AlternativeCandidate[] {
+        const candidates: AlternativeCandidate[] = [];
+        const daysSinceMonday = (targetDate.getDay() + 6) % DAYS_PER_WEEK;
+        const firstOffset = -daysSinceMonday;
+        const lastOffset = DAYS_PER_WEEK * (WEEKS_AHEAD + 1) - 1 - daysSinceMonday;
+        const firstOffsetOfNextWeek = DAYS_PER_WEEK - daysSinceMonday;
+
+        for (let offset = firstOffset; offset <= lastOffset; offset++) {
+            if (offset !== 0) {
+                const kind: AlternativeKind = offset < firstOffsetOfNextWeek ? 'sameWeek' : 'laterWeek';
+                candidates.push(this.toCandidate(kind, capacity, this.addDays(targetDate, offset), plannedAt));
+            }
+        }
+
+        const now = Date.now();
+        return candidates.filter(candidate => candidate.date.getTime() > now);
+    }
+
+    private toCandidate(
+        kind: AlternativeKind,
+        capacity: number,
+        date: Date,
+        plannedAt: Date,
+    ): AlternativeCandidate {
+        return {
+            kind,
+            date,
+            features: this.computeFeaturesAt(capacity, date, plannedAt),
+        };
+    }
+
+    private addDays(date: Date, days: number): Date {
+        const result = new Date(date.getTime());
+        result.setDate(result.getDate() + days);
+        return result;
+    }
+
     // 'n Geleentheid is "verby" sodra sy einde (of, as daar geen einde is nie, 3 uur
     // na sy begin) reeds verby is — dieselfde reël as web/mobile se eie status-afleiding.
     private isEventPast(event: EventDocument): boolean {
@@ -228,7 +276,7 @@ export class LstmService {
     async predictAttendance(eventId: string): Promise<PredictionResult> {
         const event = await this.eventsService.findById(eventId);
 
-        // The model only ever learns [capacity, dayOfWeek, month, daysInAdvance] —
+        // The model only ever learns [capacity, dayOfWeek, month, dayOfMonth, daysInAdvance] —
         // it has no notion of what actually happened, so for a past event it just
         // repeats the same forward-looking guess it would have made before the
         // event ever ran. That reliably disagrees with the real confirmedAttendees
@@ -239,16 +287,13 @@ export class LstmService {
             );
         }
 
-        const targetFeatures = this.computeFeatures(event);
-        const sequence = await this.buildFeatureSequence(targetFeatures, event.date, event._id.toString());
-
-        try {
-            return await this.runPredictScript(sequence);
-        } catch (err) {
-            throw new ServiceUnavailableException(
-                `Attendance prediction is currently unavailable: ${(err as Error).message}`,
-            );
-        }
+        const history = await this.findRecentHistory(event.date, event._id.toString());
+        return this.predictWithAlternatives(
+            event.maxCapacity,
+            event.date,
+            event.createdAt ?? event.date,
+            history,
+        );
     }
 
     // Retrospective accuracy check: re-runs the model's forward-looking guess for
@@ -270,10 +315,10 @@ export class LstmService {
 
             if (!this.isEventPast(event)) return null;
 
-            const targetFeatures = this.computeFeatures(event);
-            const sequence = await this.buildFeatureSequence(targetFeatures, event.date, event._id.toString());
+            const history = await this.findRecentHistory(event.date, event._id.toString());
+            const sequence = this.buildFeatureSequence(this.computeFeatures(event), history);
 
-            let prediction: PredictionResult;
+            let prediction: PredictScriptOutput;
             try {
                 prediction = await this.runPredictScript(sequence);
             } catch {
@@ -300,17 +345,52 @@ export class LstmService {
     // Same as predictAttendance, but for an event that doesn't exist yet -
     // used by the "create event" form to preview a prediction before submitting.
     async predictDraft(dto: PredictDraftEventDto): Promise<PredictionResult> {
-        const targetFeatures = this.computeDraftFeatures(dto);
         const eventDate = new Date(dto.date);
-        const sequence = await this.buildFeatureSequence(targetFeatures, eventDate);
+        const history = await this.findRecentHistory(eventDate);
+        return this.predictWithAlternatives(dto.maxCapacity, eventDate, new Date(), history);
+    }
 
+    private async predictWithAlternatives(
+        capacity: number,
+        targetDate: Date,
+        plannedAt: Date,
+        history: EventDocument[],
+    ): Promise<PredictionResult> {
+        const targetFeatures = this.computeFeaturesAt(capacity, targetDate, plannedAt);
+        const sequence = this.buildFeatureSequence(targetFeatures, history);
+        const candidates = this.buildAlternativeCandidates(capacity, targetDate, plannedAt);
+
+        let output: PredictScriptOutput;
         try {
-            return await this.runPredictScript(sequence);
+            output = await this.runPredictScript(sequence, candidates);
         } catch (err) {
             throw new ServiceUnavailableException(
                 `Attendance prediction is currently unavailable: ${(err as Error).message}`,
             );
         }
+
+        const prediction = this.attachAlternatives(output, candidates, capacity, targetDate);
+        const improvements = this.selectImprovements(prediction.alternatives, prediction.estimatedAttendees, targetDate);
+        return {
+            ...prediction,
+            alternatives: improvements,
+            // Die volle lys bly nodig vir die kapasiteitsreël: 'n kleiner lokaal is selde 'n "verbetering".
+            recommendations: this.recommendationService.buildRecommendations(prediction, improvements, capacity, targetDate),
+        };
+    }
+
+    private selectImprovements(
+        alternatives: AlternativePrediction[],
+        currentAttendees: number,
+        targetDate: Date,
+    ): AlternativePrediction[] {
+        const distanceFromTarget = (alternative: AlternativePrediction) =>
+            Math.abs(new Date(alternative.date).getTime() - targetDate.getTime());
+
+        return alternatives
+            .filter(alternative => alternative.estimatedAttendees > currentAttendees)
+            .sort((a, b) => (b.estimatedAttendees - a.estimatedAttendees) || (distanceFromTarget(a) - distanceFromTarget(b)))
+            .slice(0, MAX_SUGGESTED_ALTERNATIVES);
     }
 
     // apps/ml is a sibling of apps/backend; dist/ mirrors src' so this relative septh holds both ts-node dev and the compiled build
@@ -362,7 +442,8 @@ export class LstmService {
 
     private runPredictScript(
         sequence: EventFeatures[],
-    ): Promise<PredictionResult> {
+        candidates: AlternativeCandidate[] = [],
+    ): Promise<PredictScriptOutput> {
         const scriptPath = path.join(this.mlDir(), 'predict.py');
         // Always use the venv's own interpreter - the system 'python' on PATH
         // may point to an invalid Python install
@@ -373,6 +454,9 @@ export class LstmService {
         // spawn() (no shell: true) passes argv entries directly to the OS - no shell
         // parsing occurs, so JSON containing spaces/brackets/quotes needs no escaping.
         const args = [scriptPath, JSON.stringify(sequence)];
+        if (candidates.length > 0) {
+            args.push('--alternatives', JSON.stringify(candidates.map(candidate => candidate.features)));
+        }
 
         return new Promise((resolve, reject) => {
             const child = spawn(pythonPath, args);
@@ -388,12 +472,42 @@ export class LstmService {
                     reject(new Error(stderr.trim() || `predict.py exited with code ${code}`));
                     return;
                 }
+
+                let output: PredictScriptOutput;
                 try {
-                    resolve(JSON.parse(stdout) as PredictionResult);
+                    output = JSON.parse(stdout) as PredictScriptOutput;
                 } catch {
                     reject(new Error('predict.py returned invalid JSON'));
+                    return;
                 }
+
+                resolve(output);
             });
         });
+    }
+
+    private attachAlternatives(
+        output: PredictScriptOutput,
+        candidates: AlternativeCandidate[],
+        capacity: number,
+        targetDate: Date,
+    ): ModelPrediction {
+        const { alternatives, recommendedCapacity, ...prediction } = output;
+        const scriptAlternatives = Array.isArray(alternatives) ? alternatives : [];
+
+        const dayAlternatives: AlternativePrediction[] = scriptAlternatives.length === candidates.length
+            ? scriptAlternatives.map((alternative, index) => ({
+                ...alternative,
+                kind: candidates[index].kind,
+                date: candidates[index].date.toISOString(),
+            }))
+            : [];
+
+        const capacityAlternatives: AlternativePrediction[] =
+            recommendedCapacity && recommendedCapacity.capacity !== capacity && targetDate.getTime() > Date.now()
+                ? [{ ...recommendedCapacity, kind: 'recommendedCapacity', date: targetDate.toISOString() }]
+                : [];
+
+        return { ...prediction, alternatives: [...dayAlternatives, ...capacityAlternatives] };
     }
 }

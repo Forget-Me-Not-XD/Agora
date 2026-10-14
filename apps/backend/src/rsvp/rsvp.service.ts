@@ -1,5 +1,5 @@
 ﻿// ========== Imports: ==========
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { isValidObjectId, Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
@@ -12,6 +12,7 @@ import { UsersService } from "../users/users.service";
 import { CalendarSyncService } from "../calendar/calendar-sync.service";
 import { Role } from '../common/enums/role.enums';
 import { User } from '../users/schemas/user.schema';
+import { EventDocument } from "../events/schemas/event.schema";
 
 export interface ScanResponse {
     guestName: string;
@@ -50,10 +51,7 @@ export class RsvpService {
             throw new ForbiddenException('Hierdie geleentheid laat nie \'n plus-een toe nie');
         }
 
-        const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
-        if (effectiveEnd.getTime() < Date.now()) {
-            throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
-        }
+        this.assertEventNotExpired(event);
 
         const existing = await this.rsvpModel
         .findOne({ event: dto.eventId, user: userId })
@@ -149,6 +147,10 @@ export class RsvpService {
     }
 
     async createPaidTicket(eventId: string, userId: string, paymentId: string): Promise<RsvpDocument> {
+        
+        const event = await this.eventsService.findById(eventId);
+        this.assertEventNotExpired(event);
+
         const existing = await this.rsvpModel
         .findOne({ event: eventId, user: userId })
         .exec();
@@ -205,6 +207,12 @@ export class RsvpService {
         return this.rsvpModel
         .find({ event: eventId })
         .populate('user', '-passwordHash -__v')
+        .exec();
+    }
+
+    async findCheckedInAttendees(eventId: string): Promise<RsvpDocument[]> {
+        return this.rsvpModel
+        .find({ event: eventId, checkedIn: true, user: { $exists: true, $ne: null } })
         .exec();
     }
 
@@ -288,6 +296,15 @@ export class RsvpService {
         }
     }
 
+    // Word gebruik wanneer die Event alreeds verloop het om te verseker dat daar nie geRSVP kan word nie.
+    // Publiek sodat PaymentsService dieselfde toets voor betaal-bevestiging kan doen.
+    assertEventNotExpired(event: EventDocument): void {
+    const effectiveEnd = event.endDate ?? new Date(event.date.getTime() + EVENT_GRACE_PERIOD_MS);
+    if (effectiveEnd.getTime() < Date.now()) {
+        throw new ConflictException('Hierdie geleentheid het reeds afgehandel');
+    }
+}
+
     // Gebruik wanneer 'n gebruiker sy rekening verwyder: kanselleer al sy aktiewe RSVP's
     // sodat geleentheidkapasiteit en gekoppelde kalender-inskrywings korrek vrygestel word,
     // eerder as om weeskop-RSVP's met 'n verwysing na 'n nie-bestaande gebruiker agter te laat.
@@ -314,6 +331,7 @@ export class RsvpService {
 
         const event = await this.eventsService.findById(rsvp.event.toString());
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         if (rsvp.status === RsvpStatus.GEKANSELLEER) {
             throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
@@ -322,13 +340,29 @@ export class RsvpService {
             throw new ConflictException('Gas het reeds ingecheck');
         }
 
-        rsvp.checkedIn = true;
-        rsvp.checkedInAt = new Date();
-        rsvp.status = RsvpStatus.BEVESTIG;
-        await rsvp.save();
+        await this.markCheckedIn(rsvp);
         await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         return rsvp;
+    }
+
+    // Atomies "eis" die inteken: die web se "Teken in"-knoppie en die app se QR-skandeerder kan
+    // dieselfde persoon gelyktydig inteken. Albei slaag dan die checkedIn-kontrole hierbo, maar
+    // net een kry die dokument hier terug, so checkedInCount word net een keer verhoog.
+    private async markCheckedIn(rsvp: Pick<Rsvp, 'checkedIn' | 'checkedInAt' | 'status'> & { _id: Types.ObjectId }): Promise<void> {
+        const checkedInAt = new Date();
+        const claimed = await this.rsvpModel.findOneAndUpdate(
+            { _id: rsvp._id, checkedIn: { $ne: true }, status: { $ne: RsvpStatus.GEKANSELLEER } },
+            { $set: { checkedIn: true, checkedInAt, status: RsvpStatus.BEVESTIG } },
+        ).exec();
+        if (!claimed) {
+            throw new ConflictException('Gas het reeds ingecheck');
+        }
+
+        // Hou die gelaaide dokument (met sy gepopuleerde user) in lyn vir die respons
+        rsvp.checkedIn = true;
+        rsvp.checkedInAt = checkedInAt;
+        rsvp.status = RsvpStatus.BEVESTIG;
     }
 
     async getQrCode(rsvpId: string, requesterId: string, requesterRole: Role):Promise<Buffer>{
@@ -357,7 +391,7 @@ export class RsvpService {
         return toBuffer(rsvp.qrPayload);
     }
 
-    async scanRsvp(qrPayload: string, requesterId: string, requesterRole: Role): Promise <ScanResponse> {
+    async scanRsvp(qrPayload: string, eventId: string, requesterId: string, requesterRole: Role): Promise <ScanResponse> {
         const rsvp = await this.rsvpModel
         .findOne({ qrPayload })
         .populate<{ user: User }>('user')
@@ -367,8 +401,15 @@ export class RsvpService {
             throw new NotFoundException('Ongeldige QR-kode');
         }
 
+        // Voor die eienaarskap-kontrole, en sonder die ander geleentheid se naam: dit kan aan
+        // iemand anders behoort, en die skandeerder hoef net te weet dis nie vir hierdie een nie
+        if (rsvp.event.toString() !== eventId) {
+            throw new BadRequestException('Hierdie QR-kode is vir \'n ander geleentheid.');
+        }
+
         const event = await this.eventsService.findById(rsvp.event.toString());
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         if (rsvp.status === RsvpStatus.GEKANSELLEER) {
             throw new ConflictException('Kan nie \'n gekanselleerde RSVP inteken nie');
@@ -377,10 +418,7 @@ export class RsvpService {
             throw new ConflictException('Gas het reeds ingecheck');
         }
 
-        rsvp.checkedIn = true;
-        rsvp.checkedInAt = new Date();
-        rsvp.status = RsvpStatus.BEVESTIG;
-        await rsvp.save();
+        await this.markCheckedIn(rsvp);
         await this.eventsService.incrementCheckedInCount(event._id.toString());
 
         // Walk-ins en +1-gaste het geen gekoppelde `user` nie -- val dan terug op
@@ -398,6 +436,7 @@ export class RsvpService {
     async registerWalkIn(dto: CreateWalkInDto, requesterId: string, requesterRole: Role): Promise<RsvpDocument> {
         const event = await this.eventsService.findById(dto.eventId);
         this.eventsService.assertOwnership(event, requesterId, requesterRole);
+        this.assertEventNotExpired(event);
 
         await this.eventsService.incrementConfirmedAttendees(dto.eventId);
         await this.eventsService.incrementCheckedInCount(dto.eventId);

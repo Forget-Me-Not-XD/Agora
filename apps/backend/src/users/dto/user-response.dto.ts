@@ -1,7 +1,6 @@
 // ========== Imports: ==========
 import { Role } from '../../common/enums/role.enums';
 import { UserDocument } from '../schemas/user.schema';
-import { UserTitle } from '../../common/enums/user-title.enum';
 import { SsoProvider } from '../../common/enums/sso-provider.enum';
 import { UserTag } from '../../common/enums/user-tag.enum';
 /**

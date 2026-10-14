@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { Controller, Get, Patch, Param, Body, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Post, Param, Body, Query, UseGuards, ForbiddenException, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -35,23 +35,24 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
-  // Soek gebruikers per rol en/of tag
+  // Soek gebruikers per rol, tag, en/of vrye teks (?search= vir die admin-UI, ?q= bly werk)
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.DOSENT)
   async search(
     @Query('role') role?: Role,
     @Query('q') q?: string,
+    @Query('search') search?: string,
     @Query('ids') ids?: string,
     @Query('tag') tag?: UserTag,
   ) : Promise<UserResponseDto[]> {
     const idList = ids ? ids.split(',').filter(Boolean) : undefined;
-    return this.usersService.search(role, q, idList, tag);
+    return this.usersService.search(role, search ?? q, idList, tag);
   }
 
     /**
       Update a users profile. Users may only update their own profile.
-      ADMINS may update all. Only ADMINS may change tags.
+      ADMINS may update all. Only ADMINS may change role, studyCenter, isActive or tags.
     */
     @Patch(':id')
     @UseGuards(JwtAuthGuard)
@@ -65,10 +66,42 @@ export class UsersController {
             throw new ForbiddenException('Jy mag slegs jou eie profiel wysig.');
         }
 
-        if (updateUserDto.tags !== undefined && jwtPayload.role !== Role.ADMIN) {
-            throw new ForbiddenException('Slegs administrateurs mag tags toeken.');
+        const adminOnlyFieldsUsed =
+            updateUserDto.tags !== undefined ||
+            updateUserDto.role !== undefined ||
+            updateUserDto.studyCenter !== undefined ||
+            updateUserDto.isActive !== undefined;
+
+        if (adminOnlyFieldsUsed && jwtPayload.role !== Role.ADMIN) {
+            throw new ForbiddenException('Slegs administrateurs mag rol, studiesentrum, status of tags wysig.');
         }
 
         return this.usersService.updateUser(id, updateUserDto);
+    }
+
+    // Verwyder 'n gebruiker permanent. 'n Admin mag homself nie so verwyder nie.
+    @Delete(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async deleteUser(
+        @Param('id') id: string,
+        @CurrentUser() jwtPayload: { sub: string, email: string, role: Role },
+    ): Promise<void> {
+        if (jwtPayload.sub === id) {
+            throw new ForbiddenException('Jy kan nie jouself verwyder nie.');
+        }
+        await this.usersService.deleteById(id);
+    }
+
+    // Herstel 'n gebruiker se wagwoord na 'n nuwe tydelike wagwoord. Daar is geen e-posdiens
+    // nie, so die wagwoord kom eenmalig in die respons terug vir die admin om self oor te dra.
+    @Post(':id/reset-password')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    @HttpCode(HttpStatus.OK)
+    async resetPassword(@Param('id') id: string): Promise<{ temporaryPassword: string }> {
+        const temporaryPassword = await this.usersService.resetPassword(id);
+        return { temporaryPassword };
     }
 }

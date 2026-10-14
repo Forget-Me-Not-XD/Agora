@@ -11,13 +11,17 @@ import { useThemeColors } from '../theme/theme';
 import { typography } from '../theme/typography';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { safeGoBack } from '../lib/navigation';
-import { listEvents, type EventResponse, type EventType } from '../api/events';
+import type { EventResponse, EventType } from '../api/events';
 import { getModelStatus, getPredictionAccuracy, type ModelStatus, type PredictionAccuracyItem } from '../api/analytics';
 import { TYPE_LABELS, formatFullDate } from '../lib/event-status';
+import { useEventsStore } from '../stores/events.store';
 import { canViewInsights } from '../lib/rbac';
 import { ModelStatusCard } from '../components/ModelStatusCard';
+import { KeyFindingsCard, useKeyFindings } from '../components/KeyFindingsCard';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EventPickerModal } from '../components/EventPickerModal';
 import { PredictionAccuracyBarChart } from '../components/charts/PredictionAccuracyBarChart';
+import { getApiErrorMessage } from '../lib/errors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
 
@@ -46,8 +50,10 @@ export function InsightsScreen({ navigation }: Props) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [loading, setLoading] = useState(true);
+  const events = useEventsStore((s) => s.events);
+  const eventsLoading = useEventsStore((s) => s.isLoading);
+  const ensureEventsLoaded = useEventsStore((s) => s.ensureLoaded);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -57,27 +63,25 @@ export function InsightsScreen({ navigation }: Props) {
 
   const role = user?.role ?? 'STUDENT';
   const allowed = canViewInsights(role);
+  const keyFindings = useKeyFindings(allowed);
+
+  useEffect(() => {
+    if (!allowed) return;
+    ensureEventsLoaded().catch(() => {});
+  }, [allowed, ensureEventsLoaded]);
 
   useEffect(() => {
     if (!allowed) return;
     let active = true;
-    (async () => {
-      setLoading(true);
-      try {
-        const [all, status] = await Promise.all([
-          listEvents(),
-          getModelStatus().catch(() => null),
-        ]);
-        if (active) {
-          setEvents(all);
-          setModelStatus(status);
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
+    setStatusLoading(true);
+    getModelStatus()
+      .then((status) => { if (active) setModelStatus(status); })
+      .catch(() => { if (active) setModelStatus(null); })
+      .finally(() => { if (active) setStatusLoading(false); });
     return () => { active = false; };
   }, [allowed]);
+
+  const loading = statusLoading || (eventsLoading && events.length === 0);
 
   async function analyze() {
     setAccuracyLoading(true);
@@ -86,10 +90,8 @@ export function InsightsScreen({ navigation }: Props) {
     try {
       const items = await getPredictionAccuracy([...selectedIds]);
       setAccuracyResults(items);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-      const raw = axiosErr?.response?.data?.message;
-      setAccuracyError(typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie akkuraatheid laai nie.');
+    } catch (err) {
+      setAccuracyError(getApiErrorMessage(err, 'Kon nie akkuraatheid laai nie.'));
     } finally {
       setAccuracyLoading(false);
     }
@@ -158,7 +160,7 @@ export function InsightsScreen({ navigation }: Props) {
 
       {loading ? (
         <View style={styles.centerFill}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       ) : completed.length === 0 ? (
         <View style={styles.centerFill}>
@@ -167,6 +169,12 @@ export function InsightsScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <KeyFindingsCard
+            findings={keyFindings.findings}
+            loading={keyFindings.loading}
+            onRetry={keyFindings.retry}
+          />
+
           <View style={styles.kpiGrid}>
             <InsightStat
               icon="users"

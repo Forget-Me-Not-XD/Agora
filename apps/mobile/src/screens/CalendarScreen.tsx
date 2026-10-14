@@ -1,20 +1,21 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeColors, useIsDark } from '../theme/theme';
-import { listEvents, type EventResponse } from '../api/events';
+import { useEventsStore } from '../stores/events.store';
+import type { EventResponse } from '../api/events';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import {
   getEventStatus,
   getStatusPillColors,
@@ -24,6 +25,7 @@ import {
   formatEventTime,
 } from '../lib/event-status';
 import { ScreenHeader } from '../components/ScreenHeader';
+import { NotificationBell } from '../components/NotificationBell';
 import { typography } from '../theme/typography';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -63,27 +65,22 @@ export function CalendarScreen() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('maand');
 
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Gedeelde kas (sien stores/events.store.ts) -- dieselfde lys as
+  // Dashboard/Funksies/KI/Insigte, so 'n wisseling na hierdie oortjie is
+  // dikwels oombliklik. Rol-gebaseerde sigbaarheid word reeds backend-kant
+  // afgedwing.
+  const events = useEventsStore((s) => s.events);
+  const isLoading = useEventsStore((s) => s.isLoading);
+  const error = useEventsStore((s) => s.error);
+  const ensureEventsLoaded = useEventsStore((s) => s.ensureLoaded);
+  const loading = isLoading && events.length === 0;
+  const loadError = events.length === 0 ? error : null;
 
-  // Rol-gebaseerde sigbaarheid word reeds backend-kant afgedwing.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const result = await listEvents();
-        if (active) setEvents(result);
-      } catch {
-        if (active) setLoadError('Kon nie funksies laai nie.');
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      ensureEventsLoaded().catch(() => {});
+    }, [ensureEventsLoaded]),
+  );
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, EventResponse[]> = {};
@@ -137,7 +134,7 @@ export function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Page header ── */}
-      <ScreenHeader title="Kalender" />
+      <ScreenHeader title="Kalender" right={<NotificationBell />} />
 
       {/* ── View mode toggle ── */}
       <View style={styles.toggleRow}>
@@ -164,7 +161,7 @@ export function CalendarScreen() {
 
       {loading ? (
         <View style={styles.centerFill}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       ) : loadError ? (
         <View style={styles.centerFill}>
@@ -350,8 +347,9 @@ function DayEventCard({
         <Text style={styles.dayEventMeta}>
           {formatEventTime(event.date)} · {event.location} · {event.confirmedAttendees} / {event.maxCapacity}
         </Text>
-        <TouchableOpacity style={styles.openBtn} onPress={onOpen} accessibilityLabel={`Maak ${event.title} oop`}>
-          <Text style={styles.openBtnText}>Maak oop</Text>
+        {/* Die geleentheid-skerm het die RSVP-knoppie (of kaartjie) en al die besonderhede */}
+        <TouchableOpacity style={styles.openBtn} onPress={onOpen} accessibilityLabel={`RSVP of sien besonderhede vir ${event.title}`}>
+          <Text style={styles.openBtnText}>RSVP en besonderhede</Text>
           <Feather name="arrow-right" size={14} color={colors.surface} />
         </TouchableOpacity>
       </View>

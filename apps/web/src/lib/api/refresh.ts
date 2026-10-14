@@ -1,5 +1,6 @@
 // ========== Imports: ==========
 import type { TokenPair } from '@/lib/types';
+import { clientIpHeaders } from '@/lib/client-ip';
 
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 
@@ -17,12 +18,17 @@ export type RefreshResult =
   | { status: 'invalid' }
   | { status: 'unavailable' };
 
-/** Vra die backend vir nuwe tokens met die refresh token. */
+/**
+ * Vra die backend vir nuwe tokens met die refresh token.
+ *
+ * Roep dit net binne 'n versoek (route handler of server action), want clientIpHeaders lees die
+ * inkomende versoek se headers.
+ */
 export async function refreshTokenPair(refreshToken: string): Promise<RefreshResult> {
   try {
     const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...clientIpHeaders() },
       body:    JSON.stringify({ refreshToken }),
       cache:   'no-store',
       signal:  AbortSignal.timeout(REFRESH_TIMEOUT_MS),

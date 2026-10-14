@@ -143,7 +143,7 @@ const PHOTOGRAPHER_BIOS = [
     'Freelance fotograaf, fokus op sport- en kultuurgeleenthede op kampus.',
 ];
 
-const RSVP_STATUSES = ['BEVESTIG', 'HANGENDE', 'GEKANSELLEER'] as const;
+type SeedRsvpStatus = 'BEVESTIG' | 'HANGENDE' | 'GEKANSELLEER';
 
 // Slegs geleenthede met hierdie titels (sosiale/vermaaklikheidsgeleenthede) kry ooit
 // 'n kaartjieprys -- 'n akademiese simposium of departementele vergadering sou nie
@@ -182,7 +182,7 @@ function pickUniqueIndices(total: number, count: number): number[] {
     return arr.slice(0, n);
 }
 
-function weightedRsvpStatus(): (typeof RSVP_STATUSES)[number] {
+function weightedRsvpStatus(): SeedRsvpStatus {
     const r = Math.random();
     if (r < 0.70) return 'BEVESTIG';
     if (r < 0.90) return 'HANGENDE';
@@ -193,7 +193,7 @@ function weightedRsvpStatus(): (typeof RSVP_STATUSES)[number] {
 // wat dit plaasgevind het, is elke inskrywing lankal bevestig of gekanselleer.
 // Oorwegend BEVESTIG hou die werklike bywoning (BEVESTIG-telling / kapasiteit)
 // naby die geteikende ~95%-gemiddeld.
-function weightedPastRsvpStatus(): (typeof RSVP_STATUSES)[number] {
+function weightedPastRsvpStatus(): SeedRsvpStatus {
     return Math.random() < 0.99 ? 'BEVESTIG' : 'GEKANSELLEER';
 }
 
@@ -471,7 +471,7 @@ async function seed(): Promise<void> {
         title: string;
         description: string;
         date: Date;
-        endDate?: Date;
+        endDate: Date;
         location: string;
         maxCapacity: number;
         budget: number;
@@ -487,6 +487,7 @@ async function seed(): Promise<void> {
         ticketsAvailable: number | null;
         createdAt: Date;
         updatedAt: Date;
+        isDemo: boolean;
     }> = [];
 
     // Guarantee the named dosent has authored a handful of events for their dashboard
@@ -522,7 +523,7 @@ async function seed(): Promise<void> {
             title: `${titleBase} ${date.getFullYear()}`,
             description: 'Universiteitsgeleentheid geskep vir demonstrasie- en toetsdoeleindes met volledige voorbeelddata.',
             date,
-            endDate: Math.random() < 0.5 ? new Date(date.getTime() + randInt(1, 4) * 3_600_000) : undefined,
+            endDate: new Date(date.getTime() + randInt(1, 4) * 3_600_000),
             location: pick(LOCATIONS),
             maxCapacity: capacity,
             budget: Math.round(capacity * randInt(80, 250)),
@@ -538,6 +539,7 @@ async function seed(): Promise<void> {
             ticketsAvailable,
             createdAt,
             updatedAt: date,
+            isDemo: true, // keeps demo events out of LSTM training and prediction history
         });
     }
 
@@ -545,7 +547,7 @@ async function seed(): Promise<void> {
     console.log('Generating RSVPs…');
     const now = Date.now();
 
-    const rsvpDocs: object[] = [];
+    const rsvpDocs: Array<{ event: Types.ObjectId; user: Types.ObjectId } & Record<string, unknown>> = [];
     const confirmedCountByEvent = new Map<string, number>();
     const checkedInCountByEvent = new Map<string, number>();
 
@@ -599,8 +601,8 @@ async function seed(): Promise<void> {
     for (const namedUser of [namedStudent, namedGas]) {
         const alreadyBooked = new Set(
             rsvpDocs
-                .filter((r: any) => r.user.toString() === namedUser._id.toString())
-                .map((r: any) => r.event.toString()),
+                .filter((r) => r.user.toString() === namedUser._id.toString())
+                .map((r) => r.event.toString()),
         );
         const candidateEvents = eventDocs.filter((e) => {
             const requiredLevel = ROLE_LEVEL[e.intendedAttendance];

@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../stores/auth.store';
 import { useNotificationsStore } from '../stores/notifications.store';
-import { useThemeColors } from '../theme/theme';
-import { canViewNotifications } from '../lib/rbac';
-import { startOnboardingPrefetch } from '../lib/prefetch';
+import { useThemeColors, type ThemeColors } from '../theme/theme';
+import { typography } from '../theme/typography';
+import { startAppPrefetch } from '../lib/prefetch';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { QrScannerScreen } from '../screens/QrScannerScreen';
 import { RsvpManagementScreen } from '../screens/RsvpManagementScreen';
+import { ReviewScreen } from '../screens/ReviewScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AdminCreateUserScreen } from '../screens/AdminCreateScreen';
 import { AdminUsersScreen } from '../screens/AdminUsersScreen';
 import { InsightsScreen } from '../screens/InsightsScreen';
@@ -25,7 +29,9 @@ import { MainTabs } from './MainTabs';
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
+  ForgotPassword: { email?: string } | undefined;
   ChangePassword: undefined;
+  AppLoading: undefined;
   Onboarding: undefined;
   Main: undefined;
   Settings: undefined;
@@ -33,6 +39,8 @@ export type RootStackParamList = {
   EventDetail: { eventId: string };
   QrScanner: { eventId: string };
   RsvpManagement: { eventId: string };
+  Review: { eventId: string };
+  Notifications: undefined;
   AdminCreateUser: undefined;
   AdminUsers: undefined;
   Insights: undefined;
@@ -70,24 +78,53 @@ export function AppNavigator() {
     setOnboardingSeen(true);
   }
 
-  // Terwyl 'n nuwe gebruiker die onboarding-teks lees, is dit dooie tyd wat ons
-  // kan gebruik om reeds die eerste data agtergrond toe te laai -- teen die tyd
-  // hulle by die Tuisblad uitkom, wag hulle nie vir 'n netwerkoproep wat klaar
-  // klaar is nie. Vuur net een keer af sodra die onboarding-skerm wys.
+  // Die oomblik 'n gebruiker aanmeld/registreer (of stilweg outo-aanmeld op
+  // app-oopmaak via 'n gestoorde token) moet die res van die app se data reeds
+  // agtergrond toe begin laai -- die laai-hek hieronder wys die Lottie-
+  // spinner totdat dit klaar is (of 'n redelike tydgrens verstryk het, sodat
+  // 'n stadige/gebroke netwerk die gebruiker nooit vir altyd vasvang nie).
+  // `prefetchReadyId` hou watter gebruiker se sessie reeds klaar voorgelaai
+  // is -- 'n nuwe aanmelding (selfs dieselfde gebruiker, ná afmeld) kry altyd
+  // 'n vars voorlaai, nooit die vorige sessie se resultaat nie.
+  const [prefetchReadyId, setPrefetchReadyId] = useState<string | null>(null);
+  const prefetchStartedFor = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!user || onboardingSeen !== false) return;
-    const isStaff = user.role === 'ADMIN' || user.role === 'DOSENT';
-    startOnboardingPrefetch(isStaff);
-    if (canViewNotifications(user.role)) {
-      useNotificationsStore.getState().load();
+    if (!user) {
+      prefetchStartedFor.current = null;
+      setPrefetchReadyId(null);
+      return;
     }
-  }, [user?.id, onboardingSeen]);
+    if (user.mustChangePassword) return; // eers ná wagwoordverandering die moeite werd
+    if (prefetchStartedFor.current === user.id) return;
+    prefetchStartedFor.current = user.id;
+
+    let active = true;
+    const isStaff = user.role === 'ADMIN' || user.role === 'DOSENT';
+    const notifPromise = useNotificationsStore.getState().load();
+
+    const MAX_WAIT_MS = 6000;
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, MAX_WAIT_MS));
+
+    Promise.race([
+      Promise.all([startAppPrefetch(isStaff), notifPromise]).then(() => {}),
+      timeout,
+    ]).finally(() => {
+      if (active) setPrefetchReadyId(user.id);
+    });
+
+    return () => { active = false; };
+  }, [user?.id, user?.mustChangePassword]);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
         user.mustChangePassword ? (
           <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        ) : prefetchReadyId !== user.id ? (
+          <Stack.Screen name="AppLoading">
+            {() => <AppLoadingGate />}
+          </Stack.Screen>
         ) : onboardingSeen === null ? (
           <Stack.Screen name="Onboarding">
             {() => (
@@ -108,6 +145,14 @@ export function AppNavigator() {
             <Stack.Screen name="EventDetail" component={EventDetailScreen} />
             <Stack.Screen name="QrScanner" component={QrScannerScreen} />
             <Stack.Screen name="RsvpManagement" component={RsvpManagementScreen} />
+            {/* Deursigtig sodat die skerm daaronder (die geleentheid, Tuis of Kennisgewings) agter die
+                resensievel sigbaar bly. Die vel animeer self, daarom animeer die navigasie nie. */}
+            <Stack.Screen
+              name="Review"
+              component={ReviewScreen}
+              options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
+            />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="AdminCreateUser" component={AdminCreateUserScreen} />
             <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
             <Stack.Screen name="Insights" component={InsightsScreen} />
@@ -118,11 +163,39 @@ export function AppNavigator() {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Popia" component={PopiaScreen} />
         </>
       )}
     </Stack.Navigator>
   );
+}
+
+// Vol-skerm Lottie-laaihek, tussen aanmeld/registrasie en die res van die
+// app -- volg die tema (lig/donker) presies soos elke ander skerm, sodat
+// daar nooit 'n wit/swart flits van die verkeerde modus is nie.
+function AppLoadingGate() {
+  const colors = useThemeColors();
+  const gateStyles = gateStylesFor(colors);
+  return (
+    <View style={gateStyles.wrap}>
+      <LoadingSpinner size={140} />
+      <Text style={gateStyles.caption}>Besig om alles gereed te kry…</Text>
+    </View>
+  );
+}
+
+function gateStylesFor(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+      gap: 16,
+    },
+    caption: { ...typography.body, color: colors.textSubtle },
+  });
 }
 
 const styles = StyleSheet.create({

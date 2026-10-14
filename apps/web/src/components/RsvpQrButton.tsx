@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { QrCode, X, Loader2, Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { getRsvpQrAction } from '@/lib/actions/rsvp.actions';
@@ -15,9 +16,13 @@ interface RsvpQrButtonProps {
     attendeeName: string;
     disabled?: boolean;
     label?: string;
+    /** Vervang die knoppie se verstek-styl ('n klein skakel), bv. vir 'n groot knoppie op die dashboard */
+    triggerClassName?: string;
+    /** Laat die ouer weet wanneer die venster oop of toe gaan, bv. sodat 'n karrousel solank stilstaan */
+    onOpenChange?: (open: boolean) => void;
 }
 
-export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled, label = 'QR-kode' }: RsvpQrButtonProps) {
+export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocation, eventAddress, mapsUrl, attendeeName, disabled, label = 'QR-kode', triggerClassName, onOpenChange }: RsvpQrButtonProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [qrDataUri, setQrDataUri] = useState<string | null>(null);
@@ -36,6 +41,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
 
     async function handleOpen() {
         setOpen(true);
+        onOpenChange?.(true);
         if (qrDataUri) return;
         setLoading(true);
         setError(null);
@@ -47,6 +53,7 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
 
     function close() {
         setOpen(false);
+        onOpenChange?.(false);
     }
 
     async function handleDownload() {
@@ -70,16 +77,20 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
     return (
         <>
             <button
+                type="button"
                 onClick={handleOpen}
-                className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)] hover:underline"
+                className={triggerClassName ?? 'flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary)] hover:underline'}
             >
                 <QrCode size={14} />
                 {label}
             </button>
 
-            {open && (
+            {/* Reguit in <body>: die knoppie staan dikwels in 'n tabelsel met whitespace-nowrap en
+                text-right, en die venster het dit geërf. 'n Lang titel het toe nie gevou nie en buite
+                die kaartjie uitgesteek. */}
+            {open && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm text-left whitespace-normal"
                     onClick={close}
                 >
                     <div
@@ -109,12 +120,12 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
                                     ref={ticketRef}
                                     className="w-full flex flex-col items-center gap-3 bg-white text-black rounded-xl border-2 border-dashed border-gray-300 p-4"
                                 >
-                                    <div className="text-center">
-                                        <p className="text-sm font-bold">{eventTitle}</p>
+                                    <div className="w-full text-center">
+                                        <p className="text-sm font-bold [overflow-wrap:anywhere]">{eventTitle}</p>
                                         <p className="text-xs text-gray-600">{eventDate}</p>
                                         <p className="text-xs text-gray-600">{eventLocation}</p>
                                         {eventAddress && (
-                                            <p className="text-xs text-gray-600">{eventAddress}</p>
+                                            <p className="text-xs text-gray-600 [overflow-wrap:anywhere]">{eventAddress}</p>
                                         )}
                                     </div>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -151,7 +162,8 @@ export default function RsvpQrButton({ rsvpId, eventTitle, eventDate, eventLocat
                             </div>
                         ) : null}
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </>
     );

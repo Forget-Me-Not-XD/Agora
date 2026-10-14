@@ -26,9 +26,11 @@ export interface DatePickerProps {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    // Vroegste dag wat gekies mag word, as 'yyyy-mm-dd'. Vroeër dae is grys en kan nie gekies word nie.
+    minDate?: string;
 }
 
-export default function DatePicker({ value, onChange, placeholder = 'Kies datum' }: DatePickerProps) {
+export default function DatePicker({ value, onChange, placeholder = 'Kies datum', minDate }: DatePickerProps) {
     const [open, setOpen] = useState(false);
     // Die maand/jaar-wiele wat die dag-rooster vervang wanneer die gebruiker op
     // die opskrif druk.
@@ -275,18 +277,23 @@ export default function DatePicker({ value, onChange, placeholder = 'Kies datum'
 
                                     const key        = dayKey(viewYear, viewMonth, day);
                                     const isSelected = key === value;
+                                    // 'yyyy-mm-dd' sorteer soos datums, so 'n gewone teks-vergelyking is genoeg
+                                    const isDisabled = minDate !== undefined && key < minDate;
 
                                     return (
                                         <div key={cellIdx} className="h-9 flex items-center justify-center">
                                             <button
                                                 type="button"
                                                 onClick={() => selectDay(key)}
+                                                disabled={isDisabled}
                                                 aria-label={formatLong(key)}
                                                 aria-pressed={isSelected}
                                                 className={[
                                                     'w-9 h-9 flex items-center justify-center text-sm rounded-full transition-colors cursor-pointer',
                                                     isSelected
                                                         ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)] font-semibold'
+                                                        : isDisabled
+                                                        ? 'text-[var(--color-text-subtle)] opacity-40 cursor-not-allowed'
                                                         : 'text-[var(--color-text)] hover:bg-[var(--color-bg)]',
                                                     !isSelected && key === todayKey
                                                         ? 'ring-1 ring-inset ring-[var(--color-primary)] font-semibold'

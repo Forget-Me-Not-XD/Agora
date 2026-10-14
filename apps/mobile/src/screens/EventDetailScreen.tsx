@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -16,19 +17,36 @@ import {
   formatFullDate,
   formatEventTime,
 } from '../lib/event-status';
-import { canViewBudget, canManageCheckIns } from '../lib/rbac';
+import { canManageEvent, canViewBudget, canViewInsights } from '../lib/rbac';
 import { safeGoBack } from '../lib/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { getEvent, createEvent, getVenues, type EventResponse, type Venue } from '../api/events';
+import { getEvent, createEvent, deleteEvent, getVenues, type EventResponse, type Venue } from '../api/events';
 import { AddressAutocompleteInput } from '../components/AddressAutoCompleteInput';
 import type { PlaceDetails } from '../api/places';
 import { createRsvp } from '../api/rsvp';
-import { getDraftPrediction, getPrediction } from '../api/analytics';
-import type { PredictionResult } from '../api/analytics';
+import { getDraftPrediction } from '../api/analytics';
+import { getReviewEligibility, type ReviewEligibilityStatus } from '../api/reviews';
+import type { AlternativePrediction, PredictionResult } from '../api/analytics';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { PaymentModal } from '../components/PaymentModal';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { PredictionAdvice } from '../components/PredictionAdvice';
+import { ReviewCategoryEditor } from '../components/ReviewCategoryEditor';
+import { ReviewEventCard } from '../components/ReviewEventCard';
+import { EventReviewSummary } from '../components/EventReviewSummary';
+import {
+  createDraft,
+  defaultReviewCategories,
+  hasReviewCategoryErrors,
+  validateReviewCategories,
+  type ReviewCategoryDraft,
+  type ReviewCategoryErrors,
+} from '../lib/review-categories';
 import { typography } from '../theme/typography';
-import { clearMyRsvpsPrefetch } from '../lib/prefetch';
+import { useEventsStore } from '../stores/events.store';
+import { useRsvpsStore } from '../stores/rsvps.store';
+import { usePredictionsStore } from '../stores/predictions.store';
+import { getApiErrorMessage, getErrorStatus } from '../lib/errors';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'EventDetail'>;
 type Route = RouteProp<RootStackParamList, 'EventDetail'>;
@@ -37,11 +55,14 @@ export function EventDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const user = useAuthStore((s) => s.user);
+  const role = user?.role ?? 'STUDENT';
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isDark = useIsDark();
+  const isFocused = useIsFocused();
 
   const [rsvpSubmitting, setRsvpSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [wantsPlusOne, setWantsPlusOne] = useState(false);
   const [plusOneName, setPlusOneName] = useState('');
   const [plusOneSurname, setPlusOneSurname] = useState('');
@@ -49,23 +70,35 @@ export function EventDetailScreen() {
 
   const isCreating = route.params.eventId === 'new';
 
-  const [event, setEvent] = useState<EventResponse | null>(null);
+  // Die gedeelde funksielys-kas hou dikwels reeds hierdie presiese funksie
+  // (van watter skerm ook al hierheen genavigeer is), so ons kan dit dadelik
+  // wys terwyl getEvent() in die agtergrond die outoritatiewe/varsste weergawe
+  // gaan haal -- geen leë-skerm-wagtyd vir 'n reeds-geziene funksie nie.
+  const cachedEvent = useEventsStore((s) => (isCreating ? undefined : s.getEvent(route.params.eventId)));
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
+  const invalidateRsvps = useRsvpsStore((s) => s.invalidate);
+  const ensurePrediction = usePredictionsStore((s) => s.ensureLoaded);
+
+  const [fetchedEvent, setFetchedEvent] = useState<EventResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  const event = fetchedEvent ?? cachedEvent ?? null;
 
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [predictionLoading, setPredictionLoading] = useState(true);
   const [predictionUnavailable, setPredictionUnavailable] = useState(false);
 
+  const [reviewStatus, setReviewStatus] = useState<ReviewEligibilityStatus | null>(null);
+
   useEffect(() => {
     if (isCreating) return;
     let active = true;
     (async () => {
-      setLoading(true);
       setLoadFailed(false);
       try {
         const data = await getEvent(route.params.eventId);
-        if (active) setEvent(data);
+        if (active) setFetchedEvent(data);
       } catch (err: unknown) {
         const axiosErr = err as { message?: string; response?: { status?: number; data?: unknown } };
         console.error(
@@ -73,12 +106,15 @@ export function EventDetailScreen() {
           axiosErr?.response?.status,
           axiosErr?.response?.data ?? axiosErr?.message,
         );
-        if (active) setLoadFailed(true);
+        // As ons reeds 'n gekaste weergawe wys, hou eerder daarby as om 'n
+        // "nie gevind nie"-skerm oor bestaande, bruikbare inhoud te plaas.
+        if (active && !cachedEvent) setLoadFailed(true);
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCreating, route.params.eventId]);
 
   useEffect(() => {
@@ -86,19 +122,34 @@ export function EventDetailScreen() {
     // wat werklik gebeur het nie, so vir 'n afgelope geleentheid herhaal dit net
     // dieselfde raaiskoot as voor die tyd, wat nooit met die regte confirmedAttendees
     // ooreenstem nie. Ons moet dit dus nie eers vra vir geleenthede wat verby is nie.
-    if (isCreating || !event || getEventStatus(event) === 'past') {
+    // KI-inligting is net vir dosente en admins, dieselfde rolle wat die KI-oortjie kry, so
+    // vir ander rolle vra ons dit glad nie.
+    if (isCreating || !event || !canViewInsights(role) || getEventStatus(event) === 'past') {
       setPredictionLoading(false);
       return;
     }
     let cancelled = false;
     setPredictionLoading(true);
     setPredictionUnavailable(false);
-    getPrediction(event.id)
+    ensurePrediction(event.id)
       .then((r) => { if (!cancelled) setPrediction(r); })
       .catch(() => { if (!cancelled) setPredictionUnavailable(true); })
       .finally(() => { if (!cancelled) setPredictionLoading(false); });
     return () => { cancelled = true; };
-  }, [isCreating, event]);
+  }, [isCreating, event, role, ensurePrediction]);
+
+  // Haal die status elke keer as die skerm fokus kry, ook wanneer die resensievel toegaan, sodat
+  // die kaart dan "Reeds beoordeel" wys. 'n Fout wys eenvoudig geen kaart nie, soos op die web.
+  useFocusEffect(
+    useCallback(() => {
+      if (isCreating) return;
+      let active = true;
+      getReviewEligibility(route.params.eventId)
+        .then((r) => { if (active) setReviewStatus(r.status); })
+        .catch(() => { if (active) setReviewStatus(null); });
+      return () => { active = false; };
+    }, [isCreating, route.params.eventId]),
+  );
 
   if (isCreating) {
     return (
@@ -110,19 +161,17 @@ export function EventDetailScreen() {
     );
   }
 
-  const role = user?.role ?? 'STUDENT';
-
-  if (loading) {
+  if (loading && !event) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorWrap}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <LoadingSpinner size={96} />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (loadFailed || !event) {
+  if ((loadFailed && !event) || !event) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.errorWrap}>
@@ -137,6 +186,9 @@ export function EventDetailScreen() {
   }
 
   const status = getEventStatus(event);
+  // Knoppies en besonderhede wys net vir wie die backend dit ook sal toelaat
+  const isManager = canManageEvent(role, user?.id, event.createdBy);
+  const showBudget = canViewBudget(role, user?.id, event);
   const fillPct = event.maxCapacity > 0 ? Math.min(Math.round((event.confirmedAttendees / event.maxCapacity) * 100), 100) : 0;
   const predictedPct = prediction ? Math.round(prediction.predictedFillRate * 100) : 0;
   const pillColor = getStatusPillColors(status, isDark);
@@ -147,6 +199,36 @@ export function EventDetailScreen() {
 
   function handleQrScanner() {
     navigation.navigate('QrScanner', { eventId: event!.id });
+  }
+
+  // Net vir admins, soos die backend. Skrap is permanent en vee ook die RSVPs uit, so eers bevestig.
+  function handleDelete() {
+    const rsvps = event!.confirmedAttendees;
+    Alert.alert(
+      'Skrap geleentheid?',
+      `"${event!.title}" word permanent geskrap${rsvps > 0 ? `, saam met ${rsvps} ${rsvps === 1 ? 'RSVP' : 'RSVPs'} en die resensies` : ''}. Dit kan nie ongedaan gemaak word nie.`,
+      [
+        { text: 'Kanselleer', style: 'cancel' },
+        {
+          text: 'Skrap',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteEvent(event!.id);
+              // Die lys op die vorige skerm moet nie die geskrapte geleentheid uit die kas wys nie
+              useEventsStore.getState().invalidate();
+              safeGoBack(navigation);
+            } catch (err) {
+              // Bv. 'n geleentheid met betaalde kaartjies: die backend sê wat om te doen
+              Alert.alert('Kon nie skrap nie', getApiErrorMessage(err, 'Kon nie die geleentheid skrap nie. Probeer weer.'));
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleRsvp() {
@@ -165,7 +247,10 @@ export function EventDetailScreen() {
           ? { name: plusOneName.trim(), surname: plusOneSurname.trim(), email: plusOneEmail.trim() }
           : undefined,
       );
-      clearMyRsvpsPrefetch();
+      // RSVP verander die funksie se confirmedAttendees en die gebruiker se
+      // eie RSVP-lys, so albei gedeelde kaslae moet weer vars laai.
+      invalidateEvents();
+      invalidateRsvps();
       Alert.alert(
         'Ingeskryf!',
         wantsPlusOne
@@ -173,13 +258,9 @@ export function EventDetailScreen() {
           : 'Jy is vir hierdie funksie ingeskryf. Sien jou QR-kode onder die RSVP-oortjie.',
         [{ text: 'OK' }],
       );
-    } catch (err: unknown) {
-      const axiosErr = err as {
-        response?: { status?: number; data?: { message?: string | string[] } };
-      };
-      const status = axiosErr?.response?.status;
-      const raw = axiosErr?.response?.data?.message;
-      const backendMsg = Array.isArray(raw) ? raw.join(', ') : raw ?? '';
+    } catch (err) {
+      const status = getErrorStatus(err);
+      const backendMsg = getApiErrorMessage(err, '');
 
       const msg =
         status === 409
@@ -195,7 +276,10 @@ export function EventDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    // Die resensievel is deursigtig, so hierdie skerm bly daaronder sigbaar. Terwyl die vel oop is,
+    // versteek ons dit vir TalkBack, anders kan dit agter die vel by hierdie knoppies uitkom. Op iOS
+    // doen die vel se accessibilityViewIsModal dit reeds.
+    <SafeAreaView style={styles.safe} importantForAccessibility={isFocused ? 'auto' : 'no-hide-descendants'}>
       {/* ── Back + header ── */}
       <ScreenHeader
         title="Funksie Detail"
@@ -228,33 +312,38 @@ export function EventDetailScreen() {
         </View>
 
         {/* ── Stats row ── */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{event.checkedInCount}</Text>
-            <Text style={styles.statLabel}>Bygewoon</Text>
+        {/* Net vir dosente en admins: "Verwag" is die KI se voorspelling, en bywoning is vir die
+            organiseerders. Ander sien kapasiteit en besprekings in die tabel hieronder. */}
+        {canViewInsights(role) && (
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{event.checkedInCount}</Text>
+              <Text style={styles.statLabel}>Bygewoon</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.textSubtle }]}>
+                {prediction ? prediction.estimatedAttendees : '—'}
+              </Text>
+              <Text style={styles.statLabel}>Verwag</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.warning }]}>{event.maxCapacity}</Text>
+              <Text style={styles.statLabel}>Kapasiteit</Text>
+            </View>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.textSubtle }]}>
-              {prediction ? prediction.estimatedAttendees : '—'}
-            </Text>
-            <Text style={styles.statLabel}>Verwag</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.warning }]}>{event.maxCapacity}</Text>
-            <Text style={styles.statLabel}>Kapasiteit</Text>
-          </View>
-        </View>
+        )}
 
         {/* ── AI prediction card ──
             Verby geleenthede het reeds 'n regte uitkoms (sien "Bygewoon" hierbo) --
             die model voorspel net vooruit en het geen benul van wat werklik gebeur
-             het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie. */}
-        {status !== 'past' && (
+            het nie, so ons wys dit eenvoudig nie vir afgelope geleenthede nie.
+            Soos die KI-oortjie is die kaart net vir dosente en admins. */}
+        {status !== 'past' && canViewInsights(role) && (
           <View style={styles.aiCard}>
             {predictionLoading ? (
-              <ActivityIndicator color={colors.primary} />
+              <LoadingSpinner size={40} />
             ) : predictionUnavailable || !prediction ? (
               <Text style={styles.aiSubtitle}>KI-voorspelling nie tans beskikbaar vir hierdie funksie nie.</Text>
             ) : (
@@ -277,6 +366,19 @@ export function EventDetailScreen() {
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${predictedPct}%` }]} />
                 </View>
+
+                {/* Soos in die skep-vorm: eers waarom die model dit verwag, dan die aanbevelings. */}
+                <View style={styles.aiReasoning}>
+                  <Text style={styles.reasoningHeading}>Waarom hierdie voorspelling?</Text>
+                  {prediction.reasoning.map((reason, i) => (
+                    <View key={i} style={styles.reasoningRow}>
+                      <Text style={styles.reasoningBullet}>•</Text>
+                      <Text style={styles.reasoningText}>{reason}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <PredictionAdvice prediction={prediction} />
               </>
             )}
           </View>
@@ -293,24 +395,28 @@ export function EventDetailScreen() {
           <DetailRow label="Lokaal" value={event.location} colors={colors} />
           {event.address ? <DetailRow label="Adres" value={event.address} colors={colors} /> : null}
           <DetailRow label="Tipe" value={TYPE_LABELS[event.type]} colors={colors} />
-          <DetailRow label="Kapasiteit" value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`} colors={colors} />
+          <DetailRow
+            label="Kapasiteit"
+            value={`${event.confirmedAttendees} / ${event.maxCapacity} (${fillPct}%)`}
+            colors={colors}
+            isLast={!event.sellsTickets && !showBudget}
+          />
           {event.sellsTickets && (
             <DetailRow
               label="Kaartjieprys"
               value={`R${event.ticketPrice ?? 0}${event.ticketsAvailable !== null ? ` · ${event.ticketsAvailable} oor` : ''}`}
               colors={colors}
+              isLast={!showBudget}
             />
           )}
-          {canViewBudget(role) && (
+          {/* Soos op die web: wie die begroting nie mag sien nie, sien glad nie die ry nie */}
+          {showBudget && (
             <DetailRow
               label="Begroting"
               value={`R ${event.budget.toLocaleString('af-ZA')}`}
               colors={colors}
               isLast
             />
-          )}
-          {!canViewBudget(role) && (
-            <DetailRow label="Begroting" value="—" colors={colors} isLast />
           )}
         </View>
 
@@ -322,8 +428,8 @@ export function EventDetailScreen() {
           </View>
         ) : null}
 
-        {/* ── Action buttons ── */}
-        {canManageCheckIns(role) && (
+        {/* ── Action buttons ── net vir admin, of die dosent wat die geleentheid geskep het */}
+        {isManager && (
           <>
             <TouchableOpacity
               style={styles.primaryBtn}
@@ -345,9 +451,35 @@ export function EventDetailScreen() {
           </>
         )}
 
+        {role === 'ADMIN' && (
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: colors.red }]}
+            onPress={handleDelete}
+            disabled={deleting}
+            accessibilityLabel="Skrap geleentheid"
+          >
+            {deleting
+              ? <ActivityIndicator color={colors.red} />
+              : <Feather name="trash-2" size={16} color={colors.red} />}
+            <Text style={[styles.secondaryBtnText, { color: colors.red }]}>
+              {deleting ? 'Besig om te skrap…' : 'Skrap geleentheid'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {(status === 'upcoming' || status === 'ongoing') && (
           event.sellsTickets ? (
-            <PaymentModal event={event} />
+            <PaymentModal
+              event={event}
+              onPurchased={() => {
+                // Deur hierdie punt is die betaling bevestig VOLTOOI (PaymentModal
+                // het reeds self gepeil totdat die RSVP werklik bestaan), so 'n
+                // dadelike verfris hier is veilig -- nie net 'n ongeldigverklaring
+                // wat op die volgende natuurlike laai moet wag nie.
+                invalidateEvents();
+                useRsvpsStore.getState().refresh();
+              }}
+            />
           ) : (
             <>
               {event.allowsPlusOne && (
@@ -424,6 +556,16 @@ export function EventDetailScreen() {
           )
         )}
 
+        <ReviewEventCard
+          status={reviewStatus}
+          onReview={() => navigation.navigate('Review', { eventId: event.id })}
+        />
+
+        {/* ── Resensie-opsomming ── net vir admin, of die dosent wat die geleentheid geskep het */}
+        {isManager && (
+          <EventReviewSummary key={event.id} eventId={event.id} />
+        )}
+
       </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -455,6 +597,10 @@ function CreateEventForm({
   const [ticketPrice, setTicketPrice] = useState('');
   const [ticketsAvailable, setTicketsAvailable] = useState('');
   const [allowsPlusOne, setAllowsPlusOne] = useState(false);
+  const [reviewCategories, setReviewCategories] = useState<ReviewCategoryDraft[]>(
+    () => defaultReviewCategories().map((category) => createDraft(category)),
+  );
+  const [categoryErrors, setCategoryErrors] = useState<ReviewCategoryErrors>({ rows: {} });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -467,6 +613,7 @@ function CreateEventForm({
   const [useVenue, setUseVenue] = useState(false);
   const [selectedCampus, setSelectedCampus] = useState('');
   const [venueId, setVenueId] = useState('');
+  const invalidateEvents = useEventsStore((s) => s.invalidate);
 
   useEffect(() => {
 
@@ -539,7 +686,24 @@ useEffect(() => {
     if (prediction) setBudget(String(prediction.estimatedBudgetZAR));
   }
 
+  function handleChooseAlternative(alternative: AlternativePrediction) {
+    setDate(new Date(alternative.date));
+    setMaxCapacity(String(alternative.capacity));
+  }
+
+  // Sodra daar foute op die skerm is, kyk ons die hele lys weer na met elke tikslag. 'n Duplikaat-fout
+  // staan dalk op 'n ander ry as die een waarin jy tik, so net daardie ry skoonmaak is nie genoeg nie.
+  function handleCategoriesChange(next: ReviewCategoryDraft[]) {
+    setReviewCategories(next);
+    if (hasReviewCategoryErrors(categoryErrors)) setCategoryErrors(validateReviewCategories(next));
+  }
+
   async function handleSubmit() {
+    // Die kategorie-foute wys by die velde self, so ons stel hulle dadelik. Dan sien jy hulle saam
+    // met die ander fout bo-aan, eerder as eers nadat jy die res van die vorm reggemaak het.
+    const newCategoryErrors = validateReviewCategories(reviewCategories);
+    setCategoryErrors(newCategoryErrors);
+
     if (!title.trim() || !location.trim() || !maxCapacity.trim()) {
       setError('Vul asseblief alle velde in.');
       return;
@@ -559,6 +723,24 @@ useEffect(() => {
     const sm = parseInt(startMinute, 10);
     if (isNaN(sh) || sh < 0 || sh > 23 || isNaN(sm) || sm < 0 || sm > 59) {
       setError('Begintyd is ongeldig.');
+      return;
+    }
+
+    if (!endHour.trim() || !endMinute.trim()) {
+      setError('Vul asseblief die eindtyd in.');
+      return;
+    }
+
+    const eh = parseInt(endHour, 10);
+    const em = parseInt(endMinute, 10);
+    if (isNaN(eh) || eh < 0 || eh > 23 || isNaN(em) || em < 0 || em > 59) {
+      setError('Eindtyd is ongeldig.');
+      return;
+    }
+
+    // Die geleentheid is op een dag, so die eindtyd moet net later as die begintyd wees
+    if (eh * 60 + em <= sh * 60 + sm) {
+      setError('Eindtyd moet na die begintyd wees.');
       return;
     }
 
@@ -604,6 +786,12 @@ useEffect(() => {
       }
     }
 
+    // Die res van die vorm is reg, so 'n ou foutboodskap bo-aan sou nou net verwar.
+    if (hasReviewCategoryErrors(newCategoryErrors)) {
+      setError(null);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -611,22 +799,14 @@ useEffect(() => {
       const startDate = new Date(date);
       startDate.setHours(parseInt(startHour, 10), parseInt(startMinute, 10), 0, 0);
 
-      let endDate: string | undefined;
-      if (endHour.trim() && endMinute.trim()) {
-        const eh = parseInt(endHour, 10);
-        const em = parseInt(endMinute, 10);
-        if (!isNaN(eh) && !isNaN(em)) {
-          const d = new Date(date);
-          d.setHours(eh, em, 0, 0);
-          endDate = d.toISOString();
-        }
-      }
+      const endDate = new Date(date);
+      endDate.setHours(eh, em, 0, 0);
 
       await createEvent({
         title: title.trim(),
         description: description.trim(),
         date: startDate.toISOString(),
-        endDate,
+        endDate: endDate.toISOString(),
         location: location.trim(),
         address: placeDetails.address,
         placeId: placeDetails.placeId,
@@ -638,18 +818,12 @@ useEffect(() => {
         ticketPrice: sellsTickets ? ticketPriceNum : undefined,
         ticketsAvailable: sellsTickets ? ticketsAvailableNum : undefined,
         allowsPlusOne,
+        reviewCategories: reviewCategories.map(({ name }) => ({ name: name.trim() })),
       });
+      invalidateEvents();
       safeGoBack(navigation);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-      const raw = axiosErr?.response?.data?.message;
-      const msg =
-        typeof raw === 'string'
-          ? raw
-          : Array.isArray(raw)
-          ? raw.join(', ')
-          : 'Kon nie funksie skep nie. Probeer weer.';
-      setError(msg);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Kon nie funksie skep nie. Probeer weer.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -663,15 +837,14 @@ useEffect(() => {
         backDisabled={isSubmitting}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-      <ScrollView
+      {/* Die kategorie-velde is van die laaste in 'n lang vorm. Hierdie ScrollView skuif die
+          gefokusde veld self bo die sleutelbord uit, op iOS en Android, ook onder edge-to-edge. */}
+      <KeyboardAwareScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
+        bottomOffset={24}
       >
         {error && (
           <View style={styles.errorBox}>
@@ -754,7 +927,7 @@ useEffect(() => {
             />
           </View>
 
-          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Eindtyd (opsioneel)</Text>
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Eindtyd *</Text>
           <View style={styles.timeRow}>
             <TextInput
               style={[styles.textInput, styles.timeInput]}
@@ -934,6 +1107,13 @@ useEffect(() => {
               thumbColor={colors.surface}
             />
           </View>
+
+          <ReviewCategoryEditor
+            categories={reviewCategories}
+            onChange={handleCategoriesChange}
+            errors={categoryErrors}
+            disabled={isSubmitting}
+          />
         </View>
 
         {(predictionLoading || predictionUnavailable || prediction) && (
@@ -998,6 +1178,12 @@ useEffect(() => {
                     <Text style={styles.reasoningText}>{reason}</Text>
                   </View>
                 ))}
+
+                <PredictionAdvice
+                  prediction={prediction}
+                  onChooseAlternative={handleChooseAlternative}
+                  disabled={isSubmitting}
+                />
               </>
             )}
           </View>
@@ -1024,8 +1210,7 @@ useEffect(() => {
         >
           <Text style={styles.secondaryBtnText}>Kanselleer</Text>
         </TouchableOpacity>
-      </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -1155,6 +1340,7 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       borderRadius: 999,
       backgroundColor: colors.primary,
     },
+    aiReasoning: { marginTop: 14 },
 
     detailsCard: {
       backgroundColor: colors.surface,

@@ -11,6 +11,7 @@ import { DuplicateTicketException, RsvpService } from "../rsvp/rsvp.service";
 import { UsersService } from "../users/users.service";
 import { PayfastNotifyDto, PayfastNotifyResultDto } from "./dto/payfast-notify.dto";
 import { InitiatePaymentResponseDto } from "./dto/initiate-payment-response.dto";
+import { PaymentStatusResponseDto } from "./dto/payment-status-response.dto";
 import { PaymentPlatform } from "./dto/initiate-payment.dto";
 
 interface PayfastNotifyFields {
@@ -64,7 +65,10 @@ export class PaymentsService {
         const passphrase = this.configService.get<string>('payfast.passphrase')!;
         const notifyUrl = this.configService.get<string>('payfast.notifyUrl')!;
         const publicBaseUrl = this.configService.get<string>('payfast.publicBaseUrl')!;
-        const returnUrl = `${publicBaseUrl}/return?platform=${platform}`;
+        // Die verwysing gaan saam in return_url sodat die web-front-end (wat na
+        // 'n volle blaaierherlaai geen geheue meer van hierdie React-state het
+        // nie) weet watter betaling om te peil -- sien getStatusByReference().
+        const returnUrl = `${publicBaseUrl}/return?platform=${platform}&reference=${reference}`;
         const cancelUrl = `${publicBaseUrl}/cancel?platform=${platform}`;
         const checkoutUrl = this.configService.get<string>('payfast.processUrl')!;
         const mode = this.configService.get<string>('payfast.mode');
@@ -105,6 +109,23 @@ export class PaymentsService {
         };
     }
 
+    // PayFast se ITN bevestig die kaartjie heeltemal server-tot-server, onafhanklik
+    // van wanneer die gebruiker se blaaier na /payments/return herlei word (sien
+    // die kommentaar daaroor in payments.controller.ts) -- die twee gebeure is nie
+    // gewaarborg in enige volgorde nie. Die front-ends (web en mobiel) peil hierdie
+    // eindpunt ná 'n "payment=success"-herleiding totdat status regtig VOLTOOI is,
+    // i.p.v. om bloot op die herleiding self te vertrou.
+    async getStatusByReference(reference: string, userId: string): Promise<PaymentStatusResponseDto> {
+        const payment = await this.paymentModel.findOne({ reference }).exec();
+        if (!payment || payment.user.toString() !== userId) {
+            throw new NotFoundException('Onbekende betaalverwysing');
+        }
+        return {
+            status: payment.status,
+            rsvpId: payment.rsvp ? payment.rsvp.toString() : null,
+        };
+    }
+
     async handleNotify(dto: PayfastNotifyDto): Promise<PayfastNotifyResultDto> {
         const payment = await this.paymentModel.findOne({ reference: dto.m_payment_id }).exec();
         if (!payment) {
@@ -129,6 +150,19 @@ export class PaymentsService {
             payment.status = PaymentStatus.MISLUK;
             await payment.save();
             return { status: PaymentStatus.MISLUK };
+        }
+
+        // Toets verval vroeg, voordat die betaling geëis of kaartjievoorraad
+        // aangepas word: 'n geleentheid wat intussen verval het (bv. 'n
+        // vertraagde/herhaalde ITN) moet nooit VOLTOOI-status of 'n
+        // kaartjie-aftrekking kry wat weer teruggerol moet word nie.
+        const event = await this.eventsService.findById(payment.event.toString());
+        try {
+            this.rsvpService.assertEventNotExpired(event);
+        } catch (err) {
+            payment.status = PaymentStatus.MISLUK;
+            await payment.save();
+            throw err;
         }
 
         // Atomies "eis" hierdie betaling voordat 'n kaartjie geskep word — PayFast

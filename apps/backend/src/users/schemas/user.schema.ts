@@ -52,6 +52,15 @@ export class User {
     @Prop({ type: Date, default: null })
     lockedUntil!: Date | null;
 
+    @Prop({ type: String, default: null, index: true })
+    passwordResetTokenHash!: string | null;
+
+    @Prop({ type: Date, default: null })
+    passwordResetExpiresAt!: Date | null;
+
+    @Prop({ type: Date, default: null })
+    sessionsValidAfter!: Date | null;
+
     @Prop({ type: String, enum: Object.values(UserTitle), default: UserTitle.NONE})
     title!: string;
 

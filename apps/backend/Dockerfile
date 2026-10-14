@@ -10,7 +10,7 @@ WORKDIR /app/apps/backend
 COPY apps/backend/package*.json ./
 RUN npm ci
 
-COPY apps/backend/tsconfig.json apps/backend/nest-cli.json ./
+COPY apps/backend/tsconfig.json apps/backend/tsconfig.build.json apps/backend/nest-cli.json ./
 COPY apps/backend/src ./src
 RUN npm run build && find ./dist -name '*.js.map' -delete
 
@@ -42,6 +42,11 @@ RUN python3 -m venv ./venv \
 # spawns apps/ml/venv/bin/python directly. Putting the venv first on PATH
 # satisfies both call sites with a single dependency install.
 ENV PATH="/app/apps/ml/venv/bin:${PATH}"
+
+# Dieselfde tydsone as die web-houer en die gebruikers. Die weeklikse analise en aanbevelings werk
+# met plaaslike kalenderdae (getDate, getDay), en 'n datum sonder tydsone word in SA-tyd gelees.
+# Node bring sy eie sone-data saam (ICU), so die slim beeld het nie tzdata nodig nie.
+ENV TZ=Africa/Johannesburg
 
 RUN groupadd -g 1001 nodejs && \
     useradd -u 1001 -g nodejs -s /bin/false nestjs && \

@@ -55,6 +55,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Account no longer exists');
     }
 
+    // A password reset or change ends every session that started before it, access tokens
+    // included, so a stolen token stops working straight away instead of when it expires.
+    if (user.sessionsValidAfter && (payload.iat ?? 0) * 1000 < user.sessionsValidAfter.getTime()) {
+      throw new UnauthorizedException('Session ended because the password was changed');
+    }
+
     return {...payload, mustChangePassword: user.mustChangePassword };
   }
 }

@@ -1,14 +1,22 @@
 import Link from 'next/link';
+import { eventDetailHref } from '@/lib/event-origin';
 import type { Event } from '@/lib/api/events';
 import { formatDateShort } from '@/lib/format-date';
+import { STATUS_LABELS, STATUS_TONE, deriveStatus } from '@/lib/event-view';
 import { Pill } from '@/components/ui/Pill';
 
 export default function MyEventsTable({ events }: { events: Event[] }) {
     if (events.length === 0) {
         return (
-            <p className="text-xs text-[var(--color-text-subtle)] text-center py-8">
-                Jy het nog geen geleenthede geskep nie.
-            </p>
+            <div className="text-center py-8 space-y-3">
+                <p className="text-sm text-[var(--color-text-subtle)]">Jy het nog geen geleenthede geskep nie.</p>
+                <Link
+                    href="/events/create"
+                    className="inline-block px-4 py-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-text)] text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                    Skep jou eerste geleentheid
+                </Link>
+            </div>
         );
     }
 
@@ -20,7 +28,7 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                         <th className="pb-2 font-medium">Titel</th>
                         <th className="pb-2 font-medium">Datum</th>
                         <th className="pb-2 font-medium">Ligging</th>
-                        <th className="pb-2 font-medium">Kapasiteit</th>
+                        <th className="pb-2 font-medium">RSVPs / plekke</th>
                         <th className="pb-2 font-medium text-right">Status</th>
                     </tr>
                 </thead>
@@ -29,13 +37,13 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                         const fillRate = e.maxCapacity > 0
                             ? Math.min(100, Math.round((e.confirmedAttendees / e.maxCapacity) * 100))
                             : 0;
-                        const isUpcoming = new Date(e.date).getTime() >= Date.now();
+                        const status = deriveStatus(e);
 
                         return (
                             <tr key={e.id} className="hover:bg-[var(--color-bg)]">
                                 <td className="py-2.5">
                                     <Link
-                                        href={`/events/${e.id}`}
+                                        href={eventDetailHref(e.id, { from: 'oorsig' })}
                                         className="text-[var(--color-text)] font-medium hover:text-[var(--color-primary)] hover:underline"
                                     >
                                         {e.title}
@@ -57,9 +65,7 @@ export default function MyEventsTable({ events }: { events: Event[] }) {
                                     </div>
                                 </td>
                                 <td className="py-2.5 text-right">
-                                    <Pill tone={isUpcoming ? 'green' : 'neutral'}>
-                                        {isUpcoming ? 'Opkomend' : 'Verby'}
-                                    </Pill>
+                                    <Pill tone={STATUS_TONE[status]}>{STATUS_LABELS[status]}</Pill>
                                 </td>
                             </tr>
                         );

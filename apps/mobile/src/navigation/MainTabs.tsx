@@ -1,19 +1,15 @@
-import { useEffect } from 'react';
 import type { ComponentProps, ComponentType } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { useAuthStore } from '../stores/auth.store';
-import { canViewNotifications } from '../lib/rbac';
 import type { UserRole } from '../lib/rbac';
-import { useNotificationsStore } from '../stores/notifications.store';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { RsvpScreen } from '../screens/RsvpScreen';
 import { AiScreen } from '../screens/AiScreen';
-import { NotificationsScreen } from '../screens/NotificationsScreen';
 
 export type MainTabParamList = {
   Home: undefined;
@@ -21,7 +17,6 @@ export type MainTabParamList = {
   Calendar: undefined;
   Rsvp: undefined;
   Ai: undefined;
-  Notifications: undefined;
 };
 
 type TabName = keyof MainTabParamList;
@@ -51,13 +46,6 @@ const TAB_CONFIG: TabConfig[] = [
     icon: 'cpu',
     visible: (role) => role === 'ADMIN' || role === 'DOSENT',
   },
-  {
-    name: 'Notifications',
-    component: NotificationsScreen,
-    title: 'Kennisgewings',
-    icon: 'bell',
-    visible: canViewNotifications,
-  },
 ];
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -67,17 +55,6 @@ export function MainTabs() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
   const role = user?.role ?? 'STUDENT';
-
-  const canSeeNotifications = canViewNotifications(role);
-  const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const loadNotifications = useNotificationsStore((s) => s.load);
-
-  // Laai kennisgewings sodra 'n fotograaf aan meldd, sodat die kenteken reg is
-  useEffect(() => {
-    if (canSeeNotifications) {
-      loadNotifications();
-    }
-  }, [canSeeNotifications, loadNotifications]);
 
   const visibleTabs = TAB_CONFIG.filter((tab) => tab.visible(role));
 
@@ -108,7 +85,6 @@ export function MainTabs() {
           options={{
             title: tab.title,
             tabBarIcon: ({ color, size }) => <Feather name={tab.icon} color={color} size={size ?? 20} />,
-            tabBarBadge: tab.name === 'Notifications' && unreadCount > 0 ? unreadCount : undefined,
           }}
         />
       ))}

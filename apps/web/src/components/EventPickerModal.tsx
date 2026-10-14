@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react';
 import { Search, X, ListChecks, CheckSquare, Square } from 'lucide-react';
 import { formatDateShort } from '@/lib/format-date';
+import { eventWord } from '@/lib/metrics';
 
 export interface SelectableEvent {
     id:    string;
@@ -58,7 +59,7 @@ export default function EventPickerModal({ events, selected, onChange }: EventPi
                 className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] text-sm font-medium py-2 px-4 hover:bg-[var(--color-border)] transition-colors"
             >
                 <ListChecks size={15} />
-                {selected.size === 0 ? "Kies geleenthede..." : `${selected.size} geleentheid${selected.size !== 1 ? 'e' : ''} gekies`}
+                {selected.size === 0 ? "Kies geleenthede..." : `${selected.size} ${eventWord(selected.size)} gekies`}
             </button>
 
             {open && (

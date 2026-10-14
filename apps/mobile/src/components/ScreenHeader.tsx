@@ -84,6 +84,6 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
         pageHeaderText: { flex: 1 },
         pageTitle: { fontSize: 22, fontWeight: '900', color: colors.text },
         pageSubtitle: { ...typography.caption, color: colors.textSubtle, marginTop: 3 },
-        headerRight: { flexDirection: 'row', gap: 8 },
+        headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     });
 }

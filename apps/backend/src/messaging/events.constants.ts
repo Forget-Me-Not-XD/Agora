@@ -35,6 +35,7 @@ export const ROUTING_KEYS = {
    AUDIT_LOG_CREATE: 'audit.log.create',
 
    PHOTOGRAPHER_ASSIGNED: 'event.photographer.assigned',
+   REVIEW_REQUESTED: 'event.review.requested',
 } as const;
 
 export const QUEUES = {
@@ -43,6 +44,7 @@ export const QUEUES = {
    NOTIFICATION_PUSH: 'queue.notification.push',
    AUDIT_LOG: 'queue.audit.log',
    PHOTOGRAPHER_ASSIGNED: 'queue.photographer.assigned',
+   REVIEW_REQUESTED: 'queue.review.requested',
    DEAD_LETTER: 'queue.dead-letter',
 } as const;
 
@@ -87,5 +89,12 @@ export interface PhotographerAssignedEvent {
    eventId: string;
    photographerId: string;
    brief: string;
+   timestamp: string;
+}
+
+export interface ReviewRequestedEvent {
+   eventId: string;
+   userId: string;
+   eventTitle: string;
    timestamp: string;
 }

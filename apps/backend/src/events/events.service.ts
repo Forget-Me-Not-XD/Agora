@@ -1,5 +1,5 @@
 // ========== Imports: ==========
-import { ForbiddenException, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, isValidObjectId, Model, Types } from 'mongoose';
 import { Event, EventDocument } from './schemas/event.schema';
@@ -15,19 +15,38 @@ import { UsersService } from '../users/users.service';
 import { PlacesService } from '../places/places.service';
 import { PlaceDetailsDto } from '../places/dto/place-details.dto';
 import { findVenueByLocation, VENUES } from './data/venues';
+import { v4 as uuidv4 } from 'uuid';
+import { ReviewCategory } from './schemas/review-category.schema';
+import { ReviewCategoryInputDto } from './dto/review-category-input.dto';
+import { DEFAULT_REVIEW_CATEGORIES } from '../common/constants/review-categories';
+import { Rsvp, RsvpDocument } from '../rsvp/schemas/rsvp.schema';
+import { Payment, PaymentDocument, PaymentStatus } from '../payments/schemas/payment.schema';
+import { Notification, NotificationDocument } from '../notifications/schemas/notification.schema';
+import { CalendarSyncService } from '../calendar/calendar-sync.service';
+import { ReviewsService } from '../reviews/reviews.service';
+
+const DEFAULT_EVENT_DURATION_MS = 3 * 60 * 60 * 1000;
 
 @Injectable()
 export class EventsService {
+    private readonly logger = new Logger(EventsService.name);
+
     constructor(
         @InjectModel(Event.name) private readonly eventModel: Model<EventDocument>,
+        @InjectModel(Rsvp.name) private readonly rsvpModel: Model<RsvpDocument>,
+        @InjectModel(Payment.name) private readonly paymentModel: Model<PaymentDocument>,
+        @InjectModel(Notification.name) private readonly notificationModel: Model<NotificationDocument>,
         private readonly rabbitMQService: RabbitMQService,
         private readonly usersService: UsersService,
         private readonly placesService: PlacesService,
+        private readonly reviewsService: ReviewsService,
+        private readonly calendarSyncService: CalendarSyncService,
     ) {}
 
     async create(dto: CreateEventDto, creatorId: string): Promise<EventDocument> {
         const start = new Date(dto.date);
-        const end   = dto.endDate ? new Date(dto.endDate) : undefined;
+        const end   = new Date(dto.endDate);
+        this.assertStartInFuture(start);
         this.assertEndAfterStart(start, end);
         this.assertTicketsWithinCapacity(dto.sellsTickets, dto.ticketsAvailable, dto.maxCapacity);
         this.assertVenueCapacity(dto.location, dto.maxCapacity);
@@ -42,12 +61,13 @@ export class EventsService {
             ...dto,
             date:       start,
             endDate:    end,
-            address:    place?.address ?? dto.address,
+            address:    this.storedAddress(dto.location, place, dto.address),
             placeId:    place?.placeId ?? '',
             lat:        place?.lat ?? null,
             lon:        place?.lon ?? null,
             createdBy:  creatorId,
             assignedTo: dto.assignedTo ? new Types.ObjectId(dto.assignedTo) : null,
+            reviewCategories: this.buildReviewCategories(dto.reviewCategories, []),
         });
         return created.save();
     }
@@ -64,6 +84,12 @@ export class EventsService {
     // word nooit vertrou nie. Geokodering is 'n verrykings-stap, nie 'n harde vereiste
     // nie -- as Geoapify af is of kwota op is, moet funksie-skepping/-opdatering steeds
     // deurgaan met net die rou adres-string.
+    // 'n Akademia-lokaal se adres is vas: stoor die kampus se adres presies so. Geoapify sou dit
+    // herformateer; ons gebruik sy resultaat dan net vir die kaartposisie (placeId, lat, lon).
+    private storedAddress(location: string, place: PlaceDetailsDto | null, fallback: string): string {
+        return findVenueByLocation(location)?.address ?? place?.address ?? fallback;
+    }
+
     private async resolvePlace(
         address: string,
         lat?: number,
@@ -125,6 +151,48 @@ export class EventsService {
         }
 
         return this.eventModel.find(filter).sort({ date: 1 }).exec();
+    }
+
+    // Events the LSTM may learn from (and use as prediction history): not demo data,
+    // already finished, and with at least one recorded check-in - without a check-in
+    // the no-show rate is unknown, not 100%
+    async findTrainableEvents(before: Date): Promise<EventDocument[]> {
+        const startedBefore = new Date(before.getTime() - DEFAULT_EVENT_DURATION_MS);
+
+        return this.eventModel
+            .find({
+                isDemo: { $ne: true },
+                checkedInCount: { $gt: 0 },
+                $or: [
+                    { endDate: { $lt: before } },
+                    { endDate: { $in: [null, undefined] }, date: { $lt: startedBefore } },
+                ],
+            })
+            .sort({ date: 1 })
+            .exec();
+    }
+
+    async findDueForReviewRequests(endedBefore: Date, endedAfter: Date): Promise<EventDocument[]> {
+        const startedBefore = new Date(endedBefore.getTime() - DEFAULT_EVENT_DURATION_MS);
+        const startedAfter = new Date(endedAfter.getTime() - DEFAULT_EVENT_DURATION_MS);
+
+        return this.eventModel
+            .find({
+                reviewRequestsSentAt: null,
+                $or: [
+                    { endDate: { $lt: endedBefore, $gte: endedAfter } },
+                    { endDate: { $in: [null, undefined] }, date: { $lt: startedBefore, $gte: startedAfter } },
+                ],
+            })
+            .exec();
+    }
+
+    async claimReviewRequests(id: string, now: Date): Promise <EventDocument | null> {
+        return this.eventModel.findOneAndUpdate(
+            { _id: id, reviewRequestsSentAt: null },
+            { $set: { reviewRequestsSentAt: now } },
+            { new: true },
+        ).exec();
     }
 
     async findById(id: string, viewerRole?: Role, viewerId?: string): Promise<EventDocument> {
@@ -297,14 +365,26 @@ export class EventsService {
             await this.assertValidAssignee(dto.assignedTo);
         }
 
-        const { date, endDate, address, placeId, lat, lon, ...rest } = dto;
+        const { date, endDate, address, placeId, lat, lon, reviewCategories, ...rest } = dto;
+        // Net 'n nuwe begintyd moet in die toekoms wees. Die vorms stuur die datum altyd saam, ook
+        // as net die begroting verander, en 'n afgelope geleentheid moet steeds wysigbaar bly.
+        // Op die minuut vergelyk: die vorm stuur net uur en minuut, die databasis het dalk sekondes.
+        const toMinute = (d: Date) => Math.floor(d.getTime() / 60_000);
+        if (date && toMinute(new Date(date)) !== toMinute(event.date)) {
+            this.assertStartInFuture(new Date(date));
+        }
         Object.assign(event, rest);
         if (date)          event.date       = new Date(date);
         if (endDate)       event.endDate    = new Date(endDate);
         if (dto.assignedTo) event.assignedTo = new Types.ObjectId(dto.assignedTo);
+        let nextCategories: ReviewCategory[] | null = null;
+        if (reviewCategories) {
+            this.assertReviewCategoriesEditable(event, reviewCategories);
+            nextCategories = this.buildReviewCategories(reviewCategories, event.reviewCategories);
+        }
         if (address) {
             const place = await this.resolvePlace(address, lat, lon);
-            event.address = place?.address ?? address;
+            event.address = this.storedAddress(event.location, place, address);
             event.placeId = place?.placeId ?? event.placeId;
             event.lat     = place?.lat     ?? event.lat;
             event.lon     = place?.lon     ?? event.lon;
@@ -313,6 +393,11 @@ export class EventsService {
         this.assertEndAfterStart(event.date, event.endDate);
         this.assertTicketsWithinCapacity(event.sellsTickets, event.ticketsAvailable, event.maxCapacity);
         this.assertVenueCapacity(event.location, event.maxCapacity);
+
+        // Laaste, sodat die kategorieë nie verander as een van die kontroles hierbo nog sou misluk nie
+        if (nextCategories && !this.isSameReviewCategories(nextCategories, event.reviewCategories)) {
+            await this.replaceReviewCategories(event, nextCategories);
+        }
 
         return event.save();
     }
@@ -327,7 +412,47 @@ export class EventsService {
 
         this.assertOwnership(event, requesterId, requesterRole);
 
+        // Iemand het al vir 'n kaartjie betaal: daardie geld moet eers terugbetaal word, en die
+        // betaling bly die bewys daarvan. Ons skrap dit dus nie stilweg saam met die geleentheid nie.
+        const paidTickets = await this.paymentModel
+            .countDocuments({ event: event._id, status: PaymentStatus.VOLTOOI })
+            .exec();
+        if (paidTickets > 0) {
+            throw new ConflictException(
+                `Hierdie geleentheid het ${paidTickets} betaalde kaartjie${paidTickets === 1 ? '' : 's'} en kan nie geskrap word nie. Betaal die kopers eers terug.`,
+            );
+        }
+
+        await this.removeCalendarEntries(event._id);
+
+        // Alles wat na die geleentheid verwys, eerste; die geleentheid self laaste. Misluk iets
+        // halfpad, bestaan die geleentheid nog en kan die admin weer probeer.
+        await Promise.all([
+            this.rsvpModel.deleteMany({ event: event._id }).exec(),
+            this.paymentModel.deleteMany({ event: event._id }).exec(),   // net hangende of mislukte
+            this.notificationModel.deleteMany({ event: event._id }).exec(),
+            this.reviewsService.deleteByEvent(id),
+        ]);
         await event.deleteOne();
+    }
+
+    // Verwyder die geleentheid uit die Google/Outlook-kalenders van wie RSVP het, soos 'n
+    // kansellasie doen. Best effort: 'n kalender wat nie antwoord nie, keer nie die skrap nie.
+    private async removeCalendarEntries(eventId: Types.ObjectId): Promise<void> {
+        const synced = await this.rsvpModel.find({
+            event: eventId,
+            user: { $ne: null },
+            $or: [{ googleCalendarEventId: { $ne: null } }, { outlookCalendarEventId: { $ne: null } }],
+        }).exec();
+
+        for (const rsvp of synced) {
+            try {
+                const user = await this.usersService.findById(rsvp.user!.toString());
+                await this.calendarSyncService.syncRsvpCancelled(user, rsvp.googleCalendarEventId, rsvp.outlookCalendarEventId);
+            } catch (err) {
+                this.logger.warn(`Kon nie RSVP ${rsvp._id} se kalender-inskrywing verwyder nie: ${(err as Error).message}`);
+            }
+        }
     }
 
     async assignPhotographer(
@@ -359,6 +484,71 @@ export class EventsService {
         );
 
         return saved;
+    }
+
+    private buildReviewCategories(
+        input: ReviewCategoryInputDto[] | undefined,
+        existing: ReviewCategory[],
+    ): ReviewCategory[] {
+        if (!input) {
+            return DEFAULT_REVIEW_CATEGORIES.map((name) => ({ id: uuidv4(), name }));
+        }
+
+        const lowerNames = input.map((category) => category.name.toLowerCase());
+        if (new Set(lowerNames).size !== lowerNames.length) {
+            throw new BadRequestException('Elke resensie-kategorie moet \'n unieke naam hê');
+        }
+
+        const existingIds = new Set(existing.map((category) => category.id));
+        const usedIds = new Set<string>();
+
+        return input.map((category) => {
+            const id = category.id && existingIds.has(category.id) && !usedIds.has(category.id)
+                ? category.id
+                : uuidv4();
+            usedIds.add(id);
+            return { id, name: category.name };
+        });
+    }
+
+    // Kom die kategorieë onveranderd saam met 'n ander wysiging, skryf ons hulle glad nie. Anders sou
+    // 'n titel-wysiging op 'n gesluite geleentheid misluk net omdat die kategorieë saamgestuur is.
+    private isSameReviewCategories(a: ReviewCategory[], b: ReviewCategory[]): boolean {
+        return a.length === b.length && a.every((category, i) => category.id === b[i].id && category.name === b[i].name);
+    }
+
+    // Skryf net as die kategorieë nog nie gesluit is nie, in een atomiese stap. Die eerste resensie
+    // sluit hulle (ReviewsService.lockReviewCategories), so as die twee saam inkom, wen een en
+    // die ander misluk, en 'n resensie kan nooit na kategorieë verwys wat nie meer bestaan nie.
+    private async replaceReviewCategories(event: EventDocument, categories: ReviewCategory[]): Promise<void> {
+        const result = await this.eventModel
+            .updateOne(
+                // ratingCount vang ouer geleenthede wat resensies gekry het voordat die slot bestaan het
+                { _id: event._id, reviewCategoriesLocked: { $ne: true }, ratingCount: { $not: { $gt: 0 } } },
+                { $set: { reviewCategories: categories } },
+            )
+            .exec();
+
+        if (result.matchedCount === 0) {
+            throw new BadRequestException('Resensie-kategorieë kan nie verander word nadat resensies ontvang is nie');
+        }
+
+        // Die antwoord moet die nuwe kategorieë wys, maar save() mag dit nie weer sonder die
+        // voorwaarde skryf nie: 'n ander wysiging en 'n resensie kon intussen ingekom het
+        event.reviewCategories = categories;
+        event.unmarkModified('reviewCategories');
+    }
+
+    private assertReviewCategoriesEditable(event: EventDocument, input: ReviewCategoryInputDto[]): void {
+        if (!event.ratingCount) return;
+
+        const existingNames = new Map(event.reviewCategories.map((category) => [category.id, category.name]));
+        const isUnchanged = input.length === existingNames.size
+            && input.every((category) => category.id !== undefined && existingNames.get(category.id) === category.name);
+
+        if (!isUnchanged) {
+            throw new BadRequestException('Resensie-kategorieë kan nie verander word nadat resensies ontvang is nie');
+        }
     }
 
     private async assertValidPhotographers(photographerIds: string[]): Promise<void> {
@@ -394,6 +584,13 @@ export class EventsService {
             throw new ForbiddenException(
                 `You do not have permission to modify this event`,
             );
+        }
+    }
+
+    // Die mobiele app keur verlede datums net op die skerm af; hier geld dit vir elke kliënt
+    private assertStartInFuture(start: Date): void {
+        if (start.getTime() <= Date.now()) {
+            throw new BadRequestException('Die geleentheid moet in die toekoms begin');
         }
     }
 

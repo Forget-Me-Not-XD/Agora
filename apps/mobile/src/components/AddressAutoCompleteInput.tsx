@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useThemeColors } from '../theme/theme';
 import { searchPlaces, getPlaceDetails } from '../api/places';
 import type { PlaceSuggestion, PlaceDetails } from '../api/places';
+import { getApiErrorMessage } from '../lib/errors';
 
 interface AddressAutocompleteInputProps {
     initialAddress?: string;
@@ -73,11 +74,8 @@ export function AddressAutocompleteInput({ initialAddress, onSelect, editable = 
         skipNextSearchRef.current = true;
         setQuery(details.address);
         onSelect(details);
-    } catch (err: unknown) {
-        const axiosErr = err as { response?: { data?: { message?: string | string[] } } };
-        const raw = axiosErr?.response?.data?.message;
-        const msg = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.join(', ') : 'Kon nie adresbesonderhede kry nie.';
-        setPickError(msg);
+    } catch (err) {
+        setPickError(getApiErrorMessage(err, 'Kon nie adresbesonderhede kry nie.'));
     } finally {
         setIsResolving(false);
     }

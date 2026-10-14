@@ -20,6 +20,7 @@ import {
     type CalendarStatus,
 } from '../api/calendar';
 import { apiClient } from '../api/client';
+import { getErrorMessage } from '../lib/errors';
 
 export type Phase = 'view' | 'edit';
 
@@ -135,8 +136,8 @@ export function ProfilePanel({ onPhaseChange }: Props) {
             setSurname(updated.surname);
             setJustSaved(true);
             setPhase('view');
-        } catch (err: any) {
-            setError(err?.response?.data?.message ?? 'Kon nie stoor nie');
+        } catch (err) {
+            setError(getErrorMessage(err, 'Kon nie stoor nie'));
         } finally {
             setSaving(false);
         }
@@ -200,9 +201,9 @@ export function ProfilePanel({ onPhaseChange }: Props) {
                             await deleteAccount();
                             await apiClient.clearTokens();
                             useAuthStore.setState({ user: null });
-                        } catch (err: any) {
+                        } catch (err) {
                             setDeleting(false);
-                            Alert.alert('Kon nie verwyder nie', err?.response?.data?.message ?? 'Probeer asseblief weer.');
+                            Alert.alert('Kon nie verwyder nie', getErrorMessage(err, 'Probeer asseblief weer.'));
                         }
                     },
                 },

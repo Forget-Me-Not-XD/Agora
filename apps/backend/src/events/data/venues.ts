@@ -3,6 +3,7 @@ export interface Venue {
     label: string;       // "L1" ... "L10"
     campus: string;
     maxCapacity: number;
+    address: string;     // Die kampus se straatadres, dieselfde vir al sy lokale
 }
 
 /*
@@ -34,6 +35,19 @@ const VENUE_CAPACITIES: Record<string, Record<string, number>> = {
     },
 };
 
+/*
+    Straatadres per kampus. Die webvorm vul dit outomaties in wanneer 'n lokaal gekies word, en
+    die backend stoor dit presies so (sien EventsService.resolveAddress), sonder dat Geoapify dit
+    herformateer.
+ */
+const CAMPUS_ADDRESSES: Record<string, string> = {
+    'Centurion - Leriba':         '245 End Street, Clubview East, Centurion, 0246, South Africa',
+    'Centurion - Gerhard straat': '117 Gerhard Street, Lyttleton L.H., Centurion, 0163, South Africa',
+    'Paarl':                      '1 Breda Street, Drakenstein, Paarl, 7622, South Africa',
+    'George':                     '100 Meade Street, George Central, George, 6530, South Africa',
+    'Somerset Wes':               '82 Firmount Road, Greenway Rise, Somerset West, 7130, South Africa',
+};
+
 // Slugify die kode om dit na 'n skoon adres te maak
 
 function slugify(value: string): string {
@@ -47,6 +61,7 @@ export const VENUES: Venue[] = Object.entries(VENUE_CAPACITIES).flatMap(
             label,
             campus,
             maxCapacity,
+            address: CAMPUS_ADDRESSES[campus],
         })),
 );
 

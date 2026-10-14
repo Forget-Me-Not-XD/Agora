@@ -7,6 +7,10 @@ import { mergeSingleMonthlySeries } from '@/lib/chart-utils';
 import { canViewBudget } from '@/lib/rbac';
 import { getCurrentUser } from '@/lib/get-current-user';
 import { formatDateShort } from '@/lib/format-date';
+import { deriveStatus } from '@/lib/event-view';
+import { METRICS, formatRand, metricHelp, monthlyTrendInsight, type HelpContent, eventWord } from '@/lib/metrics';
+import { ChartHelpButton } from '@/components/charts/ChartHelp';
+import ChartCard from '@/components/charts/ChartCard';
 import { TYPE_LABELS, TYPE_TONE } from '@/lib/event-view';
 import { Pill, type Tone } from '@/components/ui/Pill';
 import { IconChip } from '@/components/ui/IconChip';
@@ -69,8 +73,12 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
         const totalBudget = budgetPerMonth.reduce((sum, m) => sum + m.total, 0);
         const avgPerEvent = budgetedEvents.length > 0 ? totalBudget / budgetedEvents.length : 0;
 
-        const totalAttendees = budgetedEvents.reduce((sum, e) => sum + e.confirmedAttendees, 0);
-        const costPerAttendee = totalAttendees > 0 ? totalBudget / totalAttendees : null;
+        // Soos die sleutelbevindinge: net afgelope geleenthede waar mense ingeteken is, en gedeel
+        // deur wie werklik opgedaag het, nie deur die RSVPs nie
+        const measured = budgetedEvents.filter((e) => deriveStatus(e) === 'past' && e.checkedInCount > 0);
+        const measuredBudget = measured.reduce((sum, e) => sum + e.budget, 0);
+        const totalAttendees = measured.reduce((sum, e) => sum + e.checkedInCount, 0);
+        const costPerAttendee = totalAttendees > 0 ? measuredBudget / totalAttendees : null;
 
         const byType = (Object.keys(TYPE_LABELS) as EventType[])
             .map((type) => {
@@ -96,7 +104,11 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
                         tone="blue"
                         label="Totale Begroting"
                         value={fmtRand(totalBudget)}
-                        sub={`oor ${budgetedEvents.length} geleentheid${budgetedEvents.length !== 1 ? 'e' : ''}`}
+                        sub={`oor ${budgetedEvents.length} ${eventWord(budgetedEvents.length)}`}
+                        help={{
+                            title: 'Totale Begroting',
+                            what: 'Die som van die begrotings wat aan geleenthede toegeken is. Dit is wat toegeken is, nie wat werklik spandeer is nie.',
+                        }}
                     />
                     <KpiCard
                         icon={<Banknote size={20} />}
@@ -104,25 +116,34 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
                         label="Gemiddeld per Geleentheid"
                         value={budgetedEvents.length > 0 ? fmtRand(avgPerEvent) : 'N/B'}
                         sub="gemiddelde toekenning"
+                        help={{
+                            title: 'Gemiddeld per Geleentheid',
+                            what: 'Die totale begroting gedeel deur die aantal geleenthede wat \'n begroting het. Geleenthede sonder begroting tel nie.',
+                        }}
                     />
                     <KpiCard
                         icon={<Users2 size={20} />}
                         tone="orange"
-                        label="Koste per Bywoner"
+                        label="Begroting per Bywoner"
                         value={costPerAttendee !== null ? fmtRand(costPerAttendee) : 'N/B'}
-                        sub={totalAttendees > 0 ? `oor ${totalAttendees} bywoners` : 'geen bywoners opgeteken nie'}
+                        sub={totalAttendees > 0
+                            ? `${totalAttendees} bywoners oor ${measured.length} afgelope ${eventWord(measured.length)}`
+                            : 'nog geen bywoning aangeteken nie'}
+                        help={metricHelp(METRICS.costPerAttendee)}
                     />
                 </div>
 
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
-                    <div className="mb-2">
-                        <h2 className="text-base font-semibold text-[var(--color-text)]">Begroting per Maand</h2>
-                        <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                            Toegekende begroting per geleentheid · afgelope 12 maande
-                        </p>
-                    </div>
+                <ChartCard
+                    title="Begroting per Maand"
+                    subtitle="Totale toegekende begroting van die geleenthede in elke maand"
+                    insight={monthlyTrendInsight(monthly, formatRand, 'begroting')}
+                    help={{
+                        title: 'Begroting per Maand',
+                        what: 'Die som van die begrotings wat aan geleenthede toegeken is, volgens die maand waarin die geleentheid plaasvind.',
+                    }}
+                >
                     <BudgetTrendChart data={monthly} />
-                </div>
+                </ChartCard>
 
                 {byType.length > 0 && (
                     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5">
@@ -138,7 +159,7 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
                                             <div className="flex items-center gap-2">
                                                 <Pill tone={TYPE_TONE[type]}>{TYPE_LABELS[type]}</Pill>
                                                 <span className="text-xs text-[var(--color-text-subtle)]">
-                                                    {count} geleentheid{count !== 1 ? 'e' : ''}
+                                                    {count} {eventWord(count)}
                                                 </span>
                                             </div>
                                             <span className="text-sm font-bold text-[var(--color-text)]">
@@ -163,7 +184,7 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
                         <div className="px-5 pt-4 pb-3 border-b border-[var(--color-border)]">
                             <h2 className="text-base font-semibold text-[var(--color-text)]">Top Geleenthede volgens Begroting</h2>
                             <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                                Duurste toekennings — met koste per bywoner as 'n vinnige doeltreffendheidstoets
+                                Die grootste toekennings. Per bywoner vir afgelope geleenthede; per RSVP vir dié wat nog kom.
                             </p>
                         </div>
                         <div className="divide-y divide-[var(--color-border)]">
@@ -182,7 +203,11 @@ async function BudgetData({ userId, isAdmin }: { userId: string; isAdmin: boolea
 }
 
 function TopSpenderRow({ event }: { event: Event }) {
-    const costPerAttendee = event.confirmedAttendees > 0 ? event.budget / event.confirmedAttendees : null;
+    // Ná die geleentheid deel ons deur wie opgedaag het; daarvoor is RSVPs die beste wat ons het
+    const isPast = deriveStatus(event) === 'past';
+    const people = isPast ? event.checkedInCount : event.confirmedAttendees;
+    const perPerson = people > 0 ? event.budget / people : null;
+    const unit = isPast ? 'bywoner' : 'RSVP';
 
     return (
         <div className="px-5 py-3 flex items-center justify-between gap-3">
@@ -191,13 +216,15 @@ function TopSpenderRow({ event }: { event: Event }) {
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <Pill tone={TYPE_TONE[event.type]}>{TYPE_LABELS[event.type]}</Pill>
                     <span className="text-xs text-[var(--color-text-subtle)]">{formatDateShort(event.date)}</span>
-                    <span className="text-xs text-[var(--color-text-subtle)]">· {event.confirmedAttendees} bywoners</span>
+                    <span className="text-xs text-[var(--color-text-subtle)]">
+                        · {people} {isPast ? (people === 1 ? 'bywoner' : 'bywoners') : (people === 1 ? 'RSVP' : 'RSVPs')}
+                    </span>
                 </div>
             </div>
             <div className="text-right shrink-0">
                 <p className="text-sm font-bold text-[var(--color-text)]">{fmtRand(event.budget)}</p>
                 <p className="text-xs text-[var(--color-text-subtle)] mt-0.5">
-                    {costPerAttendee !== null ? `${fmtRand(costPerAttendee)} / bywoner` : 'geen bywoners nie'}
+                    {perPerson !== null ? `${fmtRand(perPerson)} per ${unit}` : isPast ? 'geen bywoning aangeteken nie' : 'nog geen RSVPs nie'}
                 </p>
             </div>
         </div>
@@ -245,18 +272,23 @@ function KpiCard({
     label,
     value,
     sub,
+    help,
 }: {
     icon: React.ReactNode;
     tone: Tone;
     label: string;
     value: string;
     sub: string;
+    help?: HelpContent;
 }) {
     return (
         <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-5 flex items-start gap-4">
             <IconChip tone={tone}>{icon}</IconChip>
-            <div className="min-w-0">
-                <p className="text-xs text-[var(--color-text-subtle)] mb-0.5">{label}</p>
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                    <p className="text-xs text-[var(--color-text-subtle)] mb-0.5">{label}</p>
+                    {help && <ChartHelpButton help={help} />}
+                </div>
                 <p className="text-2xl font-bold text-[var(--color-text)] leading-none">{value}</p>
                 <p className="text-xs text-[var(--color-text-subtle)] mt-1 leading-snug">{sub}</p>
             </div>

@@ -12,8 +12,10 @@ const AUTH_CHECK_TIMEOUT_MS = 5_000;
 
 export default async function DashboardLayout({
     children,
+    modal,
 }: {
     children: React.ReactNode;
+    modal: React.ReactNode;
 }) {
     const token = cookies().get(COOKIE_NAME)?.value;
     if (!token) redirect('/api/auth/clear');
@@ -41,6 +43,7 @@ export default async function DashboardLayout({
         <DashboardShell user={user}>
             <SessionKeepAlive />
             {children}
+            {modal}
         </DashboardShell>
     );
 }
